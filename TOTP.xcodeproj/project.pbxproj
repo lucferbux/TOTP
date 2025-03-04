@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1F9FFEA02D77757700D81249 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFE9F2D77757700D81249 /* WidgetKit.framework */; };
+		1F9FFEA22D77757700D81249 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFEA12D77757700D81249 /* SwiftUI.framework */; };
+		1F9FFEB32D77757800D81249 /* TOTP WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1F9FFE672D77729700D81249 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,47 @@
 			remoteGlobalIDString = 1F9FFE542D77729500D81249;
 			remoteInfo = TOTP;
 		};
+		1F9FFEB12D77757800D81249 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F9FFE4D2D77729500D81249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1F9FFE9C2D77757700D81249;
+			remoteInfo = "TOTP WidgetExtension";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1F9FFEB82D77757800D81249 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1F9FFEB32D77757800D81249 /* TOTP WidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		1F9FFE552D77729500D81249 /* TOTP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TOTP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F9FFE662D77729700D81249 /* TOTPTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TOTPTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F9FFE702D77729700D81249 /* TOTPUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TOTPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "TOTP WidgetExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F9FFE9F2D77757700D81249 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		1F9FFEA12D77757700D81249 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1F9FFEB42D77757800D81249 /* Exceptions for "TOTP Widget" folder in "TOTP WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1F9FFE572D77729500D81249 /* TOTP */ = {
@@ -43,6 +83,14 @@
 		1F9FFE732D77729700D81249 /* TOTPUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TOTPUITests;
+			sourceTree = "<group>";
+		};
+		1F9FFEA32D77757700D81249 /* TOTP Widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1F9FFEB42D77757800D81249 /* Exceptions for "TOTP Widget" folder in "TOTP WidgetExtension" target */,
+			);
+			path = "TOTP Widget";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,6 +117,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1F9FFE9A2D77757700D81249 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F9FFEA22D77757700D81249 /* SwiftUI.framework in Frameworks */,
+				1F9FFEA02D77757700D81249 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -78,6 +135,8 @@
 				1F9FFE572D77729500D81249 /* TOTP */,
 				1F9FFE692D77729700D81249 /* TOTPTests */,
 				1F9FFE732D77729700D81249 /* TOTPUITests */,
+				1F9FFEA32D77757700D81249 /* TOTP Widget */,
+				1F9FFE9E2D77757700D81249 /* Frameworks */,
 				1F9FFE562D77729500D81249 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +147,18 @@
 				1F9FFE552D77729500D81249 /* TOTP.app */,
 				1F9FFE662D77729700D81249 /* TOTPTests.xctest */,
 				1F9FFE702D77729700D81249 /* TOTPUITests.xctest */,
+				1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		1F9FFE9E2D77757700D81249 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F9FFE9F2D77757700D81249 /* WidgetKit.framework */,
+				1F9FFEA12D77757700D81249 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +171,12 @@
 				1F9FFE512D77729500D81249 /* Sources */,
 				1F9FFE522D77729500D81249 /* Frameworks */,
 				1F9FFE532D77729500D81249 /* Resources */,
+				1F9FFEB82D77757800D81249 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1F9FFEB22D77757800D81249 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1F9FFE572D77729500D81249 /* TOTP */,
@@ -163,6 +234,28 @@
 			productReference = 1F9FFE702D77729700D81249 /* TOTPUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F9FFEB52D77757800D81249 /* Build configuration list for PBXNativeTarget "TOTP WidgetExtension" */;
+			buildPhases = (
+				1F9FFE992D77757700D81249 /* Sources */,
+				1F9FFE9A2D77757700D81249 /* Frameworks */,
+				1F9FFE9B2D77757700D81249 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1F9FFEA32D77757700D81249 /* TOTP Widget */,
+			);
+			name = "TOTP WidgetExtension";
+			packageProductDependencies = (
+			);
+			productName = "TOTP WidgetExtension";
+			productReference = 1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +277,9 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = 1F9FFE542D77729500D81249;
 					};
+					1F9FFE9C2D77757700D81249 = {
+						CreatedOnToolsVersion = 16.2;
+					};
 				};
 			};
 			buildConfigurationList = 1F9FFE502D77729500D81249 /* Build configuration list for PBXProject "TOTP" */;
@@ -203,6 +299,7 @@
 				1F9FFE542D77729500D81249 /* TOTP */,
 				1F9FFE652D77729700D81249 /* TOTPTests */,
 				1F9FFE6F2D77729700D81249 /* TOTPUITests */,
+				1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +320,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		1F9FFE6E2D77729700D81249 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F9FFE9B2D77757700D81249 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +357,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1F9FFE992D77757700D81249 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +376,11 @@
 			isa = PBXTargetDependency;
 			target = 1F9FFE542D77729500D81249 /* TOTP */;
 			targetProxy = 1F9FFE712D77729700D81249 /* PBXContainerItemProxy */;
+		};
+		1F9FFEB22D77757800D81249 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */;
+			targetProxy = 1F9FFEB12D77757800D81249 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -404,8 +520,8 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -443,8 +559,8 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -551,6 +667,65 @@
 			};
 			name = Release;
 		};
+		1F9FFEB62D77757800D81249 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7Y2Y846R76;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TOTP Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TOTP Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1F9FFEB72D77757800D81249 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7Y2Y846R76;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TOTP Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TOTP Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -586,6 +761,15 @@
 			buildConfigurations = (
 				1F9FFE812D77729700D81249 /* Debug */,
 				1F9FFE822D77729700D81249 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F9FFEB52D77757800D81249 /* Build configuration list for PBXNativeTarget "TOTP WidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F9FFEB62D77757800D81249 /* Debug */,
+				1F9FFEB72D77757800D81249 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

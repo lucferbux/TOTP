@@ -15,3 +15,9 @@ struct TOTPApp: App {
         }
     }
 }
+
+struct TOTPApp_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
+}
