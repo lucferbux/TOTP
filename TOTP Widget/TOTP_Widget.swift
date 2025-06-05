@@ -19,6 +19,20 @@ import UIKit
 import AppKit
 #endif
 
+// MARK: - Widget Configuration Intent
+struct ConfigurationAppIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource { "TOTP Account Configuration" }
+    static var description: IntentDescription { "Choose which TOTP account to display in the widget." }
+
+    // Allow selecting the account to display in the widget
+    @Parameter(title: "Account", default: "Red Hat")
+    var account: String
+    
+    // For multiple account support in medium and large widgets
+    @Parameter(title: "Show Multiple Accounts", default: false)
+    var showMultipleAccounts: Bool
+}
+
 // MARK: - Widget Platform Utilities
 struct WidgetPlatformColors {
     static var systemBackground: Color {
@@ -70,6 +84,7 @@ struct WidgetOtpModel: Identifiable {
     let id = UUID()
     var issuer: String
     var name: String?
+    var prefix: String?
     var entry: WidgetOtpEntry
 }
 
@@ -97,16 +112,19 @@ struct Provider: AppIntentTimelineProvider {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
+            prefix: "3bB!Qhxo",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
+            prefix: nil,
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "AWS",
             name: "admin",
+            prefix: "AWS:",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         )
     ]
@@ -211,6 +229,7 @@ struct SingleTOTPView: View {
         let code = account.entry.code()
         let formattedCode = numberFormatter.string(from: NSNumber(value: code)) ?? "------"
         let codeString = String(format: "%06d", code) // Format as 6-digit string for URL
+        let prefix = account.prefix ?? ""
         
         HStack {
             // Progress circle
@@ -265,7 +284,7 @@ struct SingleTOTPView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .widgetURL(URL(string: "totp://copy?code=3bB!Qhxo\(codeString)"))
+            .widgetURL(URL(string: "totp://copy?code=\(prefix)\(codeString)"))
         }
         .padding(.horizontal, family == .systemSmall ? 8 : 12)
         .padding(.vertical, family == .systemSmall ? 6 : 8)
@@ -383,11 +402,13 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
+            prefix: "3bB!Qhxo",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
+            prefix: nil,
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         )
     ]
@@ -405,11 +426,13 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
+            prefix: "3bB!Qhxo",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
+            prefix: nil,
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         )
     ]
@@ -427,21 +450,25 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
+            prefix: "3bB!Qhxo",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
+            prefix: nil,
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "AWS",
             name: "admin",
+            prefix: "AWS:",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "Microsoft",
             name: "work@company.com",
+            prefix: "MS-",
             entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
         )
     ]

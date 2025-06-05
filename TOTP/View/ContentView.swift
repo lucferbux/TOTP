@@ -100,28 +100,28 @@ public struct ContentView: View {
             }
             .navigationTitle("TOTP Passwords")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        self.addingAccount = true
-                    }) {
-                        Image(systemName: "plus")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            self.addingAccount = true
+                        }) {
+                            Image(systemName: "plus")
                             .font(.title3)
+                        }
                     }
                 }
-            }
             #elseif os(macOS)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: {
-                        self.addingAccount = true
-                    }) {
-                        Label("Add Account", systemImage: "plus")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(action: {
+                            self.addingAccount = true
+                        }) {
+                            Label("Add Account", systemImage: "plus")
+                        }
+                        .help("Add new TOTP account")
                     }
-                    .help("Add new TOTP account")
                 }
-            }
             #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

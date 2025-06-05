@@ -159,7 +159,8 @@ public struct TOtpView: View {
             let code = self.otp.entry.code()
             self.code = code
             self.refreshIn = self.otp.entry.get_display_value()
-            PlatformPasteboard.copyToClipboard("3bB!Qhxo\(code)")
+            let prefix = self.otp.prefix ?? ""
+            PlatformPasteboard.copyToClipboard("\(prefix)\(code)")
         }
     }
 }

@@ -6,6 +6,7 @@ public struct AddingPageView: View {
     @Binding public var addingAccount: Bool
     @State private var issuer: String = ""
     @State private var name: String = ""
+    @State private var prefix: String = ""
     @State private var key: String = ""
     @State private var digits = 6
     @State private var interval = 30
@@ -44,6 +45,7 @@ public struct AddingPageView: View {
                 Section {
                     TextField("Issuer", text: $issuer)
                     TextField("Account Name", text: $name)
+                    TextField("Prefix (optional)", text: $prefix)
                 } header: {
                     Text("Account Information")
                 }
@@ -61,6 +63,7 @@ public struct AddingPageView: View {
                         Button("Add Account") {
                             let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
                             let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
                             var entry: OtpEntry
                             if self.isHotp {
                                 entry = .hotp(
@@ -84,6 +87,7 @@ public struct AddingPageView: View {
                                     OtpModel(
                                         issuer: issuer.isEmpty ? nil : issuer,
                                         name: name.isEmpty ? nil : name,
+                                        prefix: prefix.isEmpty ? nil : prefix,
                                         entry: entry
                                     ))
                             }
@@ -98,6 +102,7 @@ public struct AddingPageView: View {
                         Button("Add Account") {
                             let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
                             let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
                             var entry: OtpEntry
                             if self.isHotp {
                                 entry = .hotp(
@@ -121,6 +126,7 @@ public struct AddingPageView: View {
                                     OtpModel(
                                         issuer: issuer.isEmpty ? nil : issuer,
                                         name: name.isEmpty ? nil : name,
+                                        prefix: prefix.isEmpty ? nil : prefix,
                                         entry: entry
                                     ))
                             }
