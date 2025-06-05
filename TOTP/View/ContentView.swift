@@ -25,90 +25,106 @@ public struct ContentView: View {
     public init() {}
 
     public var body: some View {
-        VStack {
-            GeometryReader { geometry in
-                ZStack {
-                    VStack {
-                        HStack(alignment: .center) {
-                            Button(action: {
-                                self.addingAccount = true
-                            }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.blue)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.leading, 10)
-                        }.padding(.bottom, 5)
-                        ScrollView {
-                            let searchField = self.search.trimmingCharacters(
-                                in: .whitespacesAndNewlines)
-                            LazyVGrid(
-                                columns: [GridItem(.adaptive(minimum: 250, maximum: 325))],
-                                alignment: .center,
-                                spacing: 7.5
-                            ) {
-                                ForEach(
-                                    searchField.isEmpty
-                                        ? self.accounts
-                                        : self.accounts
-                                            .filter {
-                                                $0.name?.localizedCaseInsensitiveContains(
-                                                    searchField) ?? false
-                                                    || $0
-                                                        .issuer?
-                                                        .localizedCaseInsensitiveContains(
-                                                            searchField) ?? false
-                                            }
-                                ) { account in
-                                    TOtpView(
-                                        otp: account,
-                                        cutoff: geometry.size.width,
-                                        deleting: $deletingAccount,
-                                        toast: $showCopiedToast
-                                    )
-                                    .padding()
-                                    .transition(
-                                        AnyTransition.asymmetric(
-                                            insertion: AnyTransition.move(edge: .leading),
-                                            removal: AnyTransition.move(edge: .trailing)
-                                        ).combined(with: AnyTransition.opacity)
-                                    )
-                                }
-                            }
-                            .padding()
-                            .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
-                        }
-                        VStack(alignment: .center) {
-                            Text("Click account to copy the current code to your clipboard.")
-                                .font(.caption)
-                                .fontWeight(.light)
-                                .opacity(0.75)
-                            Text("Slide or long press on an account's ball to delete the card.")
-                                .font(.caption)
-                                .fontWeight(.light)
-                                .opacity(0.75)
-                        }
-                        .multilineTextAlignment(.center)
-                    }
-                    HStack {
-                        Spacer()
+        NavigationStack {
+            VStack {
+                GeometryReader { geometry in
+                    ZStack {
                         VStack {
+                            ScrollView {
+                                let searchField = self.search.trimmingCharacters(
+                                    in: .whitespacesAndNewlines)
+                                LazyVGrid(
+                                    columns: [GridItem(.adaptive(minimum: 250, maximum: 325))],
+                                    alignment: .center,
+                                    spacing: 7.5
+                                ) {
+                                    ForEach(
+                                        searchField.isEmpty
+                                            ? self.accounts
+                                            : self.accounts
+                                                .filter {
+                                                    $0.name?.localizedCaseInsensitiveContains(
+                                                        searchField) ?? false
+                                                        || $0
+                                                            .issuer?
+                                                            .localizedCaseInsensitiveContains(
+                                                                searchField) ?? false
+                                                }
+                                    ) { account in
+                                        TOtpView(
+                                            otp: account,
+                                            cutoff: geometry.size.width,
+                                            deleting: $deletingAccount,
+                                            toast: $showCopiedToast
+                                        )
+                                        .padding(.horizontal)
+                                        .transition(
+                                            AnyTransition.asymmetric(
+                                                insertion: AnyTransition.move(edge: .leading),
+                                                removal: AnyTransition.move(edge: .trailing)
+                                            ).combined(with: AnyTransition.opacity)
+                                        )
+                                    }
+                                }
+                                .padding(.top)
+                                .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
+                            }
+                            VStack(alignment: .center) {
+                                Text("Click account to copy the current code to your clipboard.")
+                                    .font(.caption)
+                                    .fontWeight(.light)
+                                    .opacity(0.75)
+                                Text("Slide or long press on an account's ball to delete the card.")
+                                    .font(.caption)
+                                    .fontWeight(.light)
+                                    .opacity(0.75)
+                            }
+                            .multilineTextAlignment(.center)
+                        }
+                        HStack {
                             Spacer()
-                            Text("Code copied to clipboard")
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(
-                                    .regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                        }.padding()
-                        Spacer()
+                            VStack {
+                                Spacer()
+                                Text("Code copied to clipboard")
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        .regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            }.padding()
+                            Spacer()
+                        }
+                        .opacity(self.showCopiedToast ? 0.9 : 0.0)
+                        .allowsHitTesting(false)
                     }
-                    .opacity(self.showCopiedToast ? 0.9 : 0.0)
-                    .allowsHitTesting(false)
                 }
             }
+            .navigationTitle("TOTP Passwords")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        self.addingAccount = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title3)
+                    }
+                }
+            }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
+                        self.addingAccount = true
+                    }) {
+                        Label("Add Account", systemImage: "plus")
+                    }
+                    .help("Add new TOTP account")
+                }
+            }
+            #endif
         }
-        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert(item: $deletingAccount) { (item: OtpModel) in
             var alertText: String
             switch (item.issuer, item.name) {

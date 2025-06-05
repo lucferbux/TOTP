@@ -19,7 +19,7 @@ public struct AddingPageView: View {
     }()
 
     public var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     Picker("Type", selection: $isHotp) {
@@ -47,45 +47,95 @@ public struct AddingPageView: View {
                 } header: {
                     Text("Account Information")
                 }
-
-                Section {
-                    Button("Add Account") {
-                        let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        var entry: OtpEntry
-                        if self.isHotp {
-                            entry = .hotp(
-                                key: self.key.trimmingCharacters(in: .whitespacesAndNewlines).data(
-                                    using: .utf8)!,
-                                digits: self.digits,
-                                counter: UInt64(self.counter)
-                            )
-                        } else {
-                            entry = .totp(
-                                key: self.key.trimmingCharacters(in: .whitespacesAndNewlines).data(
-                                    using: .utf8)!,
-                                digits: self.digits,
-                                interval: Double(self.interval)
-                            )
-                        }
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.accounts.append(
-                                OtpModel(
-                                    issuer: issuer.isEmpty ? nil : issuer,
-                                    name: name.isEmpty ? nil : name,
-                                    entry: entry
-                                ))
-                        }
-                        self.addingAccount = false
-                    }
-                    .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10)
-
-                    Button("Cancel", role: .cancel) {
-                        self.addingAccount = false
-                    }
-                }
             }
             .navigationTitle("Add Account")
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            self.addingAccount = false
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Add Account") {
+                            let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            var entry: OtpEntry
+                            if self.isHotp {
+                                entry = .hotp(
+                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .data(
+                                            using: .utf8)!,
+                                    digits: self.digits,
+                                    counter: UInt64(self.counter)
+                                )
+                            } else {
+                                entry = .totp(
+                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .data(
+                                            using: .utf8)!,
+                                    digits: self.digits,
+                                    interval: Double(self.interval)
+                                )
+                            }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                self.accounts.append(
+                                    OtpModel(
+                                        issuer: issuer.isEmpty ? nil : issuer,
+                                        name: name.isEmpty ? nil : name,
+                                        entry: entry
+                                    ))
+                            }
+                            self.addingAccount = false
+                        }
+                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10)
+                    }
+                }
+            #elseif os(macOS)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Add Account") {
+                            let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            var entry: OtpEntry
+                            if self.isHotp {
+                                entry = .hotp(
+                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .data(
+                                            using: .utf8)!,
+                                    digits: self.digits,
+                                    counter: UInt64(self.counter)
+                                )
+                            } else {
+                                entry = .totp(
+                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .data(
+                                            using: .utf8)!,
+                                    digits: self.digits,
+                                    interval: Double(self.interval)
+                                )
+                            }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                self.accounts.append(
+                                    OtpModel(
+                                        issuer: issuer.isEmpty ? nil : issuer,
+                                        name: name.isEmpty ? nil : name,
+                                        entry: entry
+                                    ))
+                            }
+                            self.addingAccount = false
+                        }
+                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10)
+                    }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            self.addingAccount = false
+                        }
+                    }
+                }
+            #endif
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

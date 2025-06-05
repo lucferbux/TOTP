@@ -110,6 +110,11 @@ public struct TOtpView: View {
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.separator.opacity(0.3), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         .contentShape(Rectangle())
         .scaleEffect(deleting?.id == otp.id ? 0.95 : 1.0)
         .onReceive(self.timer) { _ in
