@@ -3,7 +3,7 @@ import CryptoKit
 import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 public struct ContentView: View {
@@ -12,63 +12,54 @@ public struct ContentView: View {
         OtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
-        ),
+            entry: .totp(
+                key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0
+            )
+        )
     ]
     @State var addingAccount = false
     @State var deletingAccount: OtpModel?
     @State var showCopiedToast = false
     @State var search = ""
-    
-    private let toastColor = PlatformColors.systemFill
-    private let fieldColor = PlatformColors.tertiarySystemFill
-    private let addButtonColor = PlatformColors.secondarySystemBackground
-    
+
     public init() {}
-    
+
     public var body: some View {
         VStack {
             GeometryReader { geometry in
                 ZStack {
                     VStack {
                         HStack(alignment: .center) {
-                            Image(systemName: "plus.circle.fill")
-                                .renderingMode(.template)
-                                .foregroundColor(addButtonColor)
-                                .font(.system(size: 24))
-                                .background(
-                                    Circle()
-                                        .foregroundColor(addButtonColor)
-                                        .colorInvert()
-                                        .allowsHitTesting(false)
-                                ).modifier(
-                                    ColourBoard(
-                                        base: Circle(),
-                                        color: Color.blue,
-                                        brightness: 0.025,
-                                        innerSize: 1.5,
-                                        middleSize: 3,
-                                        outerSize: 5,
-                                        blur: 3
-                                    )
-                                ).onTapGesture {
-                                    self.addingAccount = true
-                                }.padding(.leading, 10)
+                            Button(action: {
+                                self.addingAccount = true
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.blue)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 10)
                         }.padding(.bottom, 5)
                         ScrollView {
-                            let searchField = self.search.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let searchField = self.search.trimmingCharacters(
+                                in: .whitespacesAndNewlines)
                             LazyVGrid(
                                 columns: [GridItem(.adaptive(minimum: 250, maximum: 325))],
                                 alignment: .center,
                                 spacing: 7.5
                             ) {
                                 ForEach(
-                                    searchField.isEmpty ? self.accounts : self.accounts
-                                        .filter {
-                                            $0.name?.localizedCaseInsensitiveContains(searchField) ?? false || $0
-                                                .issuer?
-                                                .localizedCaseInsensitiveContains(searchField) ?? false
-                                        }
+                                    searchField.isEmpty
+                                        ? self.accounts
+                                        : self.accounts
+                                            .filter {
+                                                $0.name?.localizedCaseInsensitiveContains(
+                                                    searchField) ?? false
+                                                    || $0
+                                                        .issuer?
+                                                        .localizedCaseInsensitiveContains(
+                                                            searchField) ?? false
+                                            }
                                 ) { account in
                                     TOtpView(
                                         otp: account,
@@ -104,13 +95,11 @@ public struct ContentView: View {
                         Spacer()
                         VStack {
                             Spacer()
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 32)
-                                    .foregroundColor(toastColor)
-                                Text("Code copied to clipboard")
-                                    .padding()
-                            }
-                            .fixedSize()
+                            Text("Code copied to clipboard")
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(
+                                    .regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                         }.padding()
                         Spacer()
                     }
