@@ -32,8 +32,11 @@ struct WidgetPlatformColors {
 
 struct WidgetPlatformPasteboard {
     static func copyToClipboard(_ text: String) {
+        // Widgets cannot directly access the pasteboard
+        // This functionality is handled by the App Intent instead
         #if canImport(UIKit)
-        UIPasteboard.general.string = text
+        // For widgets, we'll use a URL scheme to trigger the main app
+        // The actual copying will be handled in the app intent
         #else
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -86,6 +89,9 @@ func hotpCode(key: Data, digits: Int = 6, counter: UInt64) -> UInt64 {
 
 // Provider that handles timeline generation
 struct Provider: AppIntentTimelineProvider {
+    typealias Entry = TOTPEntry
+    typealias Intent = ConfigurationAppIntent
+    
     // Sample data for previews
     let sampleAccounts = [
         WidgetOtpModel(
@@ -109,7 +115,7 @@ struct Provider: AppIntentTimelineProvider {
         TOTPEntry(date: Date(), accounts: [sampleAccounts[0]], configuration: ConfigurationAppIntent())
     }
     
-    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> TOTPEntry {
+    func snapshot(for configuration: Intent, in context: Context) async -> TOTPEntry {
         // For snapshot, we'll just use sample data
         let displayAccounts: [WidgetOtpModel]
         
@@ -127,7 +133,7 @@ struct Provider: AppIntentTimelineProvider {
         )
     }
     
-    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<TOTPEntry> {
+    func timeline(for configuration: Intent, in context: Context) async -> Timeline<TOTPEntry> {
         var entries: [TOTPEntry] = []
         let currentDate = Date()
         
@@ -204,6 +210,7 @@ struct SingleTOTPView: View {
     var body: some View {
         let code = account.entry.code()
         let formattedCode = numberFormatter.string(from: NSNumber(value: code)) ?? "------"
+        let codeString = String(format: "%06d", code) // Format as 6-digit string for URL
         
         HStack {
             // Progress circle
@@ -247,7 +254,9 @@ struct SingleTOTPView: View {
             
             Spacer()
             
-            Button(intent: CopyTOTPCodeIntent(code: "3bB!Qhxo\(code)")) {
+            Button {
+                // This button will open the URL scheme to communicate with the main app
+            } label: {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.primary)
@@ -256,6 +265,7 @@ struct SingleTOTPView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .widgetURL(URL(string: "totp://copy?code=3bB!Qhxo\(codeString)"))
         }
         .padding(.horizontal, family == .systemSmall ? 8 : 12)
         .padding(.vertical, family == .systemSmall ? 6 : 8)
@@ -347,29 +357,7 @@ struct TOTP_WidgetEntryView: View {
             }
         }
         .padding(family == .systemSmall ? 8 : 10)
-    }
-}
-
-// Intent for copy button
-struct CopyTOTPCodeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Copy TOTP Code"
-    static var description = IntentDescription("Copy the TOTP code to clipboard")
-    
-    @Parameter(title: "TOTP Code")
-    var code: String
-    
-    init() {
-        self.code = ""
-    }
-    
-    init(code: String) {
-        self.code = code
-    }
-    
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        // The real copy happens via pasteboard
-        WidgetPlatformPasteboard.copyToClipboard(self.code)
-        return .result(dialog: "Copied to clipboard")
+        .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 
