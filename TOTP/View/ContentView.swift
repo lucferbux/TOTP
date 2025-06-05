@@ -2,6 +2,10 @@ import Combine
 import CryptoKit
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 public struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     @State var accounts: [OtpModel] = [
@@ -16,9 +20,9 @@ public struct ContentView: View {
     @State var showCopiedToast = false
     @State var search = ""
     
-    let toastColor = Color(UIColor.systemFill)
-    let fieldColor = Color(UIColor.tertiarySystemFill)
-    let addButtonColor = Color(UIColor.secondarySystemBackground)
+    private let toastColor = PlatformColors.systemFill
+    private let fieldColor = PlatformColors.tertiarySystemFill
+    private let addButtonColor = PlatformColors.secondarySystemBackground
     
     public init() {}
     
@@ -116,7 +120,7 @@ public struct ContentView: View {
             }
         }
         .padding()
-        .alert(item: $deletingAccount.animation(.easeInOut(duration: 1))) { item in
+        .alert(item: $deletingAccount) { (item: OtpModel) in
             var alertText: String
             switch (item.issuer, item.name) {
             case let (.some(issuer), .some(name)):

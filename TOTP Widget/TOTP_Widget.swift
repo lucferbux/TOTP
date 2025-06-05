@@ -11,6 +11,36 @@ import Foundation
 import CryptoKit
 import AppIntents
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
+#if canImport(AppKit)
+import AppKit
+#endif
+
+// MARK: - Widget Platform Utilities
+struct WidgetPlatformColors {
+    static var systemBackground: Color {
+        #if canImport(UIKit)
+        return Color(UIColor.systemBackground)
+        #else
+        return Color(NSColor.windowBackgroundColor)
+        #endif
+    }
+}
+
+struct WidgetPlatformPasteboard {
+    static func copyToClipboard(_ text: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+    }
+}
+
 // Simplified versions of the app models for widget use
 enum WidgetOtpEntry {
     case totp(key: Data, digits: Int, interval: Double)
@@ -144,11 +174,11 @@ extension WidgetFamily {
         case .systemLarge, .systemExtraLarge:
             return 4
         case .accessoryCircular:
-            return 5
+            return 1
         case .accessoryRectangular:
-            return 6
+            return 1
         case .accessoryInline:
-            return 7
+            return 1
         @unknown default:
             return 1
         }
@@ -231,7 +261,7 @@ struct SingleTOTPView: View {
         .padding(.vertical, family == .systemSmall ? 6 : 8)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(UIColor.systemBackground))
+                .fill(WidgetPlatformColors.systemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
         )
     }
@@ -283,6 +313,29 @@ struct TOTP_WidgetEntryView: View {
                 ForEach(0..<accountsToShow, id: \.self) { index in
                     SingleTOTPView(account: entry.accounts[index], date: entry.date)
                 }
+            case .accessoryCircular:
+                if let account = entry.accounts.first {
+                    VStack {
+                        Text("\(account.entry.code())")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .minimumScaleFactor(0.5)
+                    }
+                }
+            case .accessoryRectangular:
+                if let account = entry.accounts.first {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.issuer)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(account.entry.code())")
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    }
+                }
+            case .accessoryInline:
+                if let account = entry.accounts.first {
+                    Text("\(account.issuer): \(account.entry.code())")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                }
             @unknown default:
 //                if let account = entry.accounts.first {
 //                    SingleTOTPView(account: account, date: entry.date)
@@ -314,10 +367,8 @@ struct CopyTOTPCodeIntent: AppIntent {
     }
     
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        // The real copy happens via UIPasteboard in the app
-        #if os(iOS)
-        UIPasteboard.general.string = self.code
-        #endif
+        // The real copy happens via pasteboard
+        WidgetPlatformPasteboard.copyToClipboard(self.code)
         return .result(dialog: "Copied to clipboard")
     }
 }
@@ -329,7 +380,6 @@ struct TOTP_Widget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in
             TOTP_WidgetEntryView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
         }
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .configurationDisplayName("TOTP Codes")

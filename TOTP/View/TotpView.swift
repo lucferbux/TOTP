@@ -20,8 +20,8 @@ public struct TOtpView: View {
     @Binding private var deleting: OtpModel?
     @Binding private var toast: Bool
     
-    private let backgroundColor = Color(UIColor.systemFill)
-    private let textColor = Color(UIColor.label)
+    private let backgroundColor = PlatformColors.systemFill
+    private let textColor = PlatformColors.label
     
     public init(otp: OtpModel, cutoff: CGFloat, deleting: Binding<OtpModel?>, toast: Binding<Bool>) {
         self._otp = State(wrappedValue: otp)
@@ -149,7 +149,7 @@ public struct TOtpView: View {
             let code = self.otp.entry.code()
             self.code = code
             self.refreshIn = self.otp.entry.get_display_value()
-            UIPasteboard.general.string = "3bB!Qhxo\(code)"
+            PlatformPasteboard.copyToClipboard("3bB!Qhxo\(code)")
         })
     }
 }

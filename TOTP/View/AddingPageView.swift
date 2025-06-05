@@ -17,9 +17,9 @@ public struct AddingPageView: View {
         formatter.groupingSeparator = " "
         return formatter
     }()
-    private let backgroundColor = Color(UIColor.systemFill)
-    private let textColor = Color(UIColor.label)
-    private let disabledColor = Color(UIColor.placeholderText)
+    private let backgroundColor = PlatformColors.systemFill
+    private let textColor = PlatformColors.label
+    private let disabledColor = PlatformColors.placeholderText
     
     public var body: some View {
         VStack {
