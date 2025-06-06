@@ -127,9 +127,12 @@ public struct AddingPageView: View {
             let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            let secretKeyString = self.key.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            guard let keyData = self.key.trimmingCharacters(in: .whitespacesAndNewlines).data(using: .utf8) else {
-                errorMessage = "Invalid key format"
+            // Use Base32 decoding for the key
+            // Ensure Data+Base32.swift is added to the target for this to compile
+            guard let keyData = Data(base32Encoded: secretKeyString) else {
+                errorMessage = "Invalid OTP Key. Please ensure it is a valid Base32 encoded string. It may also be too short or contain invalid characters."
                 showingError = true
                 return
             }

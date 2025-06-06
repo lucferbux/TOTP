@@ -25,7 +25,7 @@
     </array>
     <key>keychain-access-groups</key>
     <array>
-        <string>group.com.lucferbux.TOTP</string>
+        <string>$(AppIdentifierPrefix)com.lucferbux.TOTP</string>
     </array>
 </dict>
 </plist>
