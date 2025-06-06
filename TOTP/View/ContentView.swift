@@ -1,6 +1,7 @@
 import Combine
 import CryptoKit
 import SwiftUI
+import CloudKit
 
 #if canImport(UIKit)
     import UIKit
@@ -8,19 +9,13 @@ import SwiftUI
 
 public struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
-    @State var accounts: [OtpModel] = [
-        OtpModel(
-            issuer: "Red Hat",
-            name: "lferrnan",
-            entry: .totp(
-                key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0
-            )
-        )
-    ]
+    @StateObject private var dataManager = SharedDataManager.shared
+    @State private var accounts: [OtpModel] = []
     @State var addingAccount = false
     @State var deletingAccount: OtpModel?
     @State var showCopiedToast = false
     @State var search = ""
+    @State private var showingErrorAlert = false
 
     public init() {}
 
@@ -69,32 +64,71 @@ public struct ContentView: View {
                                 .padding(.top)
                                 .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
                             }
-                            VStack(alignment: .center) {
-                                Text("Click account to copy the current code to your clipboard.")
-                                    .font(.caption)
-                                    .fontWeight(.light)
-                                    .opacity(0.75)
-                                Text("Slide or long press on an account's ball to delete the card.")
-                                    .font(.caption)
-                                    .fontWeight(.light)
-                                    .opacity(0.75)
+                            
+                            // Loading indicator
+                            if dataManager.isLoading {
+                                VStack {
+                                    ProgressView()
+                                        .scaleEffect(1.2)
+                                    Text("Loading accounts...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 8)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
-                            .multilineTextAlignment(.center)
+                            
+                            VStack(alignment: .center) {
+                                if self.accounts.isEmpty && !dataManager.isLoading {
+                                    Spacer()
+                                    VStack(spacing: 20) {
+                                        Image(systemName: "lock.shield")
+                                            .font(.system(size: 60))
+                                            .foregroundColor(.secondary)
+                                        VStack(spacing: 8) {
+                                            Text("No TOTP accounts")
+                                                .font(.title2)
+                                                .fontWeight(.semibold)
+                                            Text("Add your first account to get started")
+                                                .font(.body)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Button("Add Account") {
+                                            self.addingAccount = true
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                    }
+                                    Spacer()
+                                } else if !self.accounts.isEmpty {
+                                    VStack(spacing: 5) {
+                                        Text("Click account to copy the current code to your clipboard.")
+                                            .font(.caption)
+                                            .fontWeight(.light)
+                                            .opacity(0.75)
+                                        Text("Slide or long press on an account's ball to delete the card.")
+                                            .font(.caption)
+                                            .fontWeight(.light)
+                                            .opacity(0.75)
+                                    }
+                                    .multilineTextAlignment(.center)
+                                }
+                                
+                                HStack {
+                                    Spacer()
+                                    VStack {
+                                        Spacer()
+                                        Text("Code copied to clipboard")
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                .regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                    }.padding()
+                                    Spacer()
+                                }
+                                .opacity(self.showCopiedToast ? 0.9 : 0.0)
+                                .allowsHitTesting(false)
+                            }
                         }
-                        HStack {
-                            Spacer()
-                            VStack {
-                                Spacer()
-                                Text("Code copied to clipboard")
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        .regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                            }.padding()
-                            Spacer()
-                        }
-                        .opacity(self.showCopiedToast ? 0.9 : 0.0)
-                        .allowsHitTesting(false)
                     }
                 }
             }
@@ -102,6 +136,15 @@ public struct ContentView: View {
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            dataManager.loadAccounts()
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.title3)
+                        }
+                        .disabled(dataManager.isLoading)
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
                             self.addingAccount = true
@@ -113,6 +156,15 @@ public struct ContentView: View {
                 }
             #elseif os(macOS)
                 .toolbar {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button(action: {
+                            dataManager.loadAccounts()
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .help("Refresh accounts")
+                        .disabled(dataManager.isLoading)
+                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button(action: {
                             self.addingAccount = true
@@ -124,7 +176,27 @@ public struct ContentView: View {
                 }
             #endif
         }
+        .onAppear {
+            self.accounts = dataManager.accounts
+        }
+        .onReceive(dataManager.$accounts) { newAccounts in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.accounts = newAccounts
+            }
+        }
+        .onReceive(dataManager.$error) { error in
+            if error != nil {
+                showingErrorAlert = true
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .alert("Data Error", isPresented: $showingErrorAlert) {
+            Button("OK") {
+                dataManager.error = nil
+            }
+        } message: {
+            Text(dataManager.error?.localizedDescription ?? "An unknown error occurred")
+        }
         .alert(item: $deletingAccount) { (item: OtpModel) in
             var alertText: String
             switch (item.issuer, item.name) {
@@ -141,6 +213,7 @@ public struct ContentView: View {
                 title: Text("Confirm Delete"),
                 message: Text("Are you sure that you want to DELETE \(alertText)"),
                 primaryButton: .destructive(Text("Delete").bold()) {
+                    dataManager.deleteAccount(item)
                     withAnimation(Animation.easeInOut(duration: 1)) {
                         self.accounts.removeAll(where: { $0.id == item.id })
                     }
@@ -149,7 +222,7 @@ public struct ContentView: View {
             )
         }
         .sheet(isPresented: $addingAccount) {
-            AddingPageView(accounts: $accounts, addingAccount: $addingAccount)
+            AddingPageView(accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager)
                 .preferredColorScheme(self.colorScheme)
         }
     }

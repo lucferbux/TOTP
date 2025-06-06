@@ -88,6 +88,21 @@ struct WidgetOtpModel: Identifiable {
     var entry: WidgetOtpEntry
 }
 
+// Storage model for reading shared data
+private struct StoredOtpAccount: Codable {
+    let id: String
+    let issuer: String?
+    let name: String?
+    let prefix: String?
+    let encryptedKey: Data
+    let isHotp: Bool
+    let digits: Int
+    let interval: Double
+    let counter: Int64
+    let createdDate: Date
+    let modifiedDate: Date
+}
+
 // HOTP Code generation function copied from the main app
 func hotpCode(key: Data, digits: Int = 6, counter: UInt64) -> UInt64 {
     let counterBytes = (0..<8).reversed().map { UInt8(counter >> (8 * $0) & 0xff) }
@@ -107,25 +122,112 @@ struct Provider: AppIntentTimelineProvider {
     typealias Entry = TOTPEntry
     typealias Intent = ConfigurationAppIntent
     
-    // Sample data for previews
+    // Load accounts from shared UserDefaults with proper decryption
+    private func loadAccounts() -> [WidgetOtpModel] {
+        let suiteName = "group.com.lucferbux.TOTP"
+        let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+        let accountsKey = "stored_totp_accounts"
+        
+        guard let data = userDefaults.data(forKey: accountsKey) else {
+            return sampleAccounts // Fallback to sample data
+        }
+        
+        // Get the shared encryption key
+        guard let encryptionKey = getSharedEncryptionKey() else {
+            print("Widget: Unable to access encryption key")
+            return sampleAccounts
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            let storedAccounts = try decoder.decode([StoredOtpAccount].self, from: data)
+            
+            var loadedAccounts: [WidgetOtpModel] = []
+            
+            for storedAccount in storedAccounts {
+                // Only support TOTP for widgets (not HOTP)
+                if !storedAccount.isHotp {
+                    do {
+                        // Decrypt the key data
+                        let decryptedKey = try decryptData(storedAccount.encryptedKey, using: encryptionKey)
+                        
+                        let widgetModel = WidgetOtpModel(
+                            issuer: storedAccount.issuer ?? "Unknown",
+                            name: storedAccount.name,
+                            prefix: storedAccount.prefix,
+                            entry: .totp(
+                                key: decryptedKey,
+                                digits: storedAccount.digits,
+                                interval: storedAccount.interval
+                            )
+                        )
+                        loadedAccounts.append(widgetModel)
+                    } catch {
+                        print("Widget: Failed to decrypt account \(storedAccount.issuer ?? "Unknown"): \(error)")
+                        // Skip corrupted accounts
+                    }
+                }
+            }
+            
+            return loadedAccounts.isEmpty ? sampleAccounts : loadedAccounts
+            
+        } catch {
+            print("Widget: Failed to decode accounts: \(error)")
+            return sampleAccounts // Fallback to sample data if loading fails
+        }
+    }
+    
+    // Helper function to get shared encryption key
+    private func getSharedEncryptionKey() -> SymmetricKey? {
+        let service = "TOTP-SharedData-Encryption"
+        let account = "master-key"
+        let accessGroup = "group.com.lucferbux.TOTP"
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessGroup as String: accessGroup,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        if status == errSecSuccess,
+           let keyData = result as? Data {
+            return SymmetricKey(data: keyData)
+        }
+        
+        return nil
+    }
+    
+    // Helper function to decrypt data
+    private func decryptData(_ encryptedData: Data, using key: SymmetricKey) throws -> Data {
+        let sealedBox = try ChaChaPoly.SealedBox(combined: encryptedData)
+        return try ChaChaPoly.open(sealedBox, using: key)
+    }
+    
+    // Sample data for previews and fallback
     let sampleAccounts = [
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
-            prefix: "3bB!Qhxo",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            prefix: "34asdfQ!a",
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
             prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "AWS",
             name: "admin",
             prefix: "AWS:",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         )
     ]
     
@@ -134,13 +236,13 @@ struct Provider: AppIntentTimelineProvider {
     }
     
     func snapshot(for configuration: Intent, in context: Context) async -> TOTPEntry {
-        // For snapshot, we'll just use sample data
+        let allAccounts = loadAccounts()
         let displayAccounts: [WidgetOtpModel]
         
         if configuration.showMultipleAccounts {
-            displayAccounts = Array(sampleAccounts.prefix(context.family.compactSize()))
+            displayAccounts = Array(allAccounts.prefix(context.family.compactSize()))
         } else {
-            let selectedAccount = sampleAccounts.first { $0.issuer == configuration.account } ?? sampleAccounts[0]
+            let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
             displayAccounts = [selectedAccount]
         }
         
@@ -155,13 +257,14 @@ struct Provider: AppIntentTimelineProvider {
         var entries: [TOTPEntry] = []
         let currentDate = Date()
         
-        // In a real app, you'd fetch actual account data from shared UserDefaults or an App Group
+        // Load actual account data from shared UserDefaults
+        let allAccounts = loadAccounts()
         let displayAccounts: [WidgetOtpModel]
         
         if configuration.showMultipleAccounts {
-            displayAccounts = Array(sampleAccounts.prefix(context.family.compactSize()))
+            displayAccounts = Array(allAccounts.prefix(context.family.compactSize()))
         } else {
-            let selectedAccount = sampleAccounts.first { $0.issuer == configuration.account } ?? sampleAccounts[0]
+            let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
             displayAccounts = [selectedAccount]
         }
         
@@ -402,14 +505,14 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
-            prefix: "3bB!Qhxo",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            prefix: "34asdfQ!a",
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
             prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         )
     ]
     
@@ -426,14 +529,14 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
-            prefix: "3bB!Qhxo",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            prefix: "34asdfQ!a",
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
             prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         )
     ]
     
@@ -450,26 +553,26 @@ struct TOTP_Widget: Widget {
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
-            prefix: "3bB!Qhxo",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            prefix: "34asdfQ!a",
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
             prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "AWS",
             name: "admin",
             prefix: "AWS:",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "Microsoft",
             name: "work@company.com",
             prefix: "MS-",
-            entry: .totp(key: Data(base64Encoded: "qo5y1y7LIewn/CFrv7AOPn+UjjQ=")!, digits: 6, interval: 30.0)
+            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
         )
     ]
     

@@ -1,9 +1,11 @@
 import Foundation
 import SwiftUI
+import CloudKit
 
 public struct AddingPageView: View {
     @Binding public var accounts: [OtpModel]
     @Binding public var addingAccount: Bool
+    public let dataManager: SharedDataManager
     @State private var issuer: String = ""
     @State private var name: String = ""
     @State private var prefix: String = ""
@@ -12,6 +14,9 @@ public struct AddingPageView: View {
     @State private var interval = 30
     @State private var counter = 0
     @State private var isHotp = false
+    @State private var isSaving = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
     @State private var numberFormatter: NumberFormatter = {
         var formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -61,78 +66,22 @@ public struct AddingPageView: View {
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Add Account") {
-                            let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-                            var entry: OtpEntry
-                            if self.isHotp {
-                                entry = .hotp(
-                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        .data(
-                                            using: .utf8)!,
-                                    digits: self.digits,
-                                    counter: UInt64(self.counter)
-                                )
-                            } else {
-                                entry = .totp(
-                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        .data(
-                                            using: .utf8)!,
-                                    digits: self.digits,
-                                    interval: Double(self.interval)
-                                )
+                            Task {
+                                await addAccount()
                             }
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                self.accounts.append(
-                                    OtpModel(
-                                        issuer: issuer.isEmpty ? nil : issuer,
-                                        name: name.isEmpty ? nil : name,
-                                        prefix: prefix.isEmpty ? nil : prefix,
-                                        entry: entry
-                                    ))
-                            }
-                            self.addingAccount = false
                         }
-                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10)
+                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10 || isSaving)
                     }
                 }
             #elseif os(macOS)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Add Account") {
-                            let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-                            var entry: OtpEntry
-                            if self.isHotp {
-                                entry = .hotp(
-                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        .data(
-                                            using: .utf8)!,
-                                    digits: self.digits,
-                                    counter: UInt64(self.counter)
-                                )
-                            } else {
-                                entry = .totp(
-                                    key: self.key.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        .data(
-                                            using: .utf8)!,
-                                    digits: self.digits,
-                                    interval: Double(self.interval)
-                                )
+                            Task {
+                                await addAccount()
                             }
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                self.accounts.append(
-                                    OtpModel(
-                                        issuer: issuer.isEmpty ? nil : issuer,
-                                        name: name.isEmpty ? nil : name,
-                                        prefix: prefix.isEmpty ? nil : prefix,
-                                        entry: entry
-                                    ))
-                            }
-                            self.addingAccount = false
                         }
-                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10)
+                        .disabled(key.isEmpty || interval < 1 || digits < 6 || digits > 10 || isSaving)
                     }
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
@@ -143,5 +92,83 @@ public struct AddingPageView: View {
             #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .alert("Error Adding Account", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
+        .overlay {
+            if isSaving {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Saving Account...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 8)
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .cornerRadius(12)
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func addAccount() async {
+        isSaving = true
+        defer { isSaving = false }
+        
+        do {
+            let issuer = self.issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = self.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            guard let keyData = self.key.trimmingCharacters(in: .whitespacesAndNewlines).data(using: .utf8) else {
+                errorMessage = "Invalid key format"
+                showingError = true
+                return
+            }
+            
+            let entry: OtpEntry
+            if self.isHotp {
+                entry = .hotp(
+                    key: keyData,
+                    digits: self.digits,
+                    counter: UInt64(self.counter)
+                )
+            } else {
+                entry = .totp(
+                    key: keyData,
+                    digits: self.digits,
+                    interval: Double(self.interval)
+                )
+            }
+            
+            let otpModel = OtpModel(
+                issuer: issuer.isEmpty ? nil : issuer,
+                name: name.isEmpty ? nil : name,
+                prefix: prefix.isEmpty ? nil : prefix,
+                entry: entry
+            )
+            
+            // Save using the data manager
+            try await dataManager.saveAccount(otpModel)
+            
+            // Update local array for immediate UI feedback
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.accounts.append(otpModel)
+            }
+            
+            self.addingAccount = false
+            
+        } catch {
+            errorMessage = "Failed to save account: \(error.localizedDescription)"
+            showingError = true
+        }
     }
 }
