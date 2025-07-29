@@ -67,6 +67,281 @@ extension Notification.Name {
 
 struct TOTPApp_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        Group {
+            // Empty state preview
+            EmptyStatePreview()
+                .previewDisplayName("Empty State")
+                .preferredColorScheme(.light)
+            
+            EmptyStatePreview()
+                .previewDisplayName("Empty State - Dark")
+                .preferredColorScheme(.dark)
+            
+            // With TOTP data preview
+            WithDataPreview()
+                .previewDisplayName("With TOTP Data")
+                .preferredColorScheme(.light)
+            
+            WithDataPreview()
+                .previewDisplayName("With TOTP Data - Dark")
+                .preferredColorScheme(.dark)
+            
+            // Loading state preview
+            LoadingStatePreview()
+                .previewDisplayName("Loading State")
+                .preferredColorScheme(.light)
+            
+            // iPad preview with data
+            WithDataPreview()
+                .previewDisplayName("iPad - TOTP Data")
+                .previewDevice("iPad Pro (12.9-inch) (6th generation)")
+                .preferredColorScheme(.light)
+        }
+    }
+}
+
+// Empty state preview
+struct EmptyStatePreview: View {
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VStack {
+                    GeometryReader { geometry in
+                        ScrollView {
+                            VStack(spacing: 20) {
+                                Image(systemName: "lock.shield")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.secondary)
+                                VStack(spacing: 8) {
+                                    Text("No TOTP accounts")
+                                        .font(.title2)
+                                        .fontWeight(.semibold)
+                                    Text("Add your first account to get started")
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                        }
+                        .refreshable {
+                            // Mock refresh
+                        }
+                    }
+                }
+                
+                // Floating Action Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {}) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.4, green: 0.5, blue: 1.0),
+                                            Color(red: 0.6, green: 0.4, blue: 0.9)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 30)
+                    }
+                }
+            }
+            .navigationTitle("TOTP Passwords")
+            .navigationBarTitleDisplayMode(.large)
+        }
+    }
+}
+
+// With data preview
+struct WithDataPreview: View {
+    private let sampleAccounts = [
+        ("Google", "john.doe@gmail.com", "123456"),
+        ("GitHub", "GitHub", "789012"),
+        ("Amazon", "AWS Console", "345678"),
+        ("Microsoft", "work@company.com", "901234"),
+        ("Discord", "Discord", "567890")
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VStack {
+                    GeometryReader { geometry in
+                        ScrollView {
+                            LazyVGrid(
+                                columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: geometry.size.width > 768 ? 3 : 1),
+                                alignment: .center,
+                                spacing: 12
+                            ) {
+                                ForEach(Array(sampleAccounts.enumerated()), id: \.offset) { index, account in
+                                    MockTOTPCard(
+                                        issuer: account.0,
+                                        name: account.1,
+                                        code: account.2
+                                    )
+                                }
+                            }
+                            .padding(.top)
+                            .padding(.horizontal, geometry.size.width > 768 ? 40 : 20)
+                            
+                            Spacer()
+                                .frame(height: 20)
+                        }
+                        .refreshable {
+                            // Mock refresh
+                        }
+                    }
+                }
+                
+                // Floating Action Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {}) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.4, green: 0.5, blue: 1.0),
+                                            Color(red: 0.6, green: 0.4, blue: 0.9)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 30)
+                    }
+                }
+            }
+            .navigationTitle("TOTP Passwords")
+            .navigationBarTitleDisplayMode(.large)
+        }
+    }
+}
+
+// Loading state preview
+struct LoadingStatePreview: View {
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VStack {
+                    GeometryReader { geometry in
+                        ScrollView {
+                            VStack {
+                                Spacer()
+                                    .frame(height: 100)
+                                
+                                VStack {
+                                    ProgressView()
+                                        .scaleEffect(1.2)
+                                    Text("Loading accounts...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 8)
+                                }
+                                .frame(maxWidth: .infinity)
+                                
+                                Spacer()
+                            }
+                        }
+                        .refreshable {
+                            // Mock refresh
+                        }
+                    }
+                }
+                
+                // Floating Action Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {}) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.4, green: 0.5, blue: 1.0),
+                                            Color(red: 0.6, green: 0.4, blue: 0.9)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 30)
+                    }
+                }
+            }
+            .navigationTitle("TOTP Passwords")
+            .navigationBarTitleDisplayMode(.large)
+        }
+    }
+}
+
+// Mock TOTP card component
+struct MockTOTPCard: View {
+    let issuer: String
+    let name: String
+    let code: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(issuer)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Text(name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 12, height: 12)
+            }
+            
+            HStack {
+                Text(code)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .tracking(2)
+                Spacer()
+                ProgressView(value: 0.7)
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .frame(width: 24, height: 24)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
     }
 }
