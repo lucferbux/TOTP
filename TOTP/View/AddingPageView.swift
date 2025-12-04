@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import CloudKit
 
+@available(iOS 26.0, macOS 26.0, *)
 public struct AddingPageView: View {
     @Binding public var accounts: [OtpModel]
     @Binding public var addingAccount: Bool
@@ -102,17 +103,22 @@ public struct AddingPageView: View {
                 ZStack {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
-                    VStack {
+                    VStack(spacing: 12) {
                         ProgressView()
-                            .scaleEffect(1.2)
+                            .scaleEffect(1.3)
+                            .tint(.blue)
                         Text("Saving Account...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 8)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding()
-                    .background(.regularMaterial)
-                    .cornerRadius(12)
+                    .padding(24)
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.background.secondary)
+                    }
+                    .glassEffect(.regular)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }

@@ -101,10 +101,15 @@ struct TOTPApp_Previews: PreviewProvider {
 }
 
 // Empty state preview
+@available(iOS 26.0, macOS 26.0, *)
 struct EmptyStatePreview: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
@@ -138,23 +143,33 @@ struct EmptyStatePreview: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
             }
@@ -165,6 +180,7 @@ struct EmptyStatePreview: View {
 }
 
 // With data preview
+@available(iOS 26.0, macOS 26.0, *)
 struct WithDataPreview: View {
     private let sampleAccounts = [
         ("Google", "john.doe@gmail.com", "123456"),
@@ -177,6 +193,10 @@ struct WithDataPreview: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
@@ -214,23 +234,33 @@ struct WithDataPreview: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
             }
@@ -241,10 +271,15 @@ struct WithDataPreview: View {
 }
 
 // Loading state preview
+@available(iOS 26.0, macOS 26.0, *)
 struct LoadingStatePreview: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
@@ -280,23 +315,33 @@ struct LoadingStatePreview: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
             }
@@ -307,6 +352,7 @@ struct LoadingStatePreview: View {
 }
 
 // Mock TOTP card component
+@available(iOS 26.0, macOS 26.0, *)
 struct MockTOTPCard: View {
     let issuer: String
     let name: String
@@ -341,7 +387,11 @@ struct MockTOTPCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemBackground))
+        }
+        .glassEffect(.regular.interactive())
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }

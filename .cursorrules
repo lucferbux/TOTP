@@ -1,0 +1,237 @@
+# Cursor Rules for TOTP App
+
+## Project Overview
+This is a **SwiftUI TOTP (Time-based One-Time Password) Authenticator** application for iOS and macOS. The app generates secure 2FA codes compatible with RFC 4226 (HOTP) and RFC 6238 (TOTP).
+
+## Tech Stack
+- **Language**: Swift 5
+- **UI Framework**: SwiftUI with **iOS 26 Liquid Glass** design
+- **Minimum iOS Version**: iOS 26+
+- **Minimum macOS Version**: macOS 26+
+- **Build System**: Xcode 17+
+
+## Architecture
+
+### Core Principles
+1. **Cross-Platform First**: All code should work on both iOS and macOS using conditional compilation
+2. **Security-First**: OTP keys must always be encrypted at rest using ChaChaPoly
+3. **Shared Data**: Use App Groups for widget data sharing
+4. **Reactive**: Use Combine and `@Published` properties for state management
+5. **iOS 26 Design**: Use Liquid Glass effects and modern SwiftUI APIs
+
+### Project Structure
+```
+TOTP/
+├── Generator/          # HOTP/TOTP code generation logic
+│   ├── HOTP.swift     # RFC 4226 HMAC-based OTP
+│   └── OTP.swift      # OTP entry types (TOTP/HOTP)
+├── Model/             # Data models and persistence
+│   ├── OtpModel.swift         # Core OTP account model
+│   ├── CloudKitOtpModel.swift # CloudKit sync model
+│   ├── CloudKitDataManager.swift  # CloudKit operations
+│   └── SharedDataManager.swift    # Local + App Groups storage
+├── View/              # SwiftUI views
+│   ├── ContentView.swift    # Main list view
+│   ├── TotpView.swift       # Individual TOTP card
+│   └── AddingPageView.swift # Account creation form
+├── Helper/            # Utilities
+│   ├── Data+Base32.swift        # Base32 decoding
+│   └── PlatformUtilities.swift  # Cross-platform helpers
+└── TOTPApp.swift      # App entry point
+```
+
+## Coding Standards
+
+### iOS 26 Liquid Glass Styling
+```swift
+// ✅ Use Liquid Glass for cards and interactive elements
+.background {
+    RoundedRectangle(cornerRadius: 20, style: .continuous)
+        .fill(.background.secondary)
+}
+.glassEffect(.regular.interactive())  // Interactive glass for cards
+.clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+// ✅ Use tinted glass for buttons
+.glassEffect(.regular.tint(.blue.opacity(0.2)))
+
+// ✅ Use modern foregroundStyle instead of foregroundColor
+.foregroundStyle(.secondary)
+.foregroundStyle(
+    LinearGradient(
+        colors: [.blue, .cyan],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+)
+
+// ✅ Use smooth animations
+.animation(.smooth(duration: 0.3), value: state)
+withAnimation(.smooth(duration: 0.3)) { ... }
+
+// ✅ Use content transitions for numeric text
+.contentTransition(.numericText())
+
+// ✅ Use symbol effects for animated icons
+.symbolEffect(.pulse.byLayer, options: .repeating)
+
+// ✅ Use sensory feedback
+.sensoryFeedback(.impact, trigger: someValue)
+```
+
+### SwiftUI Best Practices
+```swift
+// ✅ Use state management appropriately
+@State private var localState: Bool = false          // View-local state
+@StateObject private var manager = DataManager.shared // Owned observable
+@Binding var externalState: Bool                      // Parent-owned state
+
+// ✅ Mark all views with iOS 26 availability
+@available(iOS 26.0, macOS 26.0, *)
+struct MyView: View { ... }
+
+// ✅ Use conditional compilation for platform-specific code
+#if canImport(UIKit)
+    import UIKit
+#endif
+
+#if canImport(AppKit)
+    import AppKit
+#endif
+
+// ✅ Use proper view modifiers order
+.frame(...)
+.padding(...)
+.background { ... }
+.glassEffect(...)
+.clipShape(...)
+```
+
+### Naming Conventions
+- **Views**: PascalCase ending with `View` (e.g., `TotpView`, `ContentView`)
+- **Models**: PascalCase ending with `Model` (e.g., `OtpModel`)
+- **Managers**: PascalCase ending with `Manager` (e.g., `SharedDataManager`)
+- **Extensions**: `Type+Feature.swift` (e.g., `Data+Base32.swift`)
+
+### Security Guidelines
+```swift
+// ✅ Always encrypt sensitive data
+let encryptedKey = try ChaChaPoly.seal(data, using: encryptionKey).combined
+
+// ✅ Use Keychain for encryption keys
+let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword,
+    kSecAttrAccessGroup as String: accessGroup,
+    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+]
+
+// ❌ Never store raw OTP keys in UserDefaults
+// ❌ Never log sensitive data
+```
+
+### Cross-Platform Patterns
+```swift
+// ✅ Use platform abstraction
+struct PlatformPasteboard {
+    static func copyToClipboard(_ text: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+    }
+}
+```
+
+## Widget Development
+
+### Key Considerations
+- Widgets have limited capabilities - no direct clipboard access
+- Use App Groups (`group.com.lucferbux.TOTP`) for data sharing
+- Implement timeline provider for periodic updates
+- Widget must independently decrypt stored accounts
+
+```swift
+struct Provider: AppIntentTimelineProvider {
+    // Generate timeline entries every 30 seconds for TOTP refresh
+    for secondOffset in stride(from: 0, to: 300, by: 30) {
+        let entryDate = Calendar.current.date(byAdding: .second, value: secondOffset, to: currentDate)!
+        entries.append(TOTPEntry(date: entryDate, accounts: accounts, configuration: configuration))
+    }
+}
+```
+
+## Testing Standards
+- Use Swift Testing framework (`@Test` macro)
+- Test HOTP against RFC 4226 test vectors
+- Test OTP model equality and construction
+- Include both unit and integration tests
+
+## UI/UX Guidelines
+
+### Gestures
+
+- **Tap**: Copy code to clipboard with haptic feedback
+- **Swipe Left**: Reveal edit/delete glass action buttons
+- **Long Press**: Show context menu with actions
+- **Pull to Refresh**: Reload accounts from CloudKit
+
+### Responsive Design
+
+- Single column layout on iPhone
+- 3-column grid layout on iPad (width > 768pt)
+- Liquid Glass backgrounds with blur effects
+- Gradient progress ring for TOTP countdown
+
+### Animations (iOS 26)
+
+- Use `.smooth(duration:)` for gesture-based animations
+- Use `.contentTransition(.numericText())` for code updates
+- Use `.symbolEffect(.pulse.byLayer)` for icons
+- Use `.sensoryFeedback(.impact)` for haptic response
+
+## Common Patterns
+
+### Error Handling
+
+```swift
+public enum SharedDataError: LocalizedError, Identifiable {
+    case loadFailed(Error)
+    case saveFailed(Error)
+    case encryptionFailed
+    case decryptionFailed
+    
+    public var errorDescription: String? { ... }
+}
+```
+
+### Async Operations
+
+```swift
+public func saveAccount(_ account: OtpModel) async throws {
+    return try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.main.async {
+            // Perform operation
+            continuation.resume()
+        }
+    }
+}
+```
+
+## File Modification Rules
+
+1. Always add `@available(iOS 26.0, macOS 26.0, *)` to new views
+2. Always maintain cross-platform compatibility
+3. Keep encryption/security patterns consistent
+4. Use Liquid Glass effects for all interactive elements
+5. Use existing helper utilities (PlatformPasteboard, etc.)
+6. Follow established view hierarchy patterns
+7. Update previews when modifying views
+
+## Dependencies
+
+- No external dependencies - uses only Apple frameworks
+- CryptoKit for HMAC-SHA1 and encryption
+- CloudKit for sync (optional)
+- WidgetKit for home screen widgets

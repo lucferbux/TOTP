@@ -5,6 +5,7 @@ import SwiftUI
     import UIKit
 #endif
 
+@available(iOS 26.0, macOS 26.0, *)
 public struct TOtpView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common)
     private var numberFormatter: NumberFormatter = {
@@ -51,7 +52,7 @@ public struct TOtpView: View {
                 
                 // Edit button
                 Button(action: {
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
@@ -60,14 +61,15 @@ public struct TOtpView: View {
                     Image(systemName: "pencil")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color.blue, in: Circle())
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(.blue.gradient, in: Circle())
+                        .glassEffect(.regular.tint(.blue.opacity(0.3)))
                 }
                 
                 // Delete button
                 Button(action: {
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
@@ -76,30 +78,39 @@ public struct TOtpView: View {
                     Image(systemName: "trash")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color.red, in: Circle())
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(.red.gradient, in: Circle())
+                        .glassEffect(.regular.tint(.red.opacity(0.3)))
                 }
             }
             .opacity(showingActions ? 1 : 0)
             
             // Main card content
             HStack {
-                // Native circular progress indicator
+                // Native circular progress indicator with Liquid Glass
                 ZStack {
                     Circle()
-                        .stroke(.quaternary, lineWidth: 4)
-                        .frame(width: 60, height: 60)
+                        .stroke(.quaternary, lineWidth: 3)
+                        .frame(width: 56, height: 56)
 
                     Circle()
                         .trim(from: 0, to: CGFloat(progress))
-                        .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 60, height: 60)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        .frame(width: 56, height: 56)
                         .rotationEffect(.degrees(-90))
 
                     Text("\(refreshIn)")
-                        .font(.system(.headline, design: .monospaced))
-                        .foregroundColor(.primary)
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
                 }
                 .padding(.trailing, 15)
                 .onReceive(self.timer) { _ in
@@ -118,28 +129,29 @@ public struct TOtpView: View {
                     }
                 }
 
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 4) {
                     if let code = self.code {
                         Text(self.numberFormatter.string(from: NSNumber(value: code))!)
                             .font(.system(.title2, design: .monospaced))
-                            .fontWeight(.semibold)
-                            .padding(.bottom, 2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                            .contentTransition(.numericText())
                     } else {
                         Text("--- ---")
                             .font(.system(.title2, design: .monospaced))
-                            .fontWeight(.semibold)
-                            .padding(.bottom, 2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.secondary)
                     }
                     if let issuer = self.otp.issuer {
                         Text(issuer)
                             .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
                     }
                     if let name = self.otp.name {
                         Text(name)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .multilineTextAlignment(.leading)
@@ -147,12 +159,12 @@ public struct TOtpView: View {
                 Spacer()
             }
             .padding()
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(.separator.opacity(0.3), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            .background {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+            }
+            .glassEffect(.regular.interactive())
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .contentShape(Rectangle())
             .scaleEffect(deleting?.id == otp.id ? 0.95 : 1.0)
             .offset(x: self.offset)
@@ -166,7 +178,7 @@ public struct TOtpView: View {
                         }
                     }
                     .onEnded { value in
-                        withAnimation(.spring()) {
+                        withAnimation(.smooth(duration: 0.35)) {
                             if value.translation.width < -60 {
                                 // Show actions
                                 self.offset = -120
@@ -182,7 +194,7 @@ public struct TOtpView: View {
             .onTapGesture {
                 if showingActions {
                     // Hide actions if they're showing
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
@@ -215,12 +227,11 @@ public struct TOtpView: View {
                     Label("Edit", systemImage: "pencil")
                 }
                 
-                Button(action: {
+                Button(role: .destructive, action: {
                     self.deleting = self.otp
                 }) {
                     Label("Delete", systemImage: "trash")
                 }
-                .foregroundColor(.red)
             }
             .onReceive(self.timer) { _ in
                 if case .totp = self.otp.entry {

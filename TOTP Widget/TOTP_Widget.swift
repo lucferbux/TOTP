@@ -313,6 +313,7 @@ extension WidgetFamily {
 }
 
 // Single TOTP View for small widgets or individual items in larger widgets
+@available(iOS 26.0, macOS 26.0, *)
 struct SingleTOTPView: View {
     @Environment(\.widgetFamily) private var family
     let account: WidgetOtpModel
@@ -335,67 +336,62 @@ struct SingleTOTPView: View {
         let prefix = account.prefix ?? ""
         
         HStack {
-            // Progress circle
-//            ZStack {
-//                Circle()
-//                    .fill(LinearGradient(
-//                        gradient: Gradient(colors: [Color.blue, Color.green]),
-//                        startPoint: .topLeading,
-//                        endPoint: .bottomTrailing
-//                    ))
-//                    .frame(width: family == .systemSmall ? 60 : 70, height: family == .systemSmall ? 60 : 70)
-//                
-//                Circle()
-//                    .trim(from: 0, to: calculateProgress())
-//                    .stroke(style: StrokeStyle(lineWidth: 4.0, lineCap: .round, lineJoin: .round))
-//                    .frame(width: family == .systemSmall ? 56 : 66, height: family == .systemSmall ? 56 : 66)
-//                    .foregroundColor(.white)
-//                    .brightness(0.2)
-//                    .rotationEffect(.degrees(-90))
-//                
-//                Text("\(calculateTimeRemaining())")
-//                    .foregroundColor(.white)
-//                    .font(.system(.headline, design: .monospaced))
-//            }
-            
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(formattedCode)
                     .font(.system(family == .systemSmall ? .headline : .title3, design: .monospaced))
                     .fontWeight(.bold)
+                    .contentTransition(.numericText())
                 
                 if let name = account.name, family != .systemSmall {
                     Text(account.issuer)
                         .font(.system(family == .systemSmall ? .caption : .body))
+                        .fontWeight(.medium)
                         .lineLimit(1)
                     Text(name)
                         .font(.caption)
-                        .opacity(0.7)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
             
             Spacer()
             
+            // Progress ring with gradient
+            ZStack {
+                Circle()
+                    .stroke(.quaternary, lineWidth: 3)
+                    .frame(width: 28, height: 28)
+                Circle()
+                    .trim(from: 0, to: calculateProgress())
+                    .stroke(
+                        LinearGradient(
+                            colors: [.blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .frame(width: 28, height: 28)
+                    .rotationEffect(.degrees(-90))
+            }
+            
             Button {
                 // This button will open the URL scheme to communicate with the main app
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.tint)
                     .padding(10)
-                    .background(Color.secondary.opacity(0.2))
+                    .glassEffect(.regular)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .widgetURL(URL(string: "totp://copy?code=\(prefix)\(codeString)"))
         }
         .padding(.horizontal, family == .systemSmall ? 8 : 12)
-        .padding(.vertical, family == .systemSmall ? 6 : 8)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(WidgetPlatformColors.systemBackground)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-        )
+        .padding(.vertical, family == .systemSmall ? 6 : 10)
+        .glassEffect(.regular.interactive())
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     
     func calculateProgress() -> CGFloat {
@@ -418,6 +414,7 @@ struct SingleTOTPView: View {
 }
 
 // Main widget view that adapts to different sizes
+@available(iOS 26.0, macOS 26.0, *)
 struct TOTP_WidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: Provider.Entry
@@ -427,15 +424,12 @@ struct TOTP_WidgetEntryView: View {
             switch family {
             case .systemSmall:
                 let accountsToShow = min(2, entry.accounts.count)
-//                if let account = entry.accounts.first {
-//                    SingleTOTPView(account: account, date: entry.date)
-//                }
                 ForEach(0..<accountsToShow, id: \.self) { index in
                     SingleTOTPView(account: entry.accounts[index], date: entry.date)
                 }
             case .systemMedium:
                 let accountsToShow = min(2, entry.accounts.count)
-                HStack() {
+                HStack {
                     ForEach(0..<accountsToShow, id: \.self) { index in
                         SingleTOTPView(account: entry.accounts[index], date: entry.date)
                     }
@@ -451,6 +445,7 @@ struct TOTP_WidgetEntryView: View {
                         Text("\(account.entry.code())")
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .minimumScaleFactor(0.5)
+                            .contentTransition(.numericText())
                     }
                 }
             case .accessoryRectangular:
@@ -458,9 +453,10 @@ struct TOTP_WidgetEntryView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(account.issuer)
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         Text("\(account.entry.code())")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .contentTransition(.numericText())
                     }
                 }
             case .accessoryInline:
@@ -469,21 +465,19 @@ struct TOTP_WidgetEntryView: View {
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                 }
             @unknown default:
-//                if let account = entry.accounts.first {
-//                    SingleTOTPView(account: account, date: entry.date)
-//                }
                 let accountsToShow = min(2, entry.accounts.count)
                 ForEach(0..<accountsToShow, id: \.self) { index in
                     SingleTOTPView(account: entry.accounts[index], date: entry.date)
                 }
             }
         }
-        .padding(family == .systemSmall ? 8 : 10)
+        .padding(family == .systemSmall ? 8 : 12)
         .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 
 // The widget configuration
+@available(iOS 26.0, macOS 26.0, *)
 struct TOTP_Widget: Widget {
     let kind: String = "TOTP_Widget"
     

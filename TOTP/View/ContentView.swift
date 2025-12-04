@@ -7,6 +7,7 @@ import CloudKit
     import UIKit
 #endif
 
+@available(iOS 26.0, macOS 26.0, *)
 public struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     @StateObject private var dataManager = SharedDataManager.shared
@@ -23,6 +24,15 @@ public struct ContentView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                #if os(iOS)
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                #else
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea()
+                #endif
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
@@ -71,13 +81,14 @@ public struct ContentView: View {
 
                                         // Loading indicator
                                         if dataManager.isLoading {
-                                            VStack {
+                                            VStack(spacing: 12) {
                                                 ProgressView()
-                                                    .scaleEffect(1.2)
+                                                    .scaleEffect(1.3)
+                                                    .tint(.blue)
                                                 Text("Loading accounts...")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                    .padding(.top, 8)
+                                                    .font(.subheadline)
+                                                    .fontWeight(.medium)
+                                                    .foregroundStyle(.secondary)
                                             }
                                             .frame(maxWidth: .infinity)
                                             .padding()
@@ -93,17 +104,25 @@ public struct ContentView: View {
                                 
                                 // Empty state - properly centered
                                 if self.accounts.isEmpty && !dataManager.isLoading {
-                                    VStack(spacing: 20) {
-                                        Image(systemName: "lock.shield")
-                                            .font(.system(size: 60))
-                                            .foregroundColor(.secondary)
+                                    VStack(spacing: 24) {
+                                        Image(systemName: "lock.shield.fill")
+                                            .font(.system(size: 70))
+                                            .fontWeight(.light)
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [.blue, .cyan],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                            .symbolEffect(.pulse.byLayer, options: .repeating)
                                         VStack(spacing: 8) {
                                             Text("No TOTP accounts")
                                                 .font(.title2)
                                                 .fontWeight(.semibold)
                                             Text("Add your first account to get started")
                                                 .font(.body)
-                                                .foregroundColor(.secondary)
+                                                .foregroundStyle(.secondary)
                                         }
                                     }
                                     .frame(maxWidth: .infinity, minHeight: geometry.size.height)
@@ -119,15 +138,26 @@ public struct ContentView: View {
                             Spacer()
                             HStack {
                                 Spacer()
-                                Text("Code copied to clipboard")
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        .regularMaterial,
-                                        in: RoundedRectangle(cornerRadius: 12))
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text("Code copied to clipboard")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                .background {
+                                    Capsule()
+                                        .fill(.background.secondary)
+                                }
+                                .glassEffect(.regular)
+                                .clipShape(Capsule())
                                 Spacer()
                             }
-                            .opacity(self.showCopiedToast ? 0.9 : 0.0)
+                            .opacity(self.showCopiedToast ? 1.0 : 0.0)
+                            .scaleEffect(self.showCopiedToast ? 1.0 : 0.8)
+                            .animation(.smooth(duration: 0.25), value: self.showCopiedToast)
                             .allowsHitTesting(false)
                             .padding()
                         }
@@ -146,23 +176,34 @@ public struct ContentView: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .sensoryFeedback(.impact(flexibility: .soft), trigger: addingAccount)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
                 #endif
@@ -300,6 +341,7 @@ struct ContentViewWithDataPreview: PreviewProvider {
 }
 
 // Mock view for empty state
+@available(iOS 26.0, macOS 26.0, *)
 struct ContentViewEmpty: View {
     @State private var accounts: [OtpModel] = []
     @State var addingAccount = false
@@ -312,22 +354,39 @@ struct ContentViewEmpty: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                #if os(iOS)
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                #else
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea()
+                #endif
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
                             ZStack {
                                 // Empty state - properly centered
-                                VStack(spacing: 20) {
-                                    Image(systemName: "lock.shield")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(.secondary)
+                                VStack(spacing: 24) {
+                                    Image(systemName: "lock.shield.fill")
+                                        .font(.system(size: 70))
+                                        .fontWeight(.light)
+                                        .foregroundStyle(
+                                            LinearGradient(
+                                                colors: [.blue, .cyan],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .symbolEffect(.pulse.byLayer, options: .repeating)
                                     VStack(spacing: 8) {
                                         Text("No TOTP accounts")
                                             .font(.title2)
                                             .fontWeight(.semibold)
                                         Text("Add your first account to get started")
                                             .font(.body)
-                                            .foregroundColor(.secondary)
+                                            .foregroundStyle(.secondary)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, minHeight: geometry.size.height)
@@ -351,23 +410,33 @@ struct ContentViewEmpty: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
                 #endif
@@ -381,6 +450,7 @@ struct ContentViewEmpty: View {
 }
 
 // Mock view with sample data
+@available(iOS 26.0, macOS 26.0, *)
 struct ContentViewWithSampleData: View {
     @State private var accounts: [MockOtpModel] = [
         MockOtpModel(id: "1", name: "john.doe@gmail.com", issuer: "Google", currentCode: "123456"),
@@ -399,6 +469,15 @@ struct ContentViewWithSampleData: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // GitHub-style gray background
+                #if os(iOS)
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                #else
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea()
+                #endif
+                
                 VStack {
                     GeometryReader { geometry in
                         ScrollView {
@@ -440,14 +519,22 @@ struct ContentViewWithSampleData: View {
                             HStack {
                                 Spacer()
                                 Text("Code copied to clipboard")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.secondary)
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 12)
-                                    .background(
-                                        .regularMaterial,
-                                        in: RoundedRectangle(cornerRadius: 12))
+                                    .background {
+                                        Capsule()
+                                            .fill(.background.secondary)
+                                    }
+                                    .glassEffect(.regular)
+                                    .clipShape(Capsule())
                                 Spacer()
                             }
-                            .opacity(self.showCopiedToast ? 0.9 : 0.0)
+                            .opacity(self.showCopiedToast ? 0.95 : 0.0)
+                            .scaleEffect(self.showCopiedToast ? 1.0 : 0.9)
+                            .animation(.smooth(duration: 0.25), value: showCopiedToast)
                             .allowsHitTesting(false)
                             .padding()
                         }
@@ -466,23 +553,33 @@ struct ContentViewWithSampleData: View {
                             Image(systemName: "plus")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(
+                                .foregroundStyle(.primary)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .background {
+                            Circle()
+                                .fill(.background)
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.4, green: 0.5, blue: 1.0),
-                                            Color(red: 0.6, green: 0.4, blue: 0.9)
-                                        ]),
+                                        colors: [
+                                            .white.opacity(0.8),
+                                            .white.opacity(0.2)
+                                        ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
-                                    )
+                                    ),
+                                    lineWidth: 0.5
                                 )
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 30)
+                        .glassEffect(.regular.interactive())
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 32)
                     }
                 }
                 #endif
@@ -496,6 +593,7 @@ struct ContentViewWithSampleData: View {
 }
 
 // Mock data models for preview
+@available(iOS 26.0, macOS 26.0, *)
 struct MockOtpModel: Identifiable {
     let id: String
     let name: String
@@ -503,7 +601,8 @@ struct MockOtpModel: Identifiable {
     let currentCode: String
 }
 
-// Mock TOTP view for preview
+// Mock TOTP view for preview with Liquid Glass
+@available(iOS 26.0, macOS 26.0, *)
 struct MockTotpView: View {
     let otp: MockOtpModel
     let cutoff: CGFloat
@@ -515,13 +614,13 @@ struct MockTotpView: View {
     
     var body: some View {
         ZStack {
-            // Background action buttons
+            // Background action buttons with Liquid Glass
             HStack {
                 Spacer()
                 
                 // Edit button
                 Button(action: {
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
@@ -530,14 +629,24 @@ struct MockTotpView: View {
                     Image(systemName: "pencil")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .frame(width: 60, height: 60)
-                        .background(Color.blue)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .glassEffect(.regular.tint(.blue.opacity(0.2)))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                .buttonStyle(.plain)
                 
                 // Delete button
                 Button(action: {
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
@@ -546,14 +655,26 @@ struct MockTotpView: View {
                     Image(systemName: "trash")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .frame(width: 60, height: 60)
-                        .background(Color.red)
+                        .background(
+                            LinearGradient(
+                                colors: [.red, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .glassEffect(.regular.tint(.red.opacity(0.2)))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                .buttonStyle(.plain)
             }
             .opacity(showingActions ? 1 : 0)
+            .scaleEffect(showingActions ? 1.0 : 0.95)
+            .animation(.smooth(duration: 0.2), value: showingActions)
             
-            // Main card content
+            // Main card content with Liquid Glass
             VStack(spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -562,43 +683,68 @@ struct MockTotpView: View {
                             .fontWeight(.semibold)
                         Text(otp.name)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Circle()
-                        .fill(Color.blue)
+                        .fill(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 12, height: 12)
                 }
                 
                 HStack {
                     Text(otp.currentCode)
-                        .font(.title)
+                        .font(.system(.title, design: .monospaced))
                         .fontWeight(.bold)
                         .tracking(2)
+                        .contentTransition(.numericText())
                     Spacer()
-                    ProgressView(value: 0.7)
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .frame(width: 24, height: 24)
+                    ZStack {
+                        Circle()
+                            .stroke(.quaternary, lineWidth: 3)
+                            .frame(width: 28, height: 28)
+                        Circle()
+                            .trim(from: 0, to: 0.7)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                            )
+                            .frame(width: 28, height: 28)
+                            .rotationEffect(.degrees(-90))
+                    }
                 }
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
+            .background {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+            }
+            .glassEffect(.regular.interactive())
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .offset(x: self.offset)
             .gesture(
                 DragGesture(minimumDistance: 20, coordinateSpace: .local)
                     .onChanged { value in
                         // Only allow left swipe (negative translation)
                         if value.translation.width < 0 {
-                            self.offset = max(value.translation.width, -120) // Limit to -120 points
+                            self.offset = max(value.translation.width, -130) // Limit to -130 points
                             self.showingActions = self.offset < -60
                         }
                     }
                     .onEnded { value in
-                        withAnimation(.spring()) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             if value.translation.width < -60 {
                                 // Show actions
-                                self.offset = -120
+                                self.offset = -130
                                 self.showingActions = true
                             } else {
                                 // Snap back
@@ -611,7 +757,7 @@ struct MockTotpView: View {
             .onTapGesture {
                 if showingActions {
                     // Hide actions if they're showing
-                    withAnimation(.spring()) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         self.offset = 0
                         self.showingActions = false
                     }
