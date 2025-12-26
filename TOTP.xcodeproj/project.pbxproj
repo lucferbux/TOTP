@@ -51,6 +51,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1F2B6DF02EFF56F9004402DE /* TOTP WidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "TOTP WidgetExtension.entitlements"; sourceTree = "<group>"; };
 		1F9FFE552D77729500D81249 /* TOTP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TOTP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F9FFE662D77729700D81249 /* TOTPTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TOTPTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F9FFE702D77729700D81249 /* TOTPUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TOTPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -60,6 +61,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1F468FCB2EFAA3D7003143D5 /* Exceptions for "TOTP Widget" folder in "TOTP" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				CopyTOTPCodeIntent.swift,
+			);
+			target = 1F9FFE542D77729500D81249 /* TOTP */;
+		};
 		1F9FFEB42D77757800D81249 /* Exceptions for "TOTP Widget" folder in "TOTP WidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -88,6 +96,7 @@
 		1F9FFEA32D77757700D81249 /* TOTP Widget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				1F468FCB2EFAA3D7003143D5 /* Exceptions for "TOTP Widget" folder in "TOTP" target */,
 				1F9FFEB42D77757800D81249 /* Exceptions for "TOTP Widget" folder in "TOTP WidgetExtension" target */,
 			);
 			path = "TOTP Widget";
@@ -132,6 +141,7 @@
 		1F9FFE4C2D77729500D81249 = {
 			isa = PBXGroup;
 			children = (
+				1F2B6DF02EFF56F9004402DE /* TOTP WidgetExtension.entitlements */,
 				1F9FFE572D77729500D81249 /* TOTP */,
 				1F9FFE692D77729700D81249 /* TOTPTests */,
 				1F9FFE732D77729700D81249 /* TOTPUITests */,
@@ -686,6 +696,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "TOTP WidgetExtension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -707,6 +718,7 @@
 				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -722,6 +734,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "TOTP WidgetExtension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -743,6 +756,7 @@
 				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";

@@ -20,6 +20,7 @@ import AppKit
 #endif
 
 // MARK: - Widget Configuration Intent
+@available(iOS 26.0, macOS 26.0, *)
 struct ConfigurationAppIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource { "TOTP Account Configuration" }
     static var description: IntentDescription { "Choose which TOTP account to display in the widget." }
@@ -27,10 +28,6 @@ struct ConfigurationAppIntent: WidgetConfigurationIntent {
     // Allow selecting the account to display in the widget
     @Parameter(title: "Account", default: "Red Hat")
     var account: String
-    
-    // For multiple account support in medium and large widgets
-    @Parameter(title: "Show Multiple Accounts", default: false)
-    var showMultipleAccounts: Bool
 }
 
 // MARK: - Widget Platform Utilities
@@ -44,20 +41,6 @@ struct WidgetPlatformColors {
     }
 }
 
-struct WidgetPlatformPasteboard {
-    static func copyToClipboard(_ text: String) {
-        // Widgets cannot directly access the pasteboard
-        // This functionality is handled by the App Intent instead
-        #if canImport(UIKit)
-        // For widgets, we'll use a URL scheme to trigger the main app
-        // The actual copying will be handled in the app intent
-        #else
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
-    }
-}
-
 // Simplified versions of the app models for widget use
 enum WidgetOtpEntry {
     case totp(key: Data, digits: Int, interval: Double)
@@ -67,15 +50,6 @@ enum WidgetOtpEntry {
         case let .totp(key, digits, interval):
             let counter = UInt64(Date().timeIntervalSince1970 / interval)
             return hotpCode(key: key, digits: digits, counter: counter)
-        }
-    }
-    
-    func get_display_value() -> Int {
-        switch self {
-        case let .totp(_, _, interval):
-            let time = Date().timeIntervalSince1970
-            let nextUpdate = Double(ceil(time / interval) * interval)
-            return Int((nextUpdate - time).rounded())
         }
     }
 }
@@ -118,6 +92,7 @@ func hotpCode(key: Data, digits: Int = 6, counter: UInt64) -> UInt64 {
 }
 
 // Provider that handles timeline generation
+@available(iOS 26.0, macOS 26.0, *)
 struct Provider: AppIntentTimelineProvider {
     typealias Entry = TOTPEntry
     typealias Intent = ConfigurationAppIntent
@@ -125,7 +100,11 @@ struct Provider: AppIntentTimelineProvider {
     // Load accounts from shared UserDefaults with proper decryption
     private func loadAccounts() -> [WidgetOtpModel] {
         let suiteName = "group.com.lucferbux.TOTP"
-        let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+        
+        guard let userDefaults = UserDefaults(suiteName: suiteName) else {
+            return sampleAccounts
+        }
+        
         let accountsKey = "stored_totp_accounts"
         
         guard let data = userDefaults.data(forKey: accountsKey) else {
@@ -134,7 +113,6 @@ struct Provider: AppIntentTimelineProvider {
         
         // Get the shared encryption key
         guard let encryptionKey = getSharedEncryptionKey() else {
-            print("Widget: Unable to access encryption key")
             return sampleAccounts
         }
         
@@ -163,44 +141,42 @@ struct Provider: AppIntentTimelineProvider {
                         )
                         loadedAccounts.append(widgetModel)
                     } catch {
-                        print("Widget: Failed to decrypt account \(storedAccount.issuer ?? "Unknown"): \(error)")
                         // Skip corrupted accounts
                     }
                 }
             }
             
-            return loadedAccounts.isEmpty ? sampleAccounts : loadedAccounts
+            if loadedAccounts.isEmpty {
+                return sampleAccounts
+            }
+            
+            return loadedAccounts
             
         } catch {
-            print("Widget: Failed to decode accounts: \(error)")
             return sampleAccounts // Fallback to sample data if loading fails
         }
     }
     
-    // Helper function to get shared encryption key
+    // Helper function to get shared encryption key from App Group container file
+    private static let keyFileName = ".totp-encryption-key"
+    
+    private func getSharedContainerURL() -> URL? {
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.lucferbux.TOTP")
+    }
+    
     private func getSharedEncryptionKey() -> SymmetricKey? {
-        let service = "TOTP-SharedData-Encryption"
-        let account = "master-key"
-        let accessGroup = "group.com.lucferbux.TOTP"
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        if status == errSecSuccess,
-           let keyData = result as? Data {
-            return SymmetricKey(data: keyData)
+        guard let containerURL = getSharedContainerURL() else {
+            return nil
         }
         
-        return nil
+        let keyFileURL = containerURL.appendingPathComponent(Self.keyFileName)
+        
+        do {
+            let keyData = try Data(contentsOf: keyFileURL)
+            return SymmetricKey(data: keyData)
+        } catch {
+            return nil
+        }
     }
     
     // Helper function to decrypt data
@@ -210,45 +186,41 @@ struct Provider: AppIntentTimelineProvider {
     }
     
     // Sample data for previews and fallback
+    // Using valid base64 encoded sample key data
+    private static let sampleKeyData = Data([0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, 0xde, 0xad, 0xbe, 0xef])
+    
     let sampleAccounts = [
         WidgetOtpModel(
             issuer: "Red Hat",
             name: "lferrnan",
             prefix: "34asdfQ!a",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
+            entry: .totp(key: sampleKeyData, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "GitHub",
             name: "dev@example.com",
             prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
+            entry: .totp(key: sampleKeyData, digits: 6, interval: 30.0)
         ),
         WidgetOtpModel(
             issuer: "AWS",
             name: "admin",
             prefix: "AWS:",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
+            entry: .totp(key: sampleKeyData, digits: 6, interval: 30.0)
         )
     ]
     
     func placeholder(in context: Context) -> TOTPEntry {
-        TOTPEntry(date: Date(), accounts: [sampleAccounts[0]], configuration: ConfigurationAppIntent())
+        TOTPEntry(date: Date(), account: sampleAccounts[0], configuration: ConfigurationAppIntent())
     }
     
     func snapshot(for configuration: Intent, in context: Context) async -> TOTPEntry {
         let allAccounts = loadAccounts()
-        let displayAccounts: [WidgetOtpModel]
-        
-        if configuration.showMultipleAccounts {
-            displayAccounts = Array(allAccounts.prefix(context.family.compactSize()))
-        } else {
-            let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
-            displayAccounts = [selectedAccount]
-        }
+        let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
         
         return TOTPEntry(
             date: Date(),
-            accounts: displayAccounts,
+            account: selectedAccount,
             configuration: configuration
         )
     }
@@ -259,21 +231,14 @@ struct Provider: AppIntentTimelineProvider {
         
         // Load actual account data from shared UserDefaults
         let allAccounts = loadAccounts()
-        let displayAccounts: [WidgetOtpModel]
-        
-        if configuration.showMultipleAccounts {
-            displayAccounts = Array(allAccounts.prefix(context.family.compactSize()))
-        } else {
-            let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
-            displayAccounts = [selectedAccount]
-        }
+        let selectedAccount = allAccounts.first { $0.issuer == configuration.account } ?? allAccounts.first ?? sampleAccounts[0]
         
         // Generate timeline entries for the next few TOTP updates (every 30 seconds)
         for secondOffset in stride(from: 0, to: 300, by: 30) {
             let entryDate = Calendar.current.date(byAdding: .second, value: secondOffset, to: currentDate)!
             let entry = TOTPEntry(
                 date: entryDate,
-                accounts: displayAccounts,
+                account: selectedAccount,
                 configuration: configuration
             )
             entries.append(entry)
@@ -286,30 +251,8 @@ struct Provider: AppIntentTimelineProvider {
 // The entry type that will be displayed in the widget
 struct TOTPEntry: TimelineEntry {
     let date: Date
-    let accounts: [WidgetOtpModel]
+    let account: WidgetOtpModel
     let configuration: ConfigurationAppIntent
-}
-
-// Extension to determine how many accounts to show based on widget size
-extension WidgetFamily {
-    func compactSize() -> Int {
-        switch self {
-        case .systemSmall:
-            return 1
-        case .systemMedium:
-            return 2
-        case .systemLarge, .systemExtraLarge:
-            return 4
-        case .accessoryCircular:
-            return 1
-        case .accessoryRectangular:
-            return 1
-        case .accessoryInline:
-            return 1
-        @unknown default:
-            return 1
-        }
-    }
 }
 
 // Single TOTP View for small widgets or individual items in larger widgets
@@ -318,8 +261,6 @@ struct SingleTOTPView: View {
     @Environment(\.widgetFamily) private var family
     let account: WidgetOtpModel
     let date: Date
-    @State private var progress: Double = 1.0
-    @State private var timeRemaining: Int = 30
     
     private var numberFormatter: NumberFormatter {
         let formatter = NumberFormatter()
@@ -332,147 +273,66 @@ struct SingleTOTPView: View {
     var body: some View {
         let code = account.entry.code()
         let formattedCode = numberFormatter.string(from: NSNumber(value: code)) ?? "------"
-        let codeString = String(format: "%06d", code) // Format as 6-digit string for URL
+        let codeString = String(format: "%06d", code)
         let prefix = account.prefix ?? ""
+        let fullCode = "\(prefix)\(codeString)"
         
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(formattedCode)
-                    .font(.system(family == .systemSmall ? .headline : .title3, design: .monospaced))
-                    .fontWeight(.bold)
-                    .contentTransition(.numericText())
-                
-                if let name = account.name, family != .systemSmall {
-                    Text(account.issuer)
-                        .font(.system(family == .systemSmall ? .caption : .body))
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                    Text(name)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+        // Make the entire card tappable with URL scheme
+        Link(destination: URL(string: "totp://copy?code=\(fullCode)")!) {
+            VStack(spacing: 8) {
+                // Account info header
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.issuer)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        if let name = account.name {
+                            Text(name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    
+                    Spacer()
                 }
+                
+                Spacer()
+                
+                // TOTP Code - sized to fit widget
+                Text(formattedCode)
+                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .contentTransition(.numericText())
+                    .minimumScaleFactor(0.8)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                // Tap to copy hint
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.caption2)
+                    Text("Tap to copy")
+                        .font(.caption2)
+                }
+                .foregroundStyle(.secondary)
             }
-            
-            Spacer()
-            
-            // Progress ring with gradient
-            ZStack {
-                Circle()
-                    .stroke(.quaternary, lineWidth: 3)
-                    .frame(width: 28, height: 28)
-                Circle()
-                    .trim(from: 0, to: calculateProgress())
-                    .stroke(
-                        LinearGradient(
-                            colors: [.blue, .cyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 28, height: 28)
-                    .rotationEffect(.degrees(-90))
-            }
-            
-            Button {
-                // This button will open the URL scheme to communicate with the main app
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.tint)
-                    .padding(10)
-                    .glassEffect(.regular)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .widgetURL(URL(string: "totp://copy?code=\(prefix)\(codeString)"))
-        }
-        .padding(.horizontal, family == .systemSmall ? 8 : 12)
-        .padding(.vertical, family == .systemSmall ? 6 : 10)
-        .glassEffect(.regular.interactive())
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-    
-    func calculateProgress() -> CGFloat {
-        switch account.entry {
-        case let .totp(_, _, interval):
-            let time = date.timeIntervalSince1970
-            let intervalTime = time.truncatingRemainder(dividingBy: interval)
-            return CGFloat(intervalTime / interval)
-        }
-    }
-    
-    func calculateTimeRemaining() -> Int {
-        switch account.entry {
-        case let .totp(_, _, interval):
-            let time = date.timeIntervalSince1970
-            let nextUpdate = Double(ceil(time / interval) * interval)
-            return Int((nextUpdate - time).rounded())
+            .padding(12)
         }
     }
 }
 
-// Main widget view that adapts to different sizes
+// Main widget view for small size only
 @available(iOS 26.0, macOS 26.0, *)
 struct TOTP_WidgetEntryView: View {
-    @Environment(\.widgetFamily) var family
     var entry: Provider.Entry
     
     var body: some View {
-        VStack(spacing: 10) {
-            switch family {
-            case .systemSmall:
-                let accountsToShow = min(2, entry.accounts.count)
-                ForEach(0..<accountsToShow, id: \.self) { index in
-                    SingleTOTPView(account: entry.accounts[index], date: entry.date)
-                }
-            case .systemMedium:
-                let accountsToShow = min(2, entry.accounts.count)
-                HStack {
-                    ForEach(0..<accountsToShow, id: \.self) { index in
-                        SingleTOTPView(account: entry.accounts[index], date: entry.date)
-                    }
-                }
-            case .systemLarge, .systemExtraLarge:
-                let accountsToShow = min(4, entry.accounts.count)
-                ForEach(0..<accountsToShow, id: \.self) { index in
-                    SingleTOTPView(account: entry.accounts[index], date: entry.date)
-                }
-            case .accessoryCircular:
-                if let account = entry.accounts.first {
-                    VStack {
-                        Text("\(account.entry.code())")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .minimumScaleFactor(0.5)
-                            .contentTransition(.numericText())
-                    }
-                }
-            case .accessoryRectangular:
-                if let account = entry.accounts.first {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(account.issuer)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text("\(account.entry.code())")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .contentTransition(.numericText())
-                    }
-                }
-            case .accessoryInline:
-                if let account = entry.accounts.first {
-                    Text("\(account.issuer): \(account.entry.code())")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                }
-            @unknown default:
-                let accountsToShow = min(2, entry.accounts.count)
-                ForEach(0..<accountsToShow, id: \.self) { index in
-                    SingleTOTPView(account: entry.accounts[index], date: entry.date)
-                }
-            }
-        }
-        .padding(family == .systemSmall ? 8 : 12)
-        .containerBackground(.fill.tertiary, for: .widget)
+        SingleTOTPView(account: entry.account, date: entry.date)
+            .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 
@@ -485,93 +345,26 @@ struct TOTP_Widget: Widget {
         AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in
             TOTP_WidgetEntryView(entry: entry)
         }
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
-        .configurationDisplayName("TOTP Codes")
-        .description("Display your TOTP authentication codes.")
+        .supportedFamilies([.systemSmall])
+        .configurationDisplayName("TOTP Code")
+        .description("Display and copy your TOTP authentication code. Tap to copy.")
     }
 }
 
-// Previews for the widget
+// Preview for the widget
 #Preview(as: .systemSmall) {
     TOTP_Widget()
 } timeline: {
-    let accounts = [
-        WidgetOtpModel(
-            issuer: "Red Hat",
-            name: "lferrnan",
-            prefix: "34asdfQ!a",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        ),
-        WidgetOtpModel(
-            issuer: "GitHub",
-            name: "dev@example.com",
-            prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        )
-    ]
+    // Using valid sample key data for preview
+    let sampleKeyData = Data([0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, 0xde, 0xad, 0xbe, 0xef])
+    let sampleAccount = WidgetOtpModel(
+        issuer: "Red Hat",
+        name: "lferrnan",
+        prefix: "34asdfQ!a",
+        entry: .totp(key: sampleKeyData, digits: 6, interval: 30.0)
+    )
     
     let intent = ConfigurationAppIntent()
-    //intent.showMultipleAccounts = true
     
-    TOTPEntry(date: .now, accounts: accounts, configuration: intent)
-}
-
-#Preview(as: .systemMedium) {
-    TOTP_Widget()
-} timeline: {
-    let accounts = [
-        WidgetOtpModel(
-            issuer: "Red Hat",
-            name: "lferrnan",
-            prefix: "34asdfQ!a",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        ),
-        WidgetOtpModel(
-            issuer: "GitHub",
-            name: "dev@example.com",
-            prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        )
-    ]
-    
-    let intent = ConfigurationAppIntent()
-    //intent.showMultipleAccounts = true
-    
-    TOTPEntry(date: .now, accounts: accounts, configuration: intent)
-}
-
-#Preview(as: .systemLarge) {
-    TOTP_Widget()
-} timeline: {
-    let accounts = [
-        WidgetOtpModel(
-            issuer: "Red Hat",
-            name: "lferrnan",
-            prefix: "34asdfQ!a",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        ),
-        WidgetOtpModel(
-            issuer: "GitHub",
-            name: "dev@example.com",
-            prefix: nil,
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        ),
-        WidgetOtpModel(
-            issuer: "AWS",
-            name: "admin",
-            prefix: "AWS:",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        ),
-        WidgetOtpModel(
-            issuer: "Microsoft",
-            name: "work@company.com",
-            prefix: "MS-",
-            entry: .totp(key: Data(base64Encoded: "12312asdfqewrasdfasdfasdf==")!, digits: 6, interval: 30.0)
-        )
-    ]
-    
-    let intent = ConfigurationAppIntent()
-    //intent.showMultipleAccounts = true
-    
-    TOTPEntry(date: .now, accounts: accounts, configuration: intent)
+    TOTPEntry(date: .now, account: sampleAccount, configuration: intent)
 }

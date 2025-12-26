@@ -22,20 +22,27 @@ You are working on a **SwiftUI TOTP Authenticator** application that runs on iOS
 
 ## Code Generation Guidelines
 
-### iOS 26 Liquid Glass Styling (REQUIRED)
+### iOS 26 Native Styling (REQUIRED)
 ```swift
 // ALWAYS add iOS 26 availability to views
 @available(iOS 26.0, macOS 26.0, *)
 struct MyView: View { ... }
 
-// Use Liquid Glass for cards and interactive elements
+// Use native card styling (similar to Journal app)
+.padding()
 .background {
-    RoundedRectangle(cornerRadius: 20, style: .continuous)
-        .fill(.background.secondary)
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
 }
-.glassEffect(.regular.interactive())  // For cards
-.glassEffect(.regular.tint(.blue.opacity(0.2)))  // For tinted buttons
-.clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+// Use Liquid Glass ONLY for floating action buttons (FAB)
+.background {
+    Circle()
+        .fill(.background)
+}
+.glassEffect(.regular.interactive())  // Only for FAB, not cards
+.clipShape(Circle())
 
 // Use modern foregroundStyle instead of foregroundColor
 .foregroundStyle(.secondary)
@@ -93,14 +100,13 @@ let encrypted = try ChaChaPoly.seal(keyData, using: encryptionKey).combined
 
 ### When Creating Views
 ```swift
-// Use this pattern for iOS 26 Liquid Glass card styling
+// Use this pattern for native iOS card styling (like Journal app)
 .padding()
 .background {
-    RoundedRectangle(cornerRadius: 20, style: .continuous)
-        .fill(.background.secondary)
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
 }
-.glassEffect(.regular.interactive())
-.clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
 // Use platform utilities for cross-platform code
 PlatformPasteboard.copyToClipboard(code)  // Instead of direct UIPasteboard/NSPasteboard
@@ -176,9 +182,10 @@ GeometryReader { geometry in
 4. **Don't ignore widget limitations** - Widgets are sandboxed
 5. **Don't use external dependencies** - This project uses only Apple frameworks
 6. **Don't use `.foregroundColor()`** - Use `.foregroundStyle()` instead
-7. **Don't use `.shadow()`** - Use `.glassEffect()` for depth
+7. **Don't use `.shadow()`** - Cards get depth from background contrast
 8. **Don't use `.spring()` animations** - Use `.smooth(duration:)` instead
 9. **Don't forget `@available(iOS 26.0, macOS 26.0, *)`** - Required for all views
+10. **Don't use `.glassEffect()` on cards** - Only use on FAB buttons
 
 ## Testing Expectations
 

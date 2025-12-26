@@ -42,18 +42,23 @@ TOTP/
 
 ## Coding Standards
 
-### iOS 26 Liquid Glass Styling
+### iOS 26 Native Styling
 ```swift
-// ✅ Use Liquid Glass for cards and interactive elements
+// ✅ Use native card styling (similar to Journal app)
+.padding()
 .background {
-    RoundedRectangle(cornerRadius: 20, style: .continuous)
-        .fill(.background.secondary)
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
 }
-.glassEffect(.regular.interactive())  // Interactive glass for cards
-.clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-// ✅ Use tinted glass for buttons
-.glassEffect(.regular.tint(.blue.opacity(0.2)))
+// ✅ Use Liquid Glass ONLY for floating action buttons (FAB)
+.background {
+    Circle()
+        .fill(.background)
+}
+.glassEffect(.regular.interactive())  // Only for FAB, not cards
+.clipShape(Circle())
 
 // ✅ Use modern foregroundStyle instead of foregroundColor
 .foregroundStyle(.secondary)
@@ -99,11 +104,9 @@ struct MyView: View { ... }
     import AppKit
 #endif
 
-// ✅ Use proper view modifiers order
-.frame(...)
+// ✅ Use proper view modifiers order for cards
 .padding(...)
 .background { ... }
-.glassEffect(...)
 .clipShape(...)
 ```
 
@@ -181,8 +184,9 @@ struct Provider: AppIntentTimelineProvider {
 
 - Single column layout on iPhone
 - 3-column grid layout on iPad (width > 768pt)
-- Liquid Glass backgrounds with blur effects
+- Native card backgrounds with `Color(.secondarySystemGroupedBackground)`
 - Gradient progress ring for TOTP countdown
+- Glass effect only on FAB button
 
 ### Animations (iOS 26)
 
@@ -224,7 +228,7 @@ public func saveAccount(_ account: OtpModel) async throws {
 1. Always add `@available(iOS 26.0, macOS 26.0, *)` to new views
 2. Always maintain cross-platform compatibility
 3. Keep encryption/security patterns consistent
-4. Use Liquid Glass effects for all interactive elements
+4. Use Liquid Glass effects only for FAB buttons, not cards
 5. Use existing helper utilities (PlatformPasteboard, etc.)
 6. Follow established view hierarchy patterns
 7. Update previews when modifying views

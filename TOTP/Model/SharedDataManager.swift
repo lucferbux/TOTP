@@ -24,10 +24,10 @@ public class SharedDataManager: ObservableObject {
     private let encryptionKey: SymmetricKey
     
     private init() {
-        // Try to use App Group UserDefaults, fall back to standard if not available
+        // Use App Group UserDefaults for widget sharing
         self.userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
         
-        // Generate or retrieve encryption key from Keychain
+        // Generate or retrieve encryption key from shared file
         self.encryptionKey = Self.getOrCreateEncryptionKey()
         
         loadAccounts()
@@ -191,67 +191,99 @@ public class SharedDataManager: ObservableObject {
         return try ChaChaPoly.open(sealedBox, using: encryptionKey)
     }
     
-    // MARK: - Keychain Management
+    // MARK: - Shared File-based Key Management
+    
+    private static let keyFileName = ".totp-encryption-key"
+    
+    private static func getSharedContainerURL() -> URL? {
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.lucferbux.TOTP")
+    }
+    
+    private static func getKeyFileURL() -> URL? {
+        return getSharedContainerURL()?.appendingPathComponent(keyFileName)
+    }
     
     private static func getOrCreateEncryptionKey() -> SymmetricKey {
+        // First try to load from shared file (for widget compatibility)
+        if let key = loadKeyFromSharedFile() {
+            return key
+        }
+        
+        // Try Keychain as fallback (for migration from older versions)
+        if let key = loadKeyFromKeychain() {
+            // Migrate to shared file for widget access
+            saveKeyToSharedFile(key)
+            return key
+        }
+        
+        // Generate new key and save to shared file
+        let newKey = SymmetricKey(size: .bits256)
+        saveKeyToSharedFile(newKey)
+        
+        return newKey
+    }
+    
+    private static func loadKeyFromSharedFile() -> SymmetricKey? {
+        guard let keyFileURL = getKeyFileURL() else { return nil }
+        
+        do {
+            let keyData = try Data(contentsOf: keyFileURL)
+            return SymmetricKey(data: keyData)
+        } catch {
+            return nil
+        }
+    }
+    
+    private static func saveKeyToSharedFile(_ key: SymmetricKey) {
+        guard let keyFileURL = getKeyFileURL() else { return }
+        
+        let keyData = key.withUnsafeBytes { Data($0) }
+        
+        do {
+            // Write file without complete protection so widget can access it
+            try keyData.write(to: keyFileURL, options: [.atomic])
+            // Set file protection to allow access after first unlock (widget compatible)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: keyFileURL.path
+            )
+        } catch {
+            // Silently fail - encryption will still work, just won't persist
+        }
+    }
+    
+    private static func loadKeyFromKeychain() -> SymmetricKey? {
         let service = "TOTP-SharedData-Encryption"
         let account = "master-key"
-        let accessGroup = "group.com.lucferbux.TOTP"
         
-        // Try to load existing key from Keychain
+        // Try to load existing key from Keychain (without access group first)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
         
         var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        var status = SecItemCopyMatching(query as CFDictionary, &result)
         
         if status == errSecSuccess,
            let keyData = result as? Data {
             return SymmetricKey(data: keyData)
         }
         
-        // Generate new key
-        let newKey = SymmetricKey(size: .bits256)
-        let keyData = newKey.withUnsafeBytes { Data($0) }
-        
-        // Save to Keychain with App Group access
-        let saveQuery: [String: Any] = [
+        // Try with access group (for keys created with older versions)
+        let queryWithGroup: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        
-        SecItemAdd(saveQuery as CFDictionary, nil)
-        
-        return newKey
-    }
-    
-    // Public method for widget access
-    public static func getSharedEncryptionKey() -> SymmetricKey? {
-        let service = "TOTP-SharedData-Encryption"
-        let account = "master-key"
-        let accessGroup = "group.com.lucferbux.TOTP"
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
+            kSecAttrAccessGroup as String: "group.com.lucferbux.TOTP",
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
         
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        status = SecItemCopyMatching(queryWithGroup as CFDictionary, &result)
         
         if status == errSecSuccess,
            let keyData = result as? Data {
@@ -259,6 +291,11 @@ public class SharedDataManager: ObservableObject {
         }
         
         return nil
+    }
+    
+    // Public method for widget access - uses shared file
+    public static func getSharedEncryptionKey() -> SymmetricKey? {
+        return loadKeyFromSharedFile()
     }
 }
 

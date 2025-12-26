@@ -149,9 +149,8 @@ public struct ContentView: View {
                                 .padding(.vertical, 14)
                                 .background {
                                     Capsule()
-                                        .fill(.background.secondary)
+                                        .fill(Color(.secondarySystemGroupedBackground))
                                 }
-                                .glassEffect(.regular)
                                 .clipShape(Capsule())
                                 Spacer()
                             }
@@ -200,7 +199,6 @@ public struct ContentView: View {
                         }
                         .glassEffect(.regular.interactive())
                         .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                         .sensoryFeedback(.impact(flexibility: .soft), trigger: addingAccount)
                         .padding(.trailing, 24)
                         .padding(.bottom, 32)
@@ -237,7 +235,7 @@ public struct ContentView: View {
             self.accounts = dataManager.accounts
         }
         .onReceive(dataManager.$accounts) { newAccounts in
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 self.accounts = newAccounts
             }
         }
@@ -271,7 +269,7 @@ public struct ContentView: View {
                 message: Text("Are you sure that you want to DELETE \(alertText)"),
                 primaryButton: .destructive(Text("Delete").bold()) {
                     dataManager.deleteAccount(item)
-                    withAnimation(Animation.easeInOut(duration: 1)) {
+                    withAnimation(.smooth(duration: 1)) {
                         self.accounts.removeAll(where: { $0.id == item.id })
                     }
                 },
@@ -434,7 +432,6 @@ struct ContentViewEmpty: View {
                         }
                         .glassEffect(.regular.interactive())
                         .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 24)
                         .padding(.bottom, 32)
                     }
@@ -528,7 +525,6 @@ struct ContentViewWithSampleData: View {
                                         Capsule()
                                             .fill(.background.secondary)
                                     }
-                                    .glassEffect(.regular)
                                     .clipShape(Capsule())
                                 Spacer()
                             }
@@ -577,7 +573,6 @@ struct ContentViewWithSampleData: View {
                         }
                         .glassEffect(.regular.interactive())
                         .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                         .padding(.trailing, 24)
                         .padding(.bottom, 32)
                     }
@@ -639,7 +634,6 @@ struct MockTotpView: View {
                             ),
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                         )
-                        .glassEffect(.regular.tint(.blue.opacity(0.2)))
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -665,7 +659,6 @@ struct MockTotpView: View {
                             ),
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                         )
-                        .glassEffect(.regular.tint(.red.opacity(0.2)))
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -725,11 +718,10 @@ struct MockTotpView: View {
             }
             .padding()
             .background {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(.systemBackground))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
             }
-            .glassEffect(.regular.interactive())
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .offset(x: self.offset)
             .gesture(
                 DragGesture(minimumDistance: 20, coordinateSpace: .local)

@@ -115,13 +115,13 @@ public struct AddingPageView: View {
                     .padding(24)
                     .background {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.background.secondary)
+                            .fill(Color(.secondarySystemGroupedBackground))
                     }
-                    .glassEffect(.regular)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
+        .sensoryFeedback(.success, trigger: accounts.count)
     }
     
     @MainActor
@@ -169,7 +169,7 @@ public struct AddingPageView: View {
             try await dataManager.saveAccount(otpModel)
             
             // Update local array for immediate UI feedback
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 self.accounts.append(otpModel)
             }
             

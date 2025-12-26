@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 #if canImport(UIKit)
 import UIKit
@@ -15,6 +16,7 @@ import UIKit
 import AppKit
 #endif
 
+@available(iOS 26.0, macOS 26.0, *)
 @main
 struct TOTPApp: App {
     var body: some Scene {
@@ -54,6 +56,9 @@ struct TOTPApp: App {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(code, forType: .string)
             #endif
+            
+            // Refresh widget timeline so it shows updated code when user returns
+            WidgetCenter.shared.reloadTimelines(ofKind: "TOTP_Widget")
             
             // Show notification or feedback
             print("Copied TOTP code to clipboard: \(code)")

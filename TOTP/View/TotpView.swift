@@ -64,7 +64,6 @@ public struct TOtpView: View {
                         .foregroundStyle(.white)
                         .frame(width: 56, height: 56)
                         .background(.blue.gradient, in: Circle())
-                        .glassEffect(.regular.tint(.blue.opacity(0.3)))
                 }
                 
                 // Delete button
@@ -81,7 +80,6 @@ public struct TOtpView: View {
                         .foregroundStyle(.white)
                         .frame(width: 56, height: 56)
                         .background(.red.gradient, in: Circle())
-                        .glassEffect(.regular.tint(.red.opacity(0.3)))
                 }
             }
             .opacity(showingActions ? 1 : 0)
@@ -160,11 +158,10 @@ public struct TOtpView: View {
             }
             .padding()
             .background {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(.systemBackground))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
             }
-            .glassEffect(.regular.interactive())
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(Rectangle())
             .scaleEffect(deleting?.id == otp.id ? 0.95 : 1.0)
             .offset(x: self.offset)
@@ -205,10 +202,10 @@ public struct TOtpView: View {
                         impactFeedback.impactOccurred()
                     #endif
 
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.smooth(duration: 0.2)) {
                         self.toast = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(.smooth(duration: 0.3)) {
                                 self.toast = false
                             }
                         }
