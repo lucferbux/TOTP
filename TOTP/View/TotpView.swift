@@ -47,7 +47,7 @@ public struct TOtpView: View {
     public var body: some View {
         ZStack {
             // Background action buttons
-            HStack {
+            HStack(spacing: 12) {
                 Spacer()
                 
                 // Edit button
@@ -65,6 +65,7 @@ public struct TOtpView: View {
                         .frame(width: 56, height: 56)
                         .background(.blue.gradient, in: Circle())
                 }
+                .padding(.leading, 12)
                 
                 // Delete button
                 Button(action: {
@@ -170,7 +171,7 @@ public struct TOtpView: View {
                     .onChanged { value in
                         // Only allow left swipe (negative translation)
                         if value.translation.width < 0 {
-                            self.offset = max(value.translation.width, -120) // Limit to -120 points
+                            self.offset = max(value.translation.width, -140) // Limit to -140 points
                             self.showingActions = self.offset < -60
                         }
                     }
@@ -178,7 +179,7 @@ public struct TOtpView: View {
                         withAnimation(.smooth(duration: 0.35)) {
                             if value.translation.width < -60 {
                                 // Show actions
-                                self.offset = -120
+                                self.offset = -140
                                 self.showingActions = true
                             } else {
                                 // Snap back
