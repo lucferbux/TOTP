@@ -83,8 +83,8 @@ import AppKit
 ```
 
 ### When Modifying OTP Logic
-- Users input secret keys as plain text (the app handles encoding internally)
-- Plain text keys are converted to Data using UTF-8 encoding
+- Users input secret keys as Base32 encoded strings (standard OTP format)
+- Base32 keys are decoded to binary Data using `Data(base32Encoded:)`
 - The `Data+Base32.swift` extension provides both encoding and decoding
 - TOTP uses 30-second intervals by default
 - HOTP counters must be incremented after each code generation

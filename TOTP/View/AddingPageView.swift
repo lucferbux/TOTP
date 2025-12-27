@@ -267,8 +267,12 @@ public struct AddingPageView: View {
                 return
             }
             
-            // Convert plain text to Data directly (UTF-8 encoding)
-            let keyData = Data(secretKeyString.utf8)
+            // OTP secrets are Base32 encoded - decode them to get the actual key bytes
+            guard let keyData = Data(base32Encoded: secretKeyString) else {
+                errorMessage = "Invalid OTP Key. Please ensure it is a valid Base32 encoded string."
+                showingError = true
+                return
+            }
             
             let entry: OtpEntry
             if self.isHotp {
