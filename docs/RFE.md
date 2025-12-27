@@ -9,7 +9,8 @@ This document tracks planned features, enhancements, and future improvements for
 ### Core Functionality
 - [x] **TOTP Code Generation** - RFC 6238 compliant time-based OTP
 - [x] **HOTP Code Generation** - RFC 4226 compliant HMAC-based OTP
-- [x] **Base32 Key Decoding** - Standard OTP key format support
+- [x] **Base32 Key Encoding/Decoding** - Automatic Base32 encoding from plain text input
+- [x] **Plain Text Key Input** - Users paste plain text keys, app encodes automatically
 - [x] **Configurable Intervals** - 30-second default, customizable
 - [x] **Configurable Digits** - 6-10 digit codes supported
 
@@ -183,7 +184,6 @@ To request a new feature:
 ### Performance
 - [ ] Profile and optimize widget timeline generation
 - [ ] Lazy load account icons
-- [ ] Optimize Base32 decoding
 - [ ] Cache decrypted keys in memory (with timeout)
 
 ### Architecture

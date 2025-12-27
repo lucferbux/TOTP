@@ -236,7 +236,8 @@ public struct TOtpView: View {
                     self.refreshIn = self.otp.entry.get_display_value()
                 }
             }
-            .frame(minWidth: 250, maxWidth: 325)
+            // On phones (width <= 768), fill full width; on iPad/Mac, constrain to column width
+            .frame(minWidth: 250, maxWidth: cutoff > 768 ? 400 : .infinity)
         }
         .clipped()
     }

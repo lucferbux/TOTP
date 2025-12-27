@@ -37,4 +37,14 @@ public enum OtpEntry: Hashable {
             return Int((nextUpdate - time).rounded())
         }
     }
+    
+    /// Returns the key data for this OTP entry
+    public func getKey() -> Data {
+        switch self {
+        case let .hotp(key, _, _):
+            return key
+        case let .totp(key, _, _):
+            return key
+        }
+    }
 }

@@ -13,13 +13,14 @@ public struct OtpModel: Identifiable, Hashable {
         hasher.combine(entry)
     }
     
-    public let id = UUID()
+    public let id: UUID
     public var issuer: String?
     public var name: String?
     public var prefix: String?
     public var entry: OtpEntry
     
-    public init(issuer: String? = nil, name: String? = nil, prefix: String? = nil, entry: OtpEntry) {
+    public init(id: UUID = UUID(), issuer: String? = nil, name: String? = nil, prefix: String? = nil, entry: OtpEntry) {
+        self.id = id
         self.issuer = issuer
         self.name = name
         self.prefix = prefix

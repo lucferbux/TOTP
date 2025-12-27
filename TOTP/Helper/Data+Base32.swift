@@ -1,7 +1,40 @@
 import Foundation
 
-// Extension to provide Base32 decoding functionality
+// Extension to provide Base32 encoding and decoding functionality
 extension Data {
+    
+    /// The Base32 alphabet (RFC 4648)
+    private static let base32Alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+    
+    /// Encodes the data to a Base32 string (RFC 4648)
+    /// - Returns: A Base32 encoded string representation of the data
+    func base32EncodedString() -> String {
+        guard !self.isEmpty else { return "" }
+        
+        var result = ""
+        var buffer: UInt64 = 0
+        var bitsInBuffer = 0
+        
+        for byte in self {
+            buffer = (buffer << 8) | UInt64(byte)
+            bitsInBuffer += 8
+            
+            while bitsInBuffer >= 5 {
+                bitsInBuffer -= 5
+                let index = Int((buffer >> bitsInBuffer) & 0x1F)
+                result.append(Self.base32Alphabet[index])
+            }
+        }
+        
+        // Handle remaining bits (pad with zeros on the right)
+        if bitsInBuffer > 0 {
+            let index = Int((buffer << (5 - bitsInBuffer)) & 0x1F)
+            result.append(Self.base32Alphabet[index])
+        }
+        
+        return result
+    }
+    
     init?(base32Encoded base32String: String) {
         let string = base32String.uppercased().replacingOccurrences(of: "=", with: "")
         guard !string.isEmpty, string.count % 8 == 0 || string.count % 8 == 2 || string.count % 8 == 4 || string.count % 8 == 5 || string.count % 8 == 7 else {

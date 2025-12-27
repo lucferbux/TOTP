@@ -61,7 +61,11 @@ public class SharedDataManager: ObservableObject {
                         entry = .totp(key: decryptedKey, digits: storedAccount.digits, interval: storedAccount.interval)
                     }
                     
+                    // Restore the original ID from storage
+                    let accountId = UUID(uuidString: storedAccount.id) ?? UUID()
+                    
                     let otpModel = OtpModel(
+                        id: accountId,
                         issuer: storedAccount.issuer,
                         name: storedAccount.name,
                         prefix: storedAccount.prefix,
@@ -87,10 +91,12 @@ public class SharedDataManager: ObservableObject {
     }
     
     public func saveAccounts() {
+        print("DEBUG saveAccounts: Starting save with \(accounts.count) accounts")
         do {
             var storedAccounts: [StoredOtpAccount] = []
             
             for account in accounts {
+                print("DEBUG saveAccounts: Saving account - id: \(account.id), issuer: \(account.issuer ?? "nil"), name: \(account.name ?? "nil")")
                 var key: Data
                 var isHotp: Bool
                 var digits: Int
@@ -133,6 +139,7 @@ public class SharedDataManager: ObservableObject {
             let data = try encoder.encode(storedAccounts)
             userDefaults.set(data, forKey: accountsKey)
             userDefaults.synchronize()
+            print("DEBUG saveAccounts: Save completed, wrote \(data.count) bytes")
             
         } catch {
             DispatchQueue.main.async {
@@ -170,6 +177,34 @@ public class SharedDataManager: ObservableObject {
         DispatchQueue.main.async {
             self.accounts.removeAll { $0.id == account.id }
             self.saveAccounts()
+        }
+    }
+    
+    public func updateAccount(_ account: OtpModel) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.main.async {
+                print("DEBUG updateAccount: Looking for account with ID: \(account.id)")
+                print("DEBUG updateAccount: Current accounts count: \(self.accounts.count)")
+                print("DEBUG updateAccount: Current account IDs: \(self.accounts.map { $0.id })")
+                
+                if let index = self.accounts.firstIndex(where: { $0.id == account.id }) {
+                    print("DEBUG updateAccount: Found at index \(index)")
+                    self.accounts[index] = account
+                    self.saveAccounts()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let error = self.error {
+                            continuation.resume(throwing: error)
+                        } else {
+                            print("DEBUG updateAccount: Save completed successfully")
+                            continuation.resume()
+                        }
+                    }
+                } else {
+                    print("DEBUG updateAccount: Account NOT FOUND!")
+                    continuation.resume(throwing: NSError(domain: "SharedDataManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Account not found"]))
+                }
+            }
         }
     }
     

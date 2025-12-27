@@ -67,6 +67,8 @@ public struct ContentView: View {
                                                     editing: $editingAccount,
                                                     toast: $showCopiedToast
                                                 )
+                                                // Force view recreation when account data changes
+                                                .id("\(account.id)-\(account.issuer ?? "")-\(account.name ?? "")-\(account.prefix ?? "")-\(account.entry.hashValue)")
                                                 .transition(
                                                     AnyTransition.asymmetric(
                                                         insertion: AnyTransition.move(edge: .leading),
@@ -284,7 +286,7 @@ public struct ContentView: View {
         }
         .sheet(item: $editingAccount) { account in
             AddingPageView(
-                accounts: $accounts, addingAccount: .constant(false), dataManager: dataManager
+                accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager, editingAccount: account
             )
             .preferredColorScheme(self.colorScheme)
             .onDisappear {
