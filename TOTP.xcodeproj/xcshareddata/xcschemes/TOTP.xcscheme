@@ -38,6 +38,30 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1F9FFE652D77729700D81249"
+               BuildableName = "TOTPTests.xctest"
+               BlueprintName = "TOTPTests"
+               ReferencedContainer = "container:TOTP.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1F9FFE6F2D77729700D81249"
+               BuildableName = "TOTPUITests.xctest"
+               BlueprintName = "TOTPUITests"
+               ReferencedContainer = "container:TOTP.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

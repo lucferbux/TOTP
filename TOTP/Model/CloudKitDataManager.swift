@@ -21,26 +21,17 @@ public class CloudKitDataManager: ObservableObject {
     @Published public var error: CloudKitError?
     @Published public var accountStatus: CKAccountStatus = .couldNotDetermine
     
-    // Encryption key for sensitive data
-    private let encryptionKey: SymmetricKey
-    
     // Sync status
     @Published public var lastSyncDate: Date?
     @Published public var syncInProgress = false
     
+    // Subscription tracking
+    private let subscriptionID = "TOTPAccountChanges"
+    private var hasRegisteredSubscription = false
+    
     private init() {
         self.container = CKContainer.default()
         self.privateDatabase = container.privateCloudDatabase
-        
-        // Generate or retrieve encryption key from Keychain
-        self.encryptionKey = Self.getOrCreateEncryptionKey()
-        
-        Task {
-            await checkAccountStatus()
-            if accountStatus == .available {
-                await loadAccounts()
-            }
-        }
     }
     
     // MARK: - Account Status
@@ -59,6 +50,54 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
     
+    // MARK: - Subscription Management
+    
+    /// Registers a CloudKit subscription to receive push notifications when records change
+    @MainActor
+    public func registerForRemoteNotifications() async {
+        guard accountStatus == .available else { return }
+        guard !hasRegisteredSubscription else { return }
+        
+        do {
+            // First check if subscription already exists
+            let existingSubscriptions = try await privateDatabase.allSubscriptions()
+            let subscriptionExists = existingSubscriptions.contains { $0.subscriptionID == subscriptionID }
+            
+            if !subscriptionExists {
+                // Create a database subscription for all record changes
+                let subscription = CKDatabaseSubscription(subscriptionID: subscriptionID)
+                
+                let notificationInfo = CKSubscription.NotificationInfo()
+                notificationInfo.shouldSendContentAvailable = true // Silent push
+                subscription.notificationInfo = notificationInfo
+                
+                try await privateDatabase.save(subscription)
+                print("CloudKit: Registered for remote notifications")
+            }
+            
+            hasRegisteredSubscription = true
+        } catch {
+            print("CloudKit: Failed to register subscription: \(error)")
+        }
+    }
+    
+    /// Handles a remote notification from CloudKit
+    /// Returns true if the notification was handled
+    @MainActor
+    public func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> Bool {
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo as! [String: NSObject]) else {
+            return false
+        }
+        
+        if notification.subscriptionID == subscriptionID {
+            print("CloudKit: Received remote notification, fetching changes")
+            await loadAccounts()
+            return true
+        }
+        
+        return false
+    }
+    
     // MARK: - Data Operations
     
     @MainActor
@@ -69,7 +108,11 @@ public class CloudKitDataManager: ObservableObject {
         }
         
         isLoading = true
-        defer { isLoading = false }
+        syncInProgress = true
+        defer { 
+            isLoading = false
+            syncInProgress = false
+        }
         
         do {
             let query = CKQuery(recordType: CloudKitOtpModel.recordType, predicate: NSPredicate(value: true))
@@ -86,23 +129,25 @@ public class CloudKitDataManager: ObservableObject {
                         loadedAccounts.append(model)
                     }
                 case .failure(let error):
-                    print("Failed to load record: \(error)")
+                    print("CloudKit: Failed to load record: \(error)")
                 }
             }
             
             self.accounts = loadedAccounts
             self.lastSyncDate = Date()
+            self.error = nil
             
+        } catch let error as CKError {
+            handleCloudKitError(error)
         } catch {
             self.error = CloudKitError.fetchFailed(error)
         }
     }
     
     @MainActor
-    public func saveAccount(_ account: CloudKitOtpModel) async {
+    public func saveAccount(_ account: CloudKitOtpModel) async throws {
         guard accountStatus == .available else {
-            self.error = CloudKitError.accountNotAvailable
-            return
+            throw CloudKitError.accountNotAvailable
         }
         
         syncInProgress = true
@@ -123,33 +168,55 @@ public class CloudKitDataManager: ObservableObject {
             }
             
             self.lastSyncDate = Date()
+            self.error = nil
             
+        } catch let error as CKError {
+            // Handle server record changed conflict
+            if error.code == .serverRecordChanged {
+                // Last-write-wins: force overwrite
+                if let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
+                    account.record = serverRecord
+                    try await saveAccount(account)
+                    return
+                }
+            }
+            handleCloudKitError(error)
+            throw CloudKitError.saveFailed(error)
         } catch {
             self.error = CloudKitError.saveFailed(error)
+            throw CloudKitError.saveFailed(error)
         }
     }
     
     @MainActor
-    public func deleteAccount(_ account: CloudKitOtpModel) async {
+    public func deleteAccount(_ account: CloudKitOtpModel) async throws {
         guard accountStatus == .available else {
-            self.error = CloudKitError.accountNotAvailable
-            return
+            throw CloudKitError.accountNotAvailable
         }
         
         syncInProgress = true
         defer { syncInProgress = false }
         
         do {
-            if let record = account.record {
-                try await privateDatabase.deleteRecord(withID: record.recordID)
-            }
+            let recordID = account.record?.recordID ?? CKRecord.ID(recordName: account.id)
+            try await privateDatabase.deleteRecord(withID: recordID)
             
             // Remove from local array
             accounts.removeAll { $0.id == account.id }
             self.lastSyncDate = Date()
+            self.error = nil
             
+        } catch let error as CKError {
+            // If record doesn't exist, still remove locally
+            if error.code == .unknownItem {
+                accounts.removeAll { $0.id == account.id }
+                return
+            }
+            handleCloudKitError(error)
+            throw CloudKitError.deleteFailed(error)
         } catch {
             self.error = CloudKitError.deleteFailed(error)
+            throw CloudKitError.deleteFailed(error)
         }
     }
     
@@ -158,56 +225,32 @@ public class CloudKitDataManager: ObservableObject {
         await loadAccounts()
     }
     
-    // MARK: - Encryption
+    // MARK: - Encryption (using shared EncryptionKeyManager)
     
     public func encryptData(_ data: Data) throws -> Data {
-        return try ChaChaPoly.seal(data, using: encryptionKey).combined
+        return try EncryptionKeyManager.shared.encryptData(data)
     }
     
     public func decryptData(_ encryptedData: Data) throws -> Data {
-        let sealedBox = try ChaChaPoly.SealedBox(combined: encryptedData)
-        return try ChaChaPoly.open(sealedBox, using: encryptionKey)
+        return try EncryptionKeyManager.shared.decryptData(encryptedData)
     }
     
-    // MARK: - Keychain Management
+    // MARK: - Error Handling
     
-    private static func getOrCreateEncryptionKey() -> SymmetricKey {
-        let service = "TOTP-CloudKit-Encryption"
-        let account = "master-key"
-        
-        // Try to load existing key from Keychain
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        if status == errSecSuccess,
-           let keyData = result as? Data {
-            return SymmetricKey(data: keyData)
+    private func handleCloudKitError(_ error: CKError) {
+        switch error.code {
+        case .networkUnavailable, .networkFailure:
+            self.error = CloudKitError.networkError
+        case .notAuthenticated:
+            self.accountStatus = .noAccount
+            self.error = CloudKitError.accountNotAvailable
+        case .quotaExceeded:
+            self.error = CloudKitError.quotaExceeded
+        case .serverResponseLost:
+            self.error = CloudKitError.serverError
+        default:
+            self.error = CloudKitError.unknown(error)
         }
-        
-        // Generate new key
-        let newKey = SymmetricKey(size: .bits256)
-        let keyData = newKey.withUnsafeBytes { Data($0) }
-        
-        // Save to Keychain
-        let saveQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        
-        SecItemAdd(saveQuery as CFDictionary, nil)
-        
-        return newKey
     }
     
     // MARK: - Convenience Methods
@@ -219,13 +262,44 @@ public class CloudKitDataManager: ObservableObject {
     @MainActor
     public func addOtpModel(_ otpModel: OtpModel) async throws {
         let cloudKitModel = try CloudKitOtpModel.from(otpModel: otpModel)
-        await saveAccount(cloudKitModel)
+        try await saveAccount(cloudKitModel)
     }
     
     @MainActor
-    public func deleteOtpModel(withId id: String) async {
+    public func updateOtpModel(_ otpModel: OtpModel) async throws {
+        // Find existing account or create new
+        if let existingIndex = accounts.firstIndex(where: { $0.id == otpModel.id.uuidString }) {
+            let cloudKitModel = accounts[existingIndex]
+            // Update the CloudKit model
+            cloudKitModel.issuer = otpModel.issuer
+            cloudKitModel.name = otpModel.name
+            cloudKitModel.prefix = otpModel.prefix
+            
+            // Update entry data
+            switch otpModel.entry {
+            case let .hotp(key, digits, counter):
+                cloudKitModel.encryptedKey = try encryptData(key)
+                cloudKitModel.isHotp = true
+                cloudKitModel.digits = digits
+                cloudKitModel.counter = Int64(counter)
+            case let .totp(key, digits, interval):
+                cloudKitModel.encryptedKey = try encryptData(key)
+                cloudKitModel.isHotp = false
+                cloudKitModel.digits = digits
+                cloudKitModel.interval = interval
+            }
+            
+            try await saveAccount(cloudKitModel)
+        } else {
+            // Create new
+            try await addOtpModel(otpModel)
+        }
+    }
+    
+    @MainActor
+    public func deleteOtpModel(withId id: String) async throws {
         if let account = accounts.first(where: { $0.id == id }) {
-            await deleteAccount(account)
+            try await deleteAccount(account)
         }
     }
 }
@@ -239,6 +313,9 @@ public enum CloudKitError: LocalizedError, Identifiable {
     case deleteFailed(Error)
     case encryptionFailed
     case decryptionFailed
+    case networkError
+    case quotaExceeded
+    case serverError
     case unknown(Error)
     
     public var id: String {
@@ -249,6 +326,9 @@ public enum CloudKitError: LocalizedError, Identifiable {
         case .deleteFailed: return "deleteFailed"
         case .encryptionFailed: return "encryptionFailed"
         case .decryptionFailed: return "decryptionFailed"
+        case .networkError: return "networkError"
+        case .quotaExceeded: return "quotaExceeded"
+        case .serverError: return "serverError"
         case .unknown: return "unknown"
         }
     }
@@ -267,8 +347,23 @@ public enum CloudKitError: LocalizedError, Identifiable {
             return "Failed to encrypt account data"
         case .decryptionFailed:
             return "Failed to decrypt account data"
+        case .networkError:
+            return "Network connection unavailable. Changes will sync when connected."
+        case .quotaExceeded:
+            return "iCloud storage quota exceeded. Please free up space."
+        case .serverError:
+            return "iCloud server error. Please try again later."
         case .unknown(let error):
             return "An unknown error occurred: \(error.localizedDescription)"
+        }
+    }
+    
+    public var isTransient: Bool {
+        switch self {
+        case .networkError, .serverError:
+            return true
+        default:
+            return false
         }
     }
 }

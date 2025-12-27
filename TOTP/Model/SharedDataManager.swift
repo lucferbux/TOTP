@@ -69,7 +69,8 @@ public class SharedDataManager: ObservableObject {
                         issuer: storedAccount.issuer,
                         name: storedAccount.name,
                         prefix: storedAccount.prefix,
-                        entry: entry
+                        entry: entry,
+                        associatedDomains: storedAccount.associatedDomains
                     )
                     
                     loadedAccounts.append(otpModel)
@@ -129,7 +130,8 @@ public class SharedDataManager: ObservableObject {
                     interval: interval,
                     counter: counter,
                     createdDate: Date(),
-                    modifiedDate: Date()
+                    modifiedDate: Date(),
+                    associatedDomains: account.associatedDomains
                 )
                 
                 storedAccounts.append(storedAccount)
@@ -348,6 +350,41 @@ private struct StoredOtpAccount: Codable {
     let counter: Int64
     let createdDate: Date
     let modifiedDate: Date
+    let associatedDomains: [String]?
+    
+    // Custom init for backward compatibility
+    init(id: String, issuer: String?, name: String?, prefix: String?, encryptedKey: Data, isHotp: Bool, digits: Int, interval: Double, counter: Int64, createdDate: Date, modifiedDate: Date, associatedDomains: [String]? = nil) {
+        self.id = id
+        self.issuer = issuer
+        self.name = name
+        self.prefix = prefix
+        self.encryptedKey = encryptedKey
+        self.isHotp = isHotp
+        self.digits = digits
+        self.interval = interval
+        self.counter = counter
+        self.createdDate = createdDate
+        self.modifiedDate = modifiedDate
+        self.associatedDomains = associatedDomains
+    }
+    
+    // Codable conformance with backward compatibility
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        issuer = try container.decodeIfPresent(String.self, forKey: .issuer)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        prefix = try container.decodeIfPresent(String.self, forKey: .prefix)
+        encryptedKey = try container.decode(Data.self, forKey: .encryptedKey)
+        isHotp = try container.decode(Bool.self, forKey: .isHotp)
+        digits = try container.decode(Int.self, forKey: .digits)
+        interval = try container.decode(Double.self, forKey: .interval)
+        counter = try container.decode(Int64.self, forKey: .counter)
+        createdDate = try container.decode(Date.self, forKey: .createdDate)
+        modifiedDate = try container.decode(Date.self, forKey: .modifiedDate)
+        // Backward compatibility: associatedDomains might not exist in older data
+        associatedDomains = try container.decodeIfPresent([String].self, forKey: .associatedDomains)
+    }
 }
 
 // MARK: - Error Types

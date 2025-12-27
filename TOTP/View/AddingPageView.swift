@@ -5,6 +5,7 @@ import CloudKit
 @available(iOS 26.0, macOS 26.0, *)
 public struct AddingPageView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var syncManager: SyncManager
     @Binding public var accounts: [OtpModel]
     @Binding public var addingAccount: Bool
     public let dataManager: SharedDataManager
@@ -22,6 +23,7 @@ public struct AddingPageView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showKey = false
+    @State private var domainsText: String = ""
     @State private var numberFormatter: NumberFormatter = {
         var formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -86,6 +88,13 @@ public struct AddingPageView: View {
                 _counter = State(initialValue: Int(c))
                 _interval = State(initialValue: 30)
             }
+            
+            // Initialize domains text from associated domains
+            if let domains = account.associatedDomains, !domains.isEmpty {
+                _domainsText = State(initialValue: domains.joined(separator: ", "))
+            } else {
+                _domainsText = State(initialValue: "")
+            }
         } else {
             _issuer = State(initialValue: "")
             _name = State(initialValue: "")
@@ -95,6 +104,7 @@ public struct AddingPageView: View {
             _interval = State(initialValue: 30)
             _counter = State(initialValue: 0)
             _isHotp = State(initialValue: false)
+            _domainsText = State(initialValue: "")
         }
     }
 
@@ -147,6 +157,16 @@ public struct AddingPageView: View {
                     TextField("Prefix (optional)", text: $prefix)
                 } header: {
                     Text("Account Information")
+                }
+                
+                Section {
+                    TextField("e.g. github.com, example.org", text: $domainsText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("AutoFill Domains")
+                } footer: {
+                    Text("Enter domains where this code should appear in AutoFill, separated by commas.")
                 }
             }
             .navigationTitle(navigationTitle)
@@ -230,6 +250,16 @@ public struct AddingPageView: View {
             let prefix = self.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
             let secretKeyString = self.key.trimmingCharacters(in: .whitespacesAndNewlines)
             
+            // Parse domains from comma-separated text
+            let domains: [String]? = {
+                let trimmed = domainsText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty { return nil }
+                let parsed = trimmed.split(separator: ",")
+                    .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                    .filter { !$0.isEmpty }
+                return parsed.isEmpty ? nil : parsed
+            }()
+            
             // Key is always required (pre-filled when editing)
             guard !secretKeyString.isEmpty else {
                 errorMessage = "Secret key cannot be empty."
@@ -262,13 +292,12 @@ public struct AddingPageView: View {
                 updatedModel.name = name.isEmpty ? nil : name
                 updatedModel.prefix = prefix.isEmpty ? nil : prefix
                 updatedModel.entry = entry
+                updatedModel.associatedDomains = domains
                 
                 print("DEBUG: Updating account with ID: \(existingAccount.id)")
-                print("DEBUG: dataManager.accounts count: \(dataManager.accounts.count)")
-                print("DEBUG: dataManager.accounts IDs: \(dataManager.accounts.map { $0.id })")
                 
-                // Update using the data manager
-                try await dataManager.updateAccount(updatedModel)
+                // Update using SyncManager (syncs to both local and cloud)
+                try await syncManager.updateAccount(updatedModel)
                 
                 print("DEBUG: Update completed successfully")
                 
@@ -276,9 +305,6 @@ public struct AddingPageView: View {
                 withAnimation(.smooth(duration: 0.3)) {
                     if let index = self.accounts.firstIndex(where: { $0.id == existingAccount.id }) {
                         self.accounts[index] = updatedModel
-                        print("DEBUG: Updated local accounts array at index \(index)")
-                    } else {
-                        print("DEBUG: Could not find account in local array")
                     }
                 }
             } else {
@@ -286,11 +312,12 @@ public struct AddingPageView: View {
                     issuer: issuer.isEmpty ? nil : issuer,
                     name: name.isEmpty ? nil : name,
                     prefix: prefix.isEmpty ? nil : prefix,
-                    entry: entry
+                    entry: entry,
+                    associatedDomains: domains
                 )
                 
-                // Save using the data manager
-                try await dataManager.saveAccount(otpModel)
+                // Save using SyncManager (syncs to both local and cloud)
+                await syncManager.addAccount(otpModel)
                 
                 // Update local array for immediate UI feedback
                 withAnimation(.smooth(duration: 0.3)) {

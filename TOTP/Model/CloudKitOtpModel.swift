@@ -24,6 +24,7 @@ public class CloudKitOtpModel: ObservableObject {
     @Published public var counter: Int64
     @Published public var createdDate: Date
     @Published public var modifiedDate: Date
+    @Published public var associatedDomains: [String]?
     
     // CloudKit record reference
     public var record: CKRecord?
@@ -39,7 +40,8 @@ public class CloudKitOtpModel: ObservableObject {
         interval: Double = 30.0,
         counter: Int64 = 0,
         createdDate: Date = Date(),
-        modifiedDate: Date = Date()
+        modifiedDate: Date = Date(),
+        associatedDomains: [String]? = nil
     ) {
         self.id = id
         self.issuer = issuer
@@ -52,6 +54,7 @@ public class CloudKitOtpModel: ObservableObject {
         self.counter = counter
         self.createdDate = createdDate
         self.modifiedDate = modifiedDate
+        self.associatedDomains = associatedDomains
     }
     
     // Initialize from CloudKit record
@@ -77,7 +80,8 @@ public class CloudKitOtpModel: ObservableObject {
             interval: interval,
             counter: counter,
             createdDate: createdDate,
-            modifiedDate: modifiedDate
+            modifiedDate: modifiedDate,
+            associatedDomains: record["associatedDomains"] as? [String]
         )
         self.record = record
     }
@@ -96,6 +100,7 @@ public class CloudKitOtpModel: ObservableObject {
         record["counter"] = counter
         record["createdDate"] = createdDate
         record["modifiedDate"] = Date() // Always update modified date when saving
+        record["associatedDomains"] = associatedDomains
         
         self.record = record
         return record
@@ -103,7 +108,7 @@ public class CloudKitOtpModel: ObservableObject {
     
     // Convert to local OtpModel for UI
     public func toOtpModel() throws -> OtpModel {
-        let decryptedKey = try CloudKitDataManager.shared.decryptData(encryptedKey)
+        let decryptedKey = try EncryptionKeyManager.shared.decryptData(encryptedKey)
         
         let entry: OtpEntry
         if isHotp {
@@ -113,10 +118,12 @@ public class CloudKitOtpModel: ObservableObject {
         }
         
         return OtpModel(
+            id: UUID(uuidString: id) ?? UUID(),
             issuer: issuer,
             name: name,
             prefix: prefix,
-            entry: entry
+            entry: entry,
+            associatedDomains: associatedDomains
         )
     }
     
@@ -127,7 +134,6 @@ public class CloudKitOtpModel: ObservableObject {
         var digits: Int
         var interval: Double = 30.0
         var counter: Int64 = 0
-        
         switch otpModel.entry {
         case let .hotp(k, d, c):
             key = k
@@ -141,9 +147,10 @@ public class CloudKitOtpModel: ObservableObject {
             interval = i
         }
         
-        let encryptedKey = try CloudKitDataManager.shared.encryptData(key)
+        let encryptedKey = try EncryptionKeyManager.shared.encryptData(key)
         
         return CloudKitOtpModel(
+            id: otpModel.id.uuidString,
             issuer: otpModel.issuer,
             name: otpModel.name,
             prefix: otpModel.prefix,
@@ -151,7 +158,8 @@ public class CloudKitOtpModel: ObservableObject {
             isHotp: isHotp,
             digits: digits,
             interval: interval,
-            counter: counter
+            counter: counter,
+            associatedDomains: otpModel.associatedDomains
         )
     }
 }

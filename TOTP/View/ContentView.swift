@@ -10,6 +10,7 @@ import CloudKit
 @available(iOS 26.0, macOS 26.0, *)
 public struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject private var syncManager: SyncManager
     @StateObject private var dataManager = SharedDataManager.shared
     @State private var accounts: [OtpModel] = []
     @State var addingAccount = false
@@ -34,11 +35,17 @@ public struct ContentView: View {
                 #endif
                 
                 VStack {
+                    // Sync status banner (shown when there's an issue)
+                    if syncManager.syncState.isError {
+                        SyncStatusBanner(syncState: syncManager.syncState)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    
                     GeometryReader { geometry in
                         ScrollView {
                             ZStack {
                                 // Content when accounts exist or loading
-                                if !self.accounts.isEmpty || dataManager.isLoading {
+                                if !self.accounts.isEmpty || syncManager.isLoading {
                                     VStack {
                                         let searchField = self.search.trimmingCharacters(
                                             in: .whitespacesAndNewlines)
@@ -82,12 +89,12 @@ public struct ContentView: View {
                                         .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
 
                                         // Loading indicator
-                                        if dataManager.isLoading {
+                                        if syncManager.isLoading {
                                             VStack(spacing: 12) {
                                                 ProgressView()
                                                     .scaleEffect(1.3)
                                                     .tint(.blue)
-                                                Text("Loading accounts...")
+                                                Text("Syncing accounts...")
                                                     .font(.subheadline)
                                                     .fontWeight(.medium)
                                                     .foregroundStyle(.secondary)
@@ -105,7 +112,7 @@ public struct ContentView: View {
                                 }
                                 
                                 // Empty state - properly centered
-                                if self.accounts.isEmpty && !dataManager.isLoading {
+                                if self.accounts.isEmpty && !syncManager.isLoading {
                                     VStack(spacing: 24) {
                                         Image(systemName: "lock.shield.fill")
                                             .font(.system(size: 70))
@@ -132,7 +139,7 @@ public struct ContentView: View {
                             }
                         }
                         .refreshable {
-                            dataManager.loadAccounts()
+                            await syncManager.refresh()
                         }
                         
                         // Toast message overlay
@@ -215,12 +222,14 @@ public struct ContentView: View {
                 .toolbar {
                     ToolbarItem(placement: .secondaryAction) {
                         Button(action: {
-                            dataManager.loadAccounts()
+                            Task {
+                                await syncManager.refresh()
+                            }
                         }) {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                         .help("Refresh accounts")
-                        .disabled(dataManager.isLoading)
+                        .disabled(syncManager.syncState == .syncing)
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button(action: {
@@ -234,9 +243,9 @@ public struct ContentView: View {
             #endif
         }
         .onAppear {
-            self.accounts = dataManager.accounts
+            self.accounts = syncManager.accounts
         }
-        .onReceive(dataManager.$accounts) { newAccounts in
+        .onReceive(syncManager.$accounts) { newAccounts in
             withAnimation(.smooth(duration: 0.3)) {
                 self.accounts = newAccounts
             }
@@ -270,7 +279,9 @@ public struct ContentView: View {
                 title: Text("Confirm Delete"),
                 message: Text("Are you sure that you want to DELETE \(alertText)"),
                 primaryButton: .destructive(Text("Delete").bold()) {
-                    dataManager.deleteAccount(item)
+                    Task {
+                        await syncManager.deleteAccount(item)
+                    }
                     withAnimation(.smooth(duration: 1)) {
                         self.accounts.removeAll(where: { $0.id == item.id })
                     }
@@ -282,12 +293,14 @@ public struct ContentView: View {
             AddingPageView(
                 accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager
             )
+            .environmentObject(syncManager)
             .preferredColorScheme(self.colorScheme)
         }
         .sheet(item: $editingAccount) { account in
             AddingPageView(
                 accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager, editingAccount: account
             )
+            .environmentObject(syncManager)
             .preferredColorScheme(self.colorScheme)
             .onDisappear {
                 editingAccount = nil
@@ -765,5 +778,63 @@ struct MockTotpView: View {
             }
         }
         .clipped()
+    }
+}
+
+// MARK: - Sync Status UI Components
+
+@available(iOS 26.0, macOS 26.0, *)
+struct SyncStatusBanner: View {
+    let syncState: SyncState
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: syncState.systemImage)
+                .font(.subheadline)
+                .foregroundStyle(.orange)
+            
+            Text(bannerMessage)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            
+            if syncState == .iCloudDisabled {
+                Button("Settings") {
+                    openSettings()
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.orange.opacity(0.15))
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+    
+    private var bannerMessage: String {
+        switch syncState {
+        case .iCloudDisabled:
+            return "iCloud sync is disabled. Sign in to sync across devices."
+        case .error(let message):
+            return message
+        case .offline:
+            return "You're offline. Changes will sync when connected."
+        default:
+            return ""
+        }
+    }
+    
+    private func openSettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #endif
     }
 }

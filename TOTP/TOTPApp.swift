@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WidgetKit
+import CloudKit
 
 #if canImport(UIKit)
 import UIKit
@@ -19,11 +20,21 @@ import AppKit
 @available(iOS 26.0, macOS 26.0, *)
 @main
 struct TOTPApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
+    
+    @StateObject private var syncManager = SyncManager.shared
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(syncManager)
                 .onOpenURL { url in
                     handleURL(url)
+                }
+                .task {
+                    await syncManager.initializeSync()
                 }
         }
         #if os(macOS)
@@ -65,6 +76,34 @@ struct TOTPApp: App {
         }
     }
 }
+
+// MARK: - App Delegate for Remote Notifications
+
+#if os(iOS)
+@available(iOS 26.0, *)
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Register for remote notifications (CloudKit silent push)
+        application.registerForRemoteNotifications()
+        return true
+    }
+    
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        print("CloudKit: Registered for remote notifications with token")
+    }
+    
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("CloudKit: Failed to register for remote notifications: \(error)")
+    }
+    
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        Task {
+            let handled = await SyncManager.shared.handleRemoteNotification(userInfo: userInfo)
+            completionHandler(handled ? .newData : .noData)
+        }
+    }
+}
+#endif
 
 extension Notification.Name {
     static let addAccount = Notification.Name("addAccount")
