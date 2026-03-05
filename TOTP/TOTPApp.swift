@@ -15,6 +15,7 @@ import UIKit
 
 #if canImport(AppKit)
 import AppKit
+import ServiceManagement
 #endif
 
 @available(iOS 26.0, macOS 26.0, *)
@@ -22,12 +23,15 @@ import AppKit
 struct TOTPApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) var appDelegate
+    @StateObject private var macSettings = MacOSAppSettings.shared
     #endif
     
     @StateObject private var syncManager = SyncManager.shared
     
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
                 .environmentObject(syncManager)
                 .onOpenURL { url in
@@ -41,6 +45,7 @@ struct TOTPApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 800, height: 600)
+        .defaultLaunchBehavior(.suppressed)
         #endif
         .commands {
             CommandGroup(replacing: .newItem) {}
@@ -51,6 +56,20 @@ struct TOTPApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        
+        #if os(macOS)
+        // Menu bar icon with TOTP list popover
+        MenuBarExtra("TOTP Authenticator", systemImage: "lock.shield.fill") {
+            MenuBarView()
+                .environmentObject(syncManager)
+        }
+        .menuBarExtraStyle(.window)
+        
+        // macOS Settings window (Cmd+,)
+        Settings {
+            SettingsView()
+        }
+        #endif
     }
     
     private func handleURL(_ url: URL) {
@@ -105,10 +124,59 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 }
 #endif
 
+// MARK: - macOS App Delegate for Remote Notifications & Lifecycle
+
+#if os(macOS)
+@available(macOS 26.0, *)
+class MacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Register for remote notifications (CloudKit silent push)
+        NSApplication.shared.registerForRemoteNotifications()
+        
+        // Apply dock icon visibility preference
+        MacOSAppSettings.shared.applyDockIconPolicy()
+    }
+    
+    func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        print("CloudKit: Registered for remote notifications with token")
+    }
+    
+    func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("CloudKit: Failed to register for remote notifications: \(error)")
+    }
+    
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        Task {
+            _ = await SyncManager.shared.handleRemoteNotification(userInfo: userInfo)
+        }
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            // Re-open the main window when clicking dock icon
+            for window in sender.windows {
+                if window.canBecomeMain {
+                    window.makeKeyAndOrderFront(self)
+                    break
+                }
+            }
+        }
+        return true
+    }
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Don't quit — hide to menu bar instead
+        MacOSAppSettings.shared.applyDockIconPolicy()
+        return false
+    }
+}
+#endif
+
 extension Notification.Name {
     static let addAccount = Notification.Name("addAccount")
 }
 
+#if os(iOS)
 struct TOTPApp_Previews: PreviewProvider {
     static var previews: some View {
         Group {
@@ -145,7 +213,7 @@ struct TOTPApp_Previews: PreviewProvider {
 }
 
 // Empty state preview
-@available(iOS 26.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 struct EmptyStatePreview: View {
     var body: some View {
         NavigationStack {
@@ -224,7 +292,7 @@ struct EmptyStatePreview: View {
 }
 
 // With data preview
-@available(iOS 26.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 struct WithDataPreview: View {
     private let sampleAccounts = [
         ("Google", "john.doe@gmail.com", "123456"),
@@ -315,7 +383,7 @@ struct WithDataPreview: View {
 }
 
 // Loading state preview
-@available(iOS 26.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 struct LoadingStatePreview: View {
     var body: some View {
         NavigationStack {
@@ -396,7 +464,7 @@ struct LoadingStatePreview: View {
 }
 
 // Mock TOTP card component
-@available(iOS 26.0, macOS 26.0, *)
+@available(iOS 26.0, *)
 struct MockTOTPCard: View {
     let issuer: String
     let name: String
@@ -439,3 +507,4 @@ struct MockTOTPCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
+#endif // os(iOS)

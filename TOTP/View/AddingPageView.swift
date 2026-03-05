@@ -111,64 +111,13 @@ public struct AddingPageView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Type", selection: $isHotp) {
-                        Text("TOTP").tag(false)
-                        Text("HOTP").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(isEditing) // Can't change type when editing
-
-                    HStack {
-                        if showKey {
-                            TextField("Secret Key", text: $key)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        } else {
-                            SecureField("Secret Key", text: $key)
-                        }
-                        
-                        Button(action: {
-                            withAnimation(.smooth(duration: 0.2)) {
-                                showKey.toggle()
-                            }
-                        }) {
-                            Image(systemName: showKey ? "eye.slash.fill" : "eye.fill")
-                                .foregroundStyle(.secondary)
-                                .contentTransition(.symbolEffect(.replace))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if self.isHotp {
-                        Stepper("Counter: \(counter)", value: $counter, in: 0...Int.max)
-                    } else {
-                        Stepper("\(interval) seconds", value: $interval, in: 1...300)
-                    }
-
-                    Stepper("\(digits) digits", value: $digits, in: 6...10)
-                } header: {
-                    Text("OTP Configuration")
-                }
-
-                Section {
-                    TextField("Issuer", text: $issuer)
-                    TextField("Account Name", text: $name)
-                    TextField("Prefix (optional)", text: $prefix)
-                } header: {
-                    Text("Account Information")
-                }
-                
-                Section {
-                    TextField("e.g. github.com, example.org", text: $domainsText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("AutoFill Domains")
-                } footer: {
-                    Text("Enter domains where this code should appear in AutoFill, separated by commas.")
-                }
+                otpConfigSection
+                accountInfoSection
+                autoFillDomainsSection
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(navigationTitle)
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
@@ -190,12 +139,13 @@ public struct AddingPageView: View {
                 }
             #elseif os(macOS)
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItem(placement: .confirmationAction) {
                         Button(saveButtonTitle) {
                             Task {
                                 await saveAccount()
                             }
                         }
+                        .keyboardShortcut(.defaultAction)
                         .disabled(!canSave)
                     }
                     ToolbarItem(placement: .cancellationAction) {
@@ -203,10 +153,14 @@ public struct AddingPageView: View {
                             self.addingAccount = false
                             dismiss()
                         }
+                        .keyboardShortcut(.cancelAction)
                     }
                 }
             #endif
         }
+        #if os(macOS)
+        .frame(width: 480, height: 520)
+        #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert(isEditing ? "Error Updating Account" : "Error Adding Account", isPresented: $showingError) {
             Button("OK") {}
@@ -215,28 +169,102 @@ public struct AddingPageView: View {
         }
         .overlay {
             if isSaving {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.3)
-                            .tint(.blue)
-                        Text(isEditing ? "Updating Account..." : "Saving Account...")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(24)
-                    .background {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color(.secondarySystemGroupedBackground))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
+                savingOverlay
             }
         }
         .sensoryFeedback(.success, trigger: accounts.count)
+    }
+    
+    // MARK: - Section Subviews
+    
+    private var otpConfigSection: some View {
+        Section {
+            Picker("Type", selection: $isHotp) {
+                Text("TOTP").tag(false)
+                Text("HOTP").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .disabled(isEditing)
+
+            HStack {
+                if showKey {
+                    TextField("Secret Key", text: $key)
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+                        .autocorrectionDisabled()
+                } else {
+                    SecureField("Secret Key", text: $key)
+                }
+                
+                Button(action: {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        showKey.toggle()
+                    }
+                }) {
+                    Image(systemName: showKey ? "eye.slash.fill" : "eye.fill")
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if self.isHotp {
+                Stepper("Counter: \(counter)", value: $counter, in: 0...Int.max)
+            } else {
+                Stepper("\(interval) seconds", value: $interval, in: 1...300)
+            }
+
+            Stepper("\(digits) digits", value: $digits, in: 6...10)
+        } header: {
+            Text("OTP Configuration")
+        }
+    }
+    
+    private var accountInfoSection: some View {
+        Section {
+            TextField("Issuer", text: $issuer)
+            TextField("Account Name", text: $name)
+            TextField("Prefix (optional)", text: $prefix)
+        } header: {
+            Text("Account Information")
+        }
+    }
+    
+    private var autoFillDomainsSection: some View {
+        Section {
+            TextField("e.g. github.com, example.org", text: $domainsText)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+                .autocorrectionDisabled()
+        } header: {
+            Text("AutoFill Domains")
+        } footer: {
+            Text("Enter domains where this code should appear in AutoFill, separated by commas.")
+        }
+    }
+    
+    private var savingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView()
+                    .scaleEffect(1.3)
+                    .tint(.blue)
+                Text(isEditing ? "Updating Account..." : "Saving Account...")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(PlatformColors.secondarySystemGroupedBackground)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
     }
     
     @MainActor

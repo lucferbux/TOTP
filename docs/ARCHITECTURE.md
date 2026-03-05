@@ -281,6 +281,7 @@ import UIKit
 
 #if canImport(AppKit)
 import AppKit
+import ServiceManagement
 #endif
 ```
 
@@ -313,6 +314,36 @@ struct PlatformColors {
 }
 ```
 
+### macOS-Specific Components
+
+#### MacOSAppSettings (`Helper/MacOSAppSettings.swift`)
+`ObservableObject` managing macOS-exclusive preferences:
+- **Launch at Login** — Uses `SMAppService.mainApp` to register/unregister as a login item
+- **Show Dock Icon** — Toggles `NSApp.setActivationPolicy(.accessory)` vs `.regular`
+- **Window Management** — `showMainWindow()` to activate the main window from the menu bar
+
+Preferences are persisted in `UserDefaults` with keys prefixed `macOS_`.
+
+#### MenuBarView (`View/MenuBarView.swift`)
+Menu bar popover rendered via `MenuBarExtra` with `.window` style:
+- Lists all synced TOTP accounts with live countdown timers
+- Clicking a row copies `(prefix ?? "") + code` to clipboard
+- Search field for filtering accounts (shown when > 3 accounts)
+- "Open Main Window" and "Quit" footer actions
+- Auto-refreshes codes every second via `Timer.publish`
+
+#### SettingsView (`View/SettingsView.swift`)
+macOS Settings window accessible via ⌘, (standard `Settings` scene):
+- General section: Launch at Login toggle, Show Dock Icon toggle
+- Status section: Login item state, dock visibility indicator
+- About section: Version and build information
+
+#### MacAppDelegate (`TOTPApp.swift`)
+macOS `NSApplicationDelegate` adaptor handling:
+- Remote notification registration for CloudKit push sync
+- Dock icon policy application on launch
+- Window reopen behavior when clicking the Dock icon
+
 ### Platform-Specific UI
 
 ```swift
@@ -325,6 +356,15 @@ VStack {
         Button(action: addAccount) {
             Image(systemName: "plus")
         }
+    }
+}
+#endif
+
+// macOS hover effect on TOTP cards
+#if os(macOS)
+.onHover { hovering in
+    withAnimation(.smooth(duration: 0.15)) {
+        isHovered = hovering
     }
 }
 #endif

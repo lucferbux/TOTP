@@ -1,6 +1,6 @@
 import Foundation
 
-public enum OtpEntry: Hashable {
+public enum OtpEntry: Hashable, Sendable {
     public static func == (lhs: OtpEntry, rhs: OtpEntry) -> Bool {
         switch (lhs, rhs) {
         case let (.hotp(lkey, ldigits, lcounter), .hotp(rkey, rdigits, rcounter)):

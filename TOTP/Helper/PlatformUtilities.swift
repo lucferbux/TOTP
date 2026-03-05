@@ -41,6 +41,14 @@ public struct PlatformColors {
         #endif
     }
     
+    static var secondarySystemGroupedBackground: Color {
+        #if canImport(UIKit)
+        return Color(UIColor.secondarySystemGroupedBackground)
+        #else
+        return Color(NSColor.unemphasizedSelectedContentBackgroundColor)
+        #endif
+    }
+    
     static var label: Color {
         #if canImport(UIKit)
         return Color(UIColor.label)

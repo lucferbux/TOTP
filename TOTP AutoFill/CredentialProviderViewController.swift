@@ -10,6 +10,14 @@ import SwiftUI
 import CryptoKit
 import Combine
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
+#if canImport(AppKit)
+import AppKit
+#endif
+
 // MARK: - Embedded Models (for extension independence)
 
 /// OTP Entry type for the extension
@@ -124,7 +132,7 @@ struct OtpModel: Identifiable, Hashable {
 
 // MARK: - Credential Provider View Controller
 
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 class CredentialProviderViewController: ASCredentialProviderViewController {
     
     // MARK: - Properties
@@ -136,17 +144,30 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        #if canImport(UIKit)
         view.backgroundColor = .systemBackground
+        #else
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        #endif
         loadAccounts()
     }
     
+    #if canImport(UIKit)
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // If no specific method was called, show selection UI
         if !hasShownUI {
             showAccountSelectionUI(serviceIdentifiers: [])
         }
     }
+    #else
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if !hasShownUI {
+            showAccountSelectionUI(serviceIdentifiers: [])
+        }
+    }
+    #endif
     
     // MARK: - ASCredentialProviderViewController Methods
     
@@ -212,17 +233,7 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             }
         )
         
-        let hostingController = UIHostingController(rootView: configView)
-        addChild(hostingController)
-        view.addSubview(hostingController.view)
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
-            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        hostingController.didMove(toParent: self)
+        embedHostingController(rootView: configView)
     }
     
     // MARK: - Private Methods
@@ -260,7 +271,19 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             }
         )
         
-        let hostingController = UIHostingController(rootView: selectionView)
+        embedHostingController(rootView: selectionView)
+    }
+    
+    private func provideCredential(for account: OtpModel) {
+        let code = account.generateAutoFillValue()
+        let credential = ASOneTimeCodeCredential(code: code)
+        extensionContext.completeOneTimeCodeRequest(using: credential)
+    }
+    
+    /// Embeds a SwiftUI view inside this view controller using the platform-appropriate hosting controller.
+    private func embedHostingController<Content: View>(rootView: Content) {
+        #if canImport(UIKit)
+        let hostingController = UIHostingController(rootView: rootView)
         addChild(hostingController)
         view.addSubview(hostingController.view)
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -271,12 +294,18 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         hostingController.didMove(toParent: self)
-    }
-    
-    private func provideCredential(for account: OtpModel) {
-        let code = account.generateAutoFillValue()
-        let credential = ASOneTimeCodeCredential(code: code)
-        extensionContext.completeOneTimeCodeRequest(using: credential)
+        #else
+        let hostingController = NSHostingController(rootView: rootView)
+        addChild(hostingController)
+        view.addSubview(hostingController.view)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        #endif
     }
 }
 
@@ -385,7 +414,7 @@ private struct StoredOtpAccount: Codable {
 
 // MARK: - Configuration View
 
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 struct ConfigurationView: View {
     let onDismiss: () -> Void
     
@@ -424,7 +453,9 @@ struct ConfigurationView: View {
                 .padding(.bottom, 32)
             }
             .navigationTitle("Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 }

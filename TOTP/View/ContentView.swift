@@ -7,6 +7,10 @@ import CloudKit
     import UIKit
 #endif
 
+#if canImport(AppKit)
+    import AppKit
+#endif
+
 @available(iOS 26.0, macOS 26.0, *)
 public struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
@@ -36,9 +40,13 @@ public struct ContentView: View {
                 
                 VStack {
                     // Sync status banner (shown when there's an issue)
-                    if syncManager.syncState.isError {
-                        SyncStatusBanner(syncState: syncManager.syncState)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                    if syncManager.syncState.isError || syncManager.syncState == .offline {
+                        SyncStatusBanner(syncState: syncManager.syncState) {
+                            Task {
+                                await syncManager.refresh()
+                            }
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     
                     GeometryReader { geometry in
@@ -158,7 +166,7 @@ public struct ContentView: View {
                                 .padding(.vertical, 14)
                                 .background {
                                     Capsule()
-                                        .fill(Color(.secondarySystemGroupedBackground))
+                                        .fill(PlatformColors.secondarySystemGroupedBackground)
                                 }
                                 .clipShape(Capsule())
                                 Spacer()
@@ -219,18 +227,8 @@ public struct ContentView: View {
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.large)
             #elseif os(macOS)
+                .searchable(text: $search, placement: .toolbar, prompt: "Search")
                 .toolbar {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button(action: {
-                            Task {
-                                await syncManager.refresh()
-                            }
-                        }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .help("Refresh accounts")
-                        .disabled(syncManager.syncState == .syncing)
-                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button(action: {
                             self.addingAccount = true
@@ -238,6 +236,12 @@ public struct ContentView: View {
                             Label("Add Account", systemImage: "plus")
                         }
                         .help("Add new TOTP account")
+                    }
+                }
+                .onAppear {
+                    // Auto-refresh on window appear
+                    Task {
+                        await syncManager.refresh()
                     }
                 }
             #endif
@@ -495,8 +499,6 @@ struct ContentViewWithSampleData: View {
                         ScrollView {
                             ZStack {
                                 VStack {
-                                    let searchField = self.search.trimmingCharacters(
-                                        in: .whitespacesAndNewlines)
                                     LazyVGrid(
                                         columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: geometry.size.width > 768 ? 3 : 1),
                                         alignment: .center,
@@ -734,7 +736,7 @@ struct MockTotpView: View {
             .padding()
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                    .fill(PlatformColors.secondarySystemGroupedBackground)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .offset(x: self.offset)
@@ -786,6 +788,7 @@ struct MockTotpView: View {
 @available(iOS 26.0, macOS 26.0, *)
 struct SyncStatusBanner: View {
     let syncState: SyncState
+    var onRetry: (() -> Void)?
     
     var body: some View {
         HStack(spacing: 10) {
@@ -802,6 +805,12 @@ struct SyncStatusBanner: View {
             if syncState == .iCloudDisabled {
                 Button("Settings") {
                     openSettings()
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+            } else if syncState.isError || syncState == .offline {
+                Button("Retry") {
+                    onRetry?()
                 }
                 .font(.subheadline)
                 .fontWeight(.medium)
@@ -834,6 +843,10 @@ struct SyncStatusBanner: View {
         #if os(iOS)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
+        }
+        #elseif os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preferences.AppleIDPrefPane") {
+            NSWorkspace.shared.open(url)
         }
         #endif
     }

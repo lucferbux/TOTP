@@ -9,7 +9,7 @@ import Foundation
 import Combine
 import CryptoKit
 
-public class SharedDataManager: ObservableObject {
+public class SharedDataManager: ObservableObject, @unchecked Sendable {
     public static let shared = SharedDataManager()
     
     private let suiteName = "group.com.lucferbux.TOTP"
@@ -159,12 +159,12 @@ public class SharedDataManager: ObservableObject {
     
     public func saveAccount(_ account: OtpModel) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 self.accounts.append(account)
                 self.saveAccounts()
                 
                 // Check if save was successful by monitoring error state
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
                     if let error = self.error {
                         continuation.resume(throwing: error)
                     } else {
@@ -184,7 +184,7 @@ public class SharedDataManager: ObservableObject {
     
     public func updateAccount(_ account: OtpModel) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 print("DEBUG updateAccount: Looking for account with ID: \(account.id)")
                 print("DEBUG updateAccount: Current accounts count: \(self.accounts.count)")
                 print("DEBUG updateAccount: Current account IDs: \(self.accounts.map { $0.id })")
@@ -194,7 +194,7 @@ public class SharedDataManager: ObservableObject {
                     self.accounts[index] = account
                     self.saveAccounts()
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
                         if let error = self.error {
                             continuation.resume(throwing: error)
                         } else {
@@ -279,11 +279,13 @@ public class SharedDataManager: ObservableObject {
         do {
             // Write file without complete protection so widget can access it
             try keyData.write(to: keyFileURL, options: [.atomic])
+            #if os(iOS)
             // Set file protection to allow access after first unlock (widget compatible)
             try FileManager.default.setAttributes(
                 [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: keyFileURL.path
             )
+            #endif
         } catch {
             // Silently fail - encryption will still work, just won't persist
         }

@@ -79,7 +79,7 @@ extension Data {
                  D <<= (40 - totalBits)
             }
 
-            var bytesInBlock = (totalBits / 8) // Integer division gives full bytes
+            let bytesInBlock = (totalBits / 8) // Integer division gives full bytes
             
             // Handle cases where totalBits is not a multiple of 8, e.g. 2 chars (10 bits -> 1 byte), 4 chars (20 bits -> 2 bytes)
             // 5 chars (25 bits -> 3 bytes), 7 chars (35 bits -> 4 bytes)

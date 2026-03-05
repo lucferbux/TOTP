@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1F2B6DFF2F00232D004402DE /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F2B6DFE2F00232D004402DE /* AuthenticationServices.framework */; };
-		1F2B6E0A2F00232D004402DE /* TOTP Autofill.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1F2B6DFD2F00232D004402DE /* TOTP Autofill.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1F2B6E0A2F00232D004402DE /* TOTP Autofill.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1F2B6DFD2F00232D004402DE /* TOTP Autofill.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1F9FFEA02D77757700D81249 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFE9F2D77757700D81249 /* WidgetKit.framework */; };
 		1F9FFEA22D77757700D81249 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFEA12D77757700D81249 /* SwiftUI.framework */; };
 		1F9FFEB32D77757800D81249 /* TOTP WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -468,6 +468,7 @@
 /* Begin PBXTargetDependency section */
 		1F2B6E092F00232D004402DE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 1F2B6DFC2F00232D004402DE /* TOTP Autofill */;
 			targetProxy = 1F2B6E082F00232D004402DE /* PBXContainerItemProxy */;
 		};
@@ -505,7 +506,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.3;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Autofill";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -535,7 +536,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.3;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Autofill";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -687,6 +688,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TOTP/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -701,7 +703,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.3;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -731,6 +733,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TOTP/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -745,7 +748,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.3;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

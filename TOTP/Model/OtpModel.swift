@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OtpModel: Identifiable, Hashable {
+public struct OtpModel: Identifiable, Hashable, Sendable {
     public static func == (lhs: OtpModel, rhs: OtpModel) -> Bool {
         lhs.id == rhs.id || (lhs.issuer == rhs.issuer && lhs.name == rhs.name && lhs.entry == rhs.entry && lhs.prefix == rhs.prefix)
     }

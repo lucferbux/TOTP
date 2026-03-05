@@ -99,11 +99,13 @@ public final class EncryptionKeyManager {
         do {
             // Write file without complete protection so widget can access it
             try keyData.write(to: keyFileURL, options: [.atomic])
+            #if os(iOS)
             // Set file protection to allow access after first unlock (widget compatible)
             try FileManager.default.setAttributes(
                 [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: keyFileURL.path
             )
+            #endif
         } catch {
             print("EncryptionKeyManager: Failed to save key to shared file: \(error)")
         }

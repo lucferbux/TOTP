@@ -28,6 +28,11 @@ This document tracks planned features, enhancements, and future improvements for
 
 ### User Interface
 - [x] **Cross-Platform Design** - iOS and macOS support
+- [x] **macOS Menu Bar App** - Menu bar icon with TOTP list and one-click copy
+- [x] **macOS Settings Window** - Cmd+, preferences with Launch at Login and Dock visibility
+- [x] **Launch at Login** - macOS login item via SMAppService
+- [x] **Background Mode** - Run as menu bar utility without Dock icon
+- [x] **macOS Hover Effects** - Subtle card highlighting on mouse hover
 - [x] **Responsive Layout** - Adaptive grid (1 col iPhone, 3 col iPad)
 - [x] **Material Design** - Native iOS materials and blur effects
 - [x] **Dark Mode** - Full dark theme support
@@ -101,8 +106,8 @@ This document tracks planned features, enhancements, and future improvements for
 - [ ] **Accessibility** - VoiceOver optimization
 - [ ] **Larger Text** - Dynamic type support
 - [ ] **Reduce Motion** - Respect accessibility settings
-- [ ] **Keyboard Shortcuts** - macOS keyboard navigation
-- [ ] **Menu Bar App** - macOS menu bar quick access
+- [x] **Keyboard Shortcuts** - macOS keyboard navigation
+- [x] **Menu Bar App** - macOS menu bar quick access
 
 #### Account Features
 - [ ] **Custom Prefix** - Add prefix to copied code
@@ -119,7 +124,7 @@ This document tracks planned features, enhancements, and future improvements for
 ### P3 - Low Priority (Future)
 
 #### Platform Expansion
-- [ ] **macOS Menu Bar App** - Standalone menu bar utility
+- [x] **macOS Menu Bar App** - Standalone menu bar utility
 - [ ] **Safari Extension** - Auto-fill OTP codes
 - [ ] **Shortcuts Integration** - Siri Shortcuts support
 - [ ] **CarPlay Support** - Emergency access (read-only)

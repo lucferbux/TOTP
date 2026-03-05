@@ -9,7 +9,7 @@
 import SwiftUI
 import Combine
 
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 struct OTPSelectionView: View {
     let accounts: [OtpModel]
     let onSelect: (OtpModel) -> Void
@@ -39,7 +39,9 @@ struct OTPSelectionView: View {
                 }
             }
             .navigationTitle("Select Account")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -67,11 +69,15 @@ struct OTPSelectionView: View {
                     onSelect(account)
                 }
         }
+#if os(iOS)
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
     }
 }
 
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 struct AccountRowView: View {
     let account: OtpModel
     
@@ -173,7 +179,7 @@ struct AccountRowView: View {
 }
 
 #Preview {
-    if #available(iOS 26.0, *) {
+    if #available(iOS 26.0, macOS 26.0, *) {
         OTPSelectionView(
             accounts: [],
             onSelect: { _ in },
