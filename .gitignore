@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Xcode — user-specific & build artifacts
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Claude Code — personal, machine-local overrides (shared config lives in settings.json)
+.claude/settings.local.json

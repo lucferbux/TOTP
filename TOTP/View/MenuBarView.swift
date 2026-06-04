@@ -16,8 +16,18 @@ struct MenuBarView: View {
     @State private var searchText = ""
     @State private var copiedAccountId: UUID?
     @State private var tickCounter = 0
-    
+    @State private var listContentHeight: CGFloat?
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    /// Maximum height for the scrollable account list before it starts scrolling.
+    private let maxListHeight: CGFloat = 320
+
+    /// Rough per-row estimate (countdown circle + up to two text lines + padding),
+    /// used only for the first layout pass until the real height is measured.
+    private var estimatedListHeight: CGFloat {
+        CGFloat(filteredAccounts.count) * 52 + 8
+    }
     
     private var filteredAccounts: [OtpModel] {
         let accounts = syncManager.accounts
@@ -111,8 +121,24 @@ struct MenuBarView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .background(
+                        // Measure the natural content height so we can give the
+                        // ScrollView an explicit frame. Without this the list
+                        // collapses to ~0pt inside a `.window`-style MenuBarExtra,
+                        // which sizes itself to the content's *ideal* height and a
+                        // ScrollView reports ~0 along its scroll axis.
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: MenuBarListHeightKey.self,
+                                value: proxy.size.height
+                            )
+                        }
+                    )
                 }
-                .frame(maxHeight: 320)
+                .frame(height: min(listContentHeight ?? estimatedListHeight, maxListHeight))
+                .onPreferenceChange(MenuBarListHeightKey.self) { newHeight in
+                    listContentHeight = newHeight
+                }
             }
             
             Divider()
@@ -180,6 +206,15 @@ struct MenuBarView: View {
         .onReceive(timer) { _ in
             tickCounter += 1
         }
+        .task {
+            // The main window is suppressed at launch (`.defaultLaunchBehavior(.suppressed)`),
+            // so `initializeSync()` may not have run yet when the app starts straight into the
+            // menu bar. Load locally-stored accounts so the list is populated without first
+            // having to open the main window.
+            if syncManager.accounts.isEmpty {
+                SharedDataManager.shared.loadAccounts()
+            }
+        }
     }
     
     private func copyCode(for account: OtpModel) {
@@ -197,6 +232,17 @@ struct MenuBarView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Layout Measurement
+
+/// Reports the natural height of the account list so the enclosing ScrollView can
+/// be given an explicit frame inside the `.window`-style menu bar popover.
+private struct MenuBarListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
