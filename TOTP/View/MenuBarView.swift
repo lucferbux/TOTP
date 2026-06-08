@@ -16,19 +16,22 @@ struct MenuBarView: View {
     @State private var searchText = ""
     @State private var copiedAccountId: UUID?
     @State private var tickCounter = 0
-    @State private var listContentHeight: CGFloat?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    /// Maximum height for the scrollable account list before it starts scrolling.
+    /// Fixed height per account row, so the overall list height is deterministic.
+    private let rowHeight: CGFloat = 52
+    private let rowSpacing: CGFloat = 2
+
+    /// Maximum list height before the list becomes scrollable.
     private let maxListHeight: CGFloat = 320
 
-    /// Rough per-row estimate (countdown circle + up to two text lines + padding),
-    /// used only for the first layout pass until the real height is measured.
-    private var estimatedListHeight: CGFloat {
-        CGFloat(filteredAccounts.count) * 52 + 8
+    /// Natural (unclamped) height the account rows want to occupy.
+    private var naturalListHeight: CGFloat {
+        let count = CGFloat(filteredAccounts.count)
+        return count * rowHeight + max(0, count - 1) * rowSpacing + 8 // + vertical padding
     }
-    
+
     private var filteredAccounts: [OtpModel] {
         let accounts = syncManager.accounts
         let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -38,7 +41,28 @@ struct MenuBarView: View {
             || $0.name?.localizedCaseInsensitiveContains(search) ?? false
         }
     }
-    
+
+    /// The account rows as a plain `VStack`. A `VStack` always reports a definite
+    /// height, so it renders reliably inside the `.window`-style MenuBarExtra —
+    /// unlike a `ScrollView`, whose ideal height along its scroll axis is ~0, which
+    /// makes it collapse to nothing when the popover sizes itself to fit its content.
+    @ViewBuilder
+    private var accountRows: some View {
+        VStack(spacing: rowSpacing) {
+            ForEach(filteredAccounts) { account in
+                MenuBarAccountRow(
+                    account: account,
+                    isCopied: copiedAccountId == account.id,
+                    tickCounter: tickCounter
+                ) {
+                    copyCode(for: account)
+                }
+                .frame(height: rowHeight)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -107,38 +131,17 @@ struct MenuBarView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
+            } else if naturalListHeight <= maxListHeight {
+                // Everything fits — render the rows directly (no ScrollView), exactly
+                // like the footer below, which is why it renders reliably here.
+                accountRows
             } else {
+                // Too many accounts to fit — scroll, with an explicit height so the
+                // ScrollView has a concrete size instead of collapsing.
                 ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(filteredAccounts) { account in
-                            MenuBarAccountRow(
-                                account: account,
-                                isCopied: copiedAccountId == account.id,
-                                tickCounter: tickCounter
-                            ) {
-                                copyCode(for: account)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .background(
-                        // Measure the natural content height so we can give the
-                        // ScrollView an explicit frame. Without this the list
-                        // collapses to ~0pt inside a `.window`-style MenuBarExtra,
-                        // which sizes itself to the content's *ideal* height and a
-                        // ScrollView reports ~0 along its scroll axis.
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: MenuBarListHeightKey.self,
-                                value: proxy.size.height
-                            )
-                        }
-                    )
+                    accountRows
                 }
-                .frame(height: min(listContentHeight ?? estimatedListHeight, maxListHeight))
-                .onPreferenceChange(MenuBarListHeightKey.self) { newHeight in
-                    listContentHeight = newHeight
-                }
+                .frame(height: maxListHeight)
             }
             
             Divider()
@@ -232,17 +235,6 @@ struct MenuBarView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Layout Measurement
-
-/// Reports the natural height of the account list so the enclosing ScrollView can
-/// be given an explicit frame inside the `.window`-style menu bar popover.
-private struct MenuBarListHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
