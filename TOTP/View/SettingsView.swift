@@ -2,129 +2,135 @@
 //  SettingsView.swift
 //  TOTP
 //
-//  macOS Settings window (Cmd+,) with General preferences.
+//  Settings: a sheet on iPhone/iPad, the ⌘, window on macOS.
 //
 
-#if os(macOS)
 import SwiftUI
-import ServiceManagement
+import AuthenticationServices
 
-@available(macOS 26.0, *)
+#if os(macOS)
+import ServiceManagement
+#endif
+
 struct SettingsView: View {
-    @StateObject private var settings = MacOSAppSettings.shared
-    
+    @ObservedObject private var lock = AppLockManager.shared
+    @State private var clipboardClearSeconds = AppPreferences.clipboardClearSeconds
+    #if os(macOS)
+    @ObservedObject private var macSettings = MacOSAppSettings.shared
+    #endif
+
     var body: some View {
         Form {
-            // MARK: - General
-            Section {
-                Toggle("Launch TOTP at Login", isOn: $settings.launchAtLogin)
-                
-                HStack {
-                    Toggle("Show Dock Icon", isOn: $settings.showDockIcon)
-                    
-                    Spacer()
-                    
-                    if !settings.showDockIcon {
-                        Text("Menu bar only")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background {
-                                Capsule()
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                            }
-                    }
-                }
-            } header: {
-                Label("General", systemImage: "gear")
-            } footer: {
-                Text("When the Dock icon is hidden, access TOTP from the menu bar icon. The app will continue running in the background.")
-            }
-            
-            // MARK: - Status
-            Section {
-                HStack {
-                    Text("Login Item")
-                    Spacer()
-                    Text(loginItemStatusText)
-                        .foregroundStyle(.secondary)
-                    Circle()
-                        .fill(loginItemStatusColor)
-                        .frame(width: 8, height: 8)
-                }
-                
-                HStack {
-                    Text("Dock Visibility")
-                    Spacer()
-                    Text(settings.showDockIcon ? "Visible" : "Hidden")
-                        .foregroundStyle(.secondary)
-                    Circle()
-                        .fill(settings.showDockIcon ? .green : .orange)
-                        .frame(width: 8, height: 8)
-                }
-            } header: {
-                Label("Status", systemImage: "info.circle")
-            }
-            
-            // MARK: - About
-            Section {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text(appVersion)
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Text("Build")
-                    Spacer()
-                    Text(appBuild)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Label("About", systemImage: "questionmark.circle")
-            }
+            securitySection
+            #if os(macOS)
+            macGeneralSection
+            #endif
+            autoFillSection
+            aboutSection
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 340)
         .navigationTitle("Settings")
+        #if os(macOS)
+        .frame(minWidth: 440, idealWidth: 480, minHeight: 420, idealHeight: 520)
+        #endif
+        .onChange(of: clipboardClearSeconds) { _, seconds in
+            AppPreferences.clipboardClearSeconds = seconds
+        }
     }
-    
-    // MARK: - Computed Properties
-    
+
+    // MARK: - Sections
+
+    private var securitySection: some View {
+        Section {
+            Toggle(isOn: Binding(get: { lock.isEnabled }, set: { newValue in
+                Task { await lock.setEnabled(newValue) }
+            })) {
+                Label("Require \(lock.methodName)", systemImage: lock.methodSymbol)
+            }
+            .disabled(!lock.canAuthenticate)
+            .accessibilityIdentifier("appLockToggle")
+
+            Picker(selection: $clipboardClearSeconds) {
+                ForEach(AppPreferences.clipboardClearOptions, id: \.self) { seconds in
+                    Text(clipboardLabel(seconds)).tag(seconds)
+                }
+            } label: {
+                Label("Clear Copied Codes", systemImage: "clipboard")
+            }
+            .accessibilityIdentifier("clipboardClearPicker")
+        } header: {
+            Text("Security")
+        } footer: {
+            Text("The lock hides your codes until you authenticate. AutoFill and widgets keep working. Copied codes are removed from the clipboard after the chosen time.")
+        }
+    }
+
+    #if os(macOS)
+    private var macGeneralSection: some View {
+        Section {
+            Toggle("Launch TOTP at Login", isOn: $macSettings.launchAtLogin)
+            Toggle("Show Dock Icon", isOn: $macSettings.showDockIcon)
+            LabeledContent("Login Item", value: loginItemStatusText)
+        } header: {
+            Text("General")
+        } footer: {
+            Text("When the Dock icon is hidden, open TOTP from its menu bar icon. On macOS 27, menu bar icons that don't fit are in the menu bar's overflow area.")
+        }
+    }
+
     private var loginItemStatusText: String {
-        switch settings.loginItemStatus {
-        case .enabled:
-            return "Enabled"
-        case .notRegistered:
-            return "Disabled"
-        case .requiresApproval:
-            return "Requires Approval"
-        case .notFound:
-            return "Not Found"
-        @unknown default:
-            return "Unknown"
+        switch macSettings.loginItemStatus {
+        case .enabled: String(localized: "Enabled")
+        case .notRegistered: String(localized: "Off")
+        case .requiresApproval: String(localized: "Requires Approval")
+        case .notFound: String(localized: "Not Found")
+        @unknown default: String(localized: "Unknown")
         }
     }
-    
-    private var loginItemStatusColor: Color {
-        switch settings.loginItemStatus {
-        case .enabled:
-            return .green
-        case .requiresApproval:
-            return .orange
-        default:
-            return .secondary
+    #endif
+
+    private var autoFillSection: some View {
+        Section {
+            Button {
+                ASSettingsHelper.openCredentialProviderAppSettings { _ in }
+            } label: {
+                Label("AutoFill Settings", systemImage: "key.viewfinder")
+            }
+        } header: {
+            Text("AutoFill")
+        } footer: {
+            Text("Turn on TOTP under AutoFill & Passwords to fill codes, including any fixed prefix, on websites and in apps.")
         }
     }
-    
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: appVersion)
+            LabeledContent("Build", value: appBuild)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func clipboardLabel(_ seconds: Int) -> String {
+        switch seconds {
+        case 0: String(localized: "Never")
+        case ..<60: String(localized: "After \(seconds) seconds")
+        default: String(localized: "After \(seconds / 60) min")
+        }
+    }
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
-    
+
     private var appBuild: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
     }
 }
-#endif
+
+#Preview {
+    NavigationStack {
+        SettingsView()
+    }
+}

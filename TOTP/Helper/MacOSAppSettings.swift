@@ -9,8 +9,8 @@
 import SwiftUI
 import ServiceManagement
 import AppKit
+import os
 
-@available(macOS 26.0, *)
 final class MacOSAppSettings: ObservableObject {
     static let shared = MacOSAppSettings()
     
@@ -70,14 +70,14 @@ final class MacOSAppSettings: ObservableObject {
         do {
             if launchAtLogin {
                 try service.register()
-                print("MacOSAppSettings: Registered as login item")
             } else {
                 try service.unregister()
-                print("MacOSAppSettings: Unregistered as login item")
             }
         } catch {
-            print("MacOSAppSettings: Failed to update login item state: \(error)")
+            Logger(subsystem: "com.lucferbux.TOTP", category: "Settings")
+                .error("Failed to update login item: \(error.localizedDescription, privacy: .public)")
         }
+        objectWillChange.send()
     }
     
     /// Reads the current login item status from the system.

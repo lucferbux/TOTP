@@ -1,853 +1,376 @@
-import Combine
-import CryptoKit
+//
+//  ContentView.swift
+//  TOTP
+//
+//  Main list of codes. Adapts to the available width through size classes only, so it
+//  works the same on iPhone, iPhone Duo (folded / unfolded), iPad split views and Mac.
+//
+
 import SwiftUI
-import CloudKit
+import Combine
 
-#if canImport(UIKit)
-    import UIKit
-#endif
+/// Routes deep links (otpauth://) and menu commands into the main window.
+@MainActor
+final class AppRouter: ObservableObject {
+    static let shared = AppRouter()
+    @Published var pendingImport: OtpAuthURL?
+    @Published var importError: String?
+}
 
-#if canImport(AppKit)
-    import AppKit
-#endif
+/// Lets ⌘N (File ▸ Add Account) reach the focused window.
+struct AddAccountAction: Equatable {
+    let perform: () -> Void
 
-@available(iOS 26.0, macOS 26.0, *)
+    func callAsFunction() { perform() }
+
+    // The action always does the same thing for a given window; don't invalidate on identity.
+    static func == (lhs: AddAccountAction, rhs: AddAccountAction) -> Bool { true }
+}
+
+extension FocusedValues {
+    @Entry var addAccountAction: AddAccountAction?
+}
+
+enum AccountSheet: Identifiable {
+    case add(OtpAuthURL?)
+    case edit(OtpModel)
+    case settings
+
+    var id: String {
+        switch self {
+        case .add: "add"
+        case .edit(let account): "edit-\(account.id)"
+        case .settings: "settings"
+        }
+    }
+}
+
 public struct ContentView: View {
-    @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject private var syncManager: SyncManager
-    @StateObject private var dataManager = SharedDataManager.shared
-    @State private var accounts: [OtpModel] = []
-    @State var addingAccount = false
-    @State var editingAccount: OtpModel?
-    @State var deletingAccount: OtpModel?
-    @State var showCopiedToast = false
-    @State var search = ""
-    @State private var showingErrorAlert = false
+    @ObservedObject private var dataManager = SharedDataManager.shared
+    @ObservedObject private var router = AppRouter.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    @State private var search = ""
+    @State private var sheet: AccountSheet?
+    @State private var deleting: OtpModel?
+    @State private var copiedAccountID: UUID?
+    @State private var copyCount = 0
 
     public init() {}
 
+    private var filteredAccounts: [OtpModel] {
+        syncManager.accounts.filter { $0.matches(search: search) }
+    }
+
+    private var usesCompactList: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
     public var body: some View {
         NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                #if os(iOS)
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                #else
-                Color(nsColor: .windowBackgroundColor)
-                    .ignoresSafeArea()
-                #endif
-                
-                VStack {
-                    // Sync status banner (shown when there's an issue)
-                    if syncManager.syncState.isError || syncManager.syncState == .offline {
-                        SyncStatusBanner(syncState: syncManager.syncState) {
-                            Task {
-                                await syncManager.refresh()
-                            }
-                        }
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    
-                    GeometryReader { geometry in
-                        ScrollView {
-                            ZStack {
-                                // Content when accounts exist or loading
-                                if !self.accounts.isEmpty || syncManager.isLoading {
-                                    VStack {
-                                        let searchField = self.search.trimmingCharacters(
-                                            in: .whitespacesAndNewlines)
-                                        LazyVGrid(
-                                            columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: geometry.size.width > 768 ? 3 : 1),
-                                            alignment: .center,
-                                            spacing: 12
-                                        ) {
-                                            ForEach(
-                                                searchField.isEmpty
-                                                    ? self.accounts
-                                                    : self.accounts
-                                                        .filter {
-                                                            $0.name?.localizedCaseInsensitiveContains(
-                                                                searchField) ?? false
-                                                                || $0
-                                                                    .issuer?
-                                                                    .localizedCaseInsensitiveContains(
-                                                                        searchField) ?? false
-                                                        }
-                                            ) { account in
-                                                TOtpView(
-                                                    otp: account,
-                                                    cutoff: geometry.size.width,
-                                                    deleting: $deletingAccount,
-                                                    editing: $editingAccount,
-                                                    toast: $showCopiedToast
-                                                )
-                                                // Force view recreation when account data changes
-                                                .id("\(account.id)-\(account.issuer ?? "")-\(account.name ?? "")-\(account.prefix ?? "")-\(account.entry.hashValue)")
-                                                .transition(
-                                                    AnyTransition.asymmetric(
-                                                        insertion: AnyTransition.move(edge: .leading),
-                                                        removal: AnyTransition.move(edge: .trailing)
-                                                    ).combined(with: AnyTransition.opacity)
-                                                )
-                                            }
-                                        }
-                                        .padding(.top)
-                                        .padding(.horizontal, geometry.size.width > 768 ? 40 : 20)
-                                        .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
-
-                                        // Loading indicator
-                                        if syncManager.isLoading {
-                                            VStack(spacing: 12) {
-                                                ProgressView()
-                                                    .scaleEffect(1.3)
-                                                    .tint(.blue)
-                                                Text("Syncing accounts...")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.medium)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .frame(maxWidth: .infinity)
-                                            .padding()
-                                        }
-
-                                        // Instructions for existing accounts
-                                        if !self.accounts.isEmpty {
-                                            Spacer()
-                                                .frame(height: 20)
-                                        }
-                                    }
-                                }
-                                
-                                // Empty state - properly centered
-                                if self.accounts.isEmpty && !syncManager.isLoading {
-                                    VStack(spacing: 24) {
-                                        Image(systemName: "lock.shield.fill")
-                                            .font(.system(size: 70))
-                                            .fontWeight(.light)
-                                            .foregroundStyle(
-                                                LinearGradient(
-                                                    colors: [.blue, .cyan],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                )
-                                            )
-                                            .symbolEffect(.pulse.byLayer, options: .repeating)
-                                        VStack(spacing: 8) {
-                                            Text("No TOTP accounts")
-                                                .font(.title2)
-                                                .fontWeight(.semibold)
-                                            Text("Add your first account to get started")
-                                                .font(.body)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
-                                }
-                            }
-                        }
-                        .refreshable {
-                            await syncManager.refresh()
-                        }
-                        
-                        // Toast message overlay
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                    Text("Code copied to clipboard")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 14)
-                                .background {
-                                    Capsule()
-                                        .fill(PlatformColors.secondarySystemGroupedBackground)
-                                }
-                                .clipShape(Capsule())
-                                Spacer()
-                            }
-                            .opacity(self.showCopiedToast ? 1.0 : 0.0)
-                            .scaleEffect(self.showCopiedToast ? 1.0 : 0.8)
-                            .animation(.smooth(duration: 0.25), value: self.showCopiedToast)
-                            .allowsHitTesting(false)
-                            .padding()
-                        }
-                    }
-                }
-                
-                // Floating Action Button (iOS only)
-                #if os(iOS)
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            self.addingAccount = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .sensoryFeedback(.impact(flexibility: .soft), trigger: addingAccount)
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-                #endif
+            content
+                .navigationTitle("Codes")
+                .searchable(text: $search, prompt: "Search accounts")
+                .toolbar { toolbarContent }
+                .safeAreaInset(edge: .top) { syncBanner }
+                .overlay(alignment: .bottom) { copiedToast }
+                .refreshable { await syncManager.refresh() }
+        }
+        .focusedSceneValue(\.addAccountAction, AddAccountAction { sheet = .add(nil) })
+        .sensoryFeedback(.success, trigger: copyCount)
+        .sheet(item: $sheet) { sheet in
+            sheetContent(sheet)
+        }
+        .confirmationDialog(
+            deleteTitle,
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            titleVisibility: .visible,
+            presenting: deleting
+        ) { account in
+            Button("Delete Account", role: .destructive) {
+                Task { await syncManager.deleteAccount(account) }
             }
-            .navigationTitle("TOTP Passwords")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.large)
-            #elseif os(macOS)
-                .searchable(text: $search, placement: .toolbar, prompt: "Search")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(action: {
-                            self.addingAccount = true
-                        }) {
-                            Label("Add Account", systemImage: "plus")
-                        }
-                        .help("Add new TOTP account")
-                    }
-                }
-                .onAppear {
-                    // Auto-refresh on window appear
-                    Task {
-                        await syncManager.refresh()
-                    }
-                }
-            #endif
+            .accessibilityIdentifier("confirmDeleteButton")
+        } message: { _ in
+            Text("You won't be able to generate codes for this account unless you add it again.")
+        }
+        .alert("Data Error", isPresented: Binding(get: { dataManager.error != nil }, set: { if !$0 { dataManager.error = nil } })) {
+            Button("OK", role: .cancel) { dataManager.error = nil }
+        } message: {
+            Text(dataManager.error?.localizedDescription ?? "")
+        }
+        .alert("Can't Add Account", isPresented: Binding(get: { router.importError != nil }, set: { if !$0 { router.importError = nil } })) {
+            Button("OK", role: .cancel) { router.importError = nil }
+        } message: {
+            Text(router.importError ?? "")
+        }
+        .onChange(of: router.pendingImport) { _, pending in
+            guard let pending else { return }
+            sheet = .add(pending)
+            router.pendingImport = nil
         }
         .onAppear {
-            self.accounts = syncManager.accounts
-        }
-        .onReceive(syncManager.$accounts) { newAccounts in
-            withAnimation(.smooth(duration: 0.3)) {
-                self.accounts = newAccounts
+            if let pending = router.pendingImport {
+                sheet = .add(pending)
+                router.pendingImport = nil
             }
         }
-        .onReceive(dataManager.$error) { error in
-            if error != nil {
-                showingErrorAlert = true
+        #if os(macOS)
+        .frame(minWidth: 360, minHeight: 320)
+        #endif
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        if syncManager.accounts.isEmpty {
+            if syncManager.isLoading {
+                ProgressView("Loading accounts…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                emptyState
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .alert("Data Error", isPresented: $showingErrorAlert) {
-            Button("OK") {
-                dataManager.error = nil
-            }
-        } message: {
-            Text(dataManager.error?.localizedDescription ?? "An unknown error occurred")
-        }
-        .alert(item: $deletingAccount) { (item: OtpModel) in
-            var alertText: String
-            switch (item.issuer, item.name) {
-            case let (.some(issuer), .some(name)):
-                alertText = "the account \"\(name)\" for \"\(issuer)\""
-            case let (.none, .some(name)):
-                alertText = "the account \"\(name)\""
-            case let (.some(issuer), .none):
-                alertText = "the account for \"\(issuer)\""
-            case (.none, .none):
-                alertText = "this account"
-            }
-            return Alert(
-                title: Text("Confirm Delete"),
-                message: Text("Are you sure that you want to DELETE \(alertText)"),
-                primaryButton: .destructive(Text("Delete").bold()) {
-                    Task {
-                        await syncManager.deleteAccount(item)
-                    }
-                    withAnimation(.smooth(duration: 1)) {
-                        self.accounts.removeAll(where: { $0.id == item.id })
-                    }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .sheet(isPresented: $addingAccount) {
-            AddingPageView(
-                accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager
-            )
-            .environmentObject(syncManager)
-            .preferredColorScheme(self.colorScheme)
-        }
-        .sheet(item: $editingAccount) { account in
-            AddingPageView(
-                accounts: $accounts, addingAccount: $addingAccount, dataManager: dataManager, editingAccount: account
-            )
-            .environmentObject(syncManager)
-            .preferredColorScheme(self.colorScheme)
-            .onDisappear {
-                editingAccount = nil
-            }
+        } else if filteredAccounts.isEmpty {
+            ContentUnavailableView.search(text: search)
+        } else if usesCompactList {
+            compactList
+        } else {
+            regularGrid
         }
     }
-}
 
-struct ContentViewPreviewLight: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .preferredColorScheme(.light)
-    }
-}
-
-struct ContentViewPreviewDark: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .preferredColorScheme(.dark)
-    }
-}
-
-// Preview with empty state
-struct ContentViewEmptyPreview: PreviewProvider {
-    static var previews: some View {
-        Group {
-            ContentViewEmpty()
-                .preferredColorScheme(.light)
-                .previewDisplayName("Empty State - Light")
-            
-            ContentViewEmpty()
-                .preferredColorScheme(.dark)
-                .previewDisplayName("Empty State - Dark")
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Accounts", systemImage: "lock.shield")
+        } description: {
+            Text("Add an account by scanning its setup QR code or entering the secret key.")
+        } actions: {
+            Button("Add Account") { sheet = .add(nil) }
+                .buttonStyle(.glassProminent)
+                .accessibilityIdentifier("emptyStateAddButton")
         }
     }
-}
 
-// Preview with sample data
-struct ContentViewWithDataPreview: PreviewProvider {
-    static var previews: some View {
-        Group {
-            ContentViewWithSampleData()
-                .preferredColorScheme(.light)
-                .previewDisplayName("With Data - Light")
-            
-            ContentViewWithSampleData()
-                .preferredColorScheme(.dark)
-                .previewDisplayName("With Data - Dark")
-        }
-    }
-}
-
-// Mock view for empty state
-@available(iOS 26.0, macOS 26.0, *)
-struct ContentViewEmpty: View {
-    @State private var accounts: [OtpModel] = []
-    @State var addingAccount = false
-    @State var deletingAccount: OtpModel?
-    @State var showCopiedToast = false
-    @State var search = ""
-    @State private var showingErrorAlert = false
-    @Environment(\.colorScheme) var colorScheme
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                #if os(iOS)
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                #else
-                Color(nsColor: .windowBackgroundColor)
-                    .ignoresSafeArea()
-                #endif
-                
-                VStack {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            ZStack {
-                                // Empty state - properly centered
-                                VStack(spacing: 24) {
-                                    Image(systemName: "lock.shield.fill")
-                                        .font(.system(size: 70))
-                                        .fontWeight(.light)
-                                        .foregroundStyle(
-                                            LinearGradient(
-                                                colors: [.blue, .cyan],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .symbolEffect(.pulse.byLayer, options: .repeating)
-                                    VStack(spacing: 8) {
-                                        Text("No TOTP accounts")
-                                            .font(.title2)
-                                            .fontWeight(.semibold)
-                                        Text("Add your first account to get started")
-                                            .font(.body)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, minHeight: geometry.size.height)
-                            }
-                        }
-                        .refreshable {
-                            // Mock refresh action
-                        }
-                    }
-                }
-                
-                // Floating Action Button (iOS only)
-                #if os(iOS)
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            self.addingAccount = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-                #endif
-            }
-            .navigationTitle("TOTP Passwords")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.large)
-            #endif
-        }
-    }
-}
-
-// Mock view with sample data
-@available(iOS 26.0, macOS 26.0, *)
-struct ContentViewWithSampleData: View {
-    @State private var accounts: [MockOtpModel] = [
-        MockOtpModel(id: "1", name: "john.doe@gmail.com", issuer: "Google", currentCode: "123456"),
-        MockOtpModel(id: "2", name: "GitHub", issuer: "GitHub", currentCode: "789012"),
-        MockOtpModel(id: "3", name: "AWS Console", issuer: "Amazon", currentCode: "345678"),
-        MockOtpModel(id: "4", name: "work@company.com", issuer: "Microsoft", currentCode: "901234"),
-        MockOtpModel(id: "5", name: "Discord", issuer: "Discord", currentCode: "567890")
-    ]
-    @State var addingAccount = false
-    @State var editingAccount: MockOtpModel?
-    @State var deletingAccount: MockOtpModel?
-    @State var showCopiedToast = false
-    @State var search = ""
-    @Environment(\.colorScheme) var colorScheme
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                #if os(iOS)
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                #else
-                Color(nsColor: .windowBackgroundColor)
-                    .ignoresSafeArea()
-                #endif
-                
-                VStack {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            ZStack {
-                                VStack {
-                                    LazyVGrid(
-                                        columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: geometry.size.width > 768 ? 3 : 1),
-                                        alignment: .center,
-                                        spacing: 12
-                                    ) {
-                                        ForEach(accounts) { account in
-                                            MockTotpView(
-                                                otp: account,
-                                                cutoff: geometry.size.width,
-                                                deleting: $deletingAccount,
-                                                editing: $editingAccount,
-                                                toast: $showCopiedToast
-                                            )
-                                        }
-                                    }
-                                    .padding(.top)
-                                    .padding(.horizontal, geometry.size.width > 768 ? 40 : 20)
-                                    .frame(minWidth: geometry.size.width, maxWidth: geometry.size.width)
-
-                                    Spacer()
-                                        .frame(height: 20)
-                                }
-                            }
-                        }
-                        .refreshable {
-                            // Mock refresh action
-                        }
-                        
-                        // Toast message overlay
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                Text("Code copied to clipboard")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                                    .background {
-                                        Capsule()
-                                            .fill(.background.secondary)
-                                    }
-                                    .clipShape(Capsule())
-                                Spacer()
-                            }
-                            .opacity(self.showCopiedToast ? 0.95 : 0.0)
-                            .scaleEffect(self.showCopiedToast ? 1.0 : 0.9)
-                            .animation(.smooth(duration: 0.25), value: showCopiedToast)
-                            .allowsHitTesting(false)
-                            .padding()
-                        }
-                    }
-                }
-                
-                // Floating Action Button (iOS only)
-                #if os(iOS)
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            self.addingAccount = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-                #endif
-            }
-            .navigationTitle("TOTP Passwords")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.large)
-            #endif
-        }
-    }
-}
-
-// Mock data models for preview
-@available(iOS 26.0, macOS 26.0, *)
-struct MockOtpModel: Identifiable {
-    let id: String
-    let name: String
-    let issuer: String
-    let currentCode: String
-}
-
-// Mock TOTP view for preview with Liquid Glass
-@available(iOS 26.0, macOS 26.0, *)
-struct MockTotpView: View {
-    let otp: MockOtpModel
-    let cutoff: CGFloat
-    @Binding var deleting: MockOtpModel?
-    @Binding var editing: MockOtpModel?
-    @Binding var toast: Bool
-    @State private var offset: CGFloat = 0.0
-    @State private var showingActions = false
-    
-    var body: some View {
-        ZStack {
-            // Background action buttons with Liquid Glass
-            HStack {
-                Spacer()
-                
-                // Edit button
-                Button(action: {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        self.offset = 0
-                        self.showingActions = false
-                    }
-                    // Mock edit action
-                }) {
-                    Image(systemName: "pencil")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(
-                            LinearGradient(
-                                colors: [.blue, .cyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    /// iPhone, iPhone Duo folded, iPad slide-over / narrow splits.
+    private var compactList: some View {
+        List {
+            ForEach(filteredAccounts) { account in
+                Button {
+                    copy(account)
+                } label: {
+                    AccountCodeView(account: account, style: .row, isCopied: copiedAccountID == account.id)
                 }
                 .buttonStyle(.plain)
-                
-                // Delete button
-                Button(action: {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        self.offset = 0
-                        self.showingActions = false
+                .accessibilityIdentifier("account-\(account.displayTitle)")
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { deleting = account } label: {
+                        Label("Delete", systemImage: "trash")
                     }
-                    // Mock delete action
-                }) {
-                    Image(systemName: "trash")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(
-                            LinearGradient(
-                                colors: [.red, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    Button { sheet = .edit(account) } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(.blue)
                 }
-                .buttonStyle(.plain)
+                .swipeActions(edge: .leading) {
+                    Button { copy(account) } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .tint(.green)
+                }
+                .contextMenu { accountMenu(account) }
             }
-            .opacity(showingActions ? 1 : 0)
-            .scaleEffect(showingActions ? 1.0 : 0.95)
-            .animation(.smooth(duration: 0.2), value: showingActions)
-            
-            // Main card content with Liquid Glass
-            VStack(spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(otp.issuer)
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Text(otp.name)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            .onMove(perform: search.isEmpty ? { source, destination in
+                syncManager.moveAccounts(fromOffsets: source, toOffset: destination)
+            } : nil)
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+    }
+
+    /// iPad, iPhone Duo unfolded, Mac: adaptive columns that reflow continuously with width.
+    private var regularGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 480), spacing: 16)], spacing: 16) {
+                ForEach(filteredAccounts) { account in
+                    Button {
+                        copy(account)
+                    } label: {
+                        AccountCodeView(account: account, style: .card, isCopied: copiedAccountID == account.id)
                     }
-                    Spacer()
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue, .cyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 12, height: 12)
-                }
-                
-                HStack {
-                    Text(otp.currentCode)
-                        .font(.system(.title, design: .monospaced))
-                        .fontWeight(.bold)
-                        .tracking(2)
-                        .contentTransition(.numericText())
-                    Spacer()
-                    ZStack {
-                        Circle()
-                            .stroke(.quaternary, lineWidth: 3)
-                            .frame(width: 28, height: 28)
-                        Circle()
-                            .trim(from: 0, to: 0.7)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                            )
-                            .frame(width: 28, height: 28)
-                            .rotationEffect(.degrees(-90))
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("account-\(account.displayTitle)")
+                    .contextMenu { accountMenu(account) }
                 }
             }
             .padding()
-            .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(PlatformColors.secondarySystemGroupedBackground)
+        }
+        .background(PlatformColors.systemGroupedBackground)
+    }
+
+    @ViewBuilder
+    private func accountMenu(_ account: OtpModel) -> some View {
+        Button { copy(account) } label: {
+            Label("Copy Code", systemImage: "doc.on.doc")
+        }
+        .accessibilityIdentifier("copyAction")
+        Button { sheet = .edit(account) } label: {
+            Label("Edit", systemImage: "pencil")
+        }
+        .accessibilityIdentifier("editAction")
+        Divider()
+        Button(role: .destructive) { deleting = account } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        .accessibilityIdentifier("deleteAction")
+    }
+
+    // MARK: - Chrome
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .topBarLeading) {
+            Button { sheet = .settings } label: {
+                Label("Settings", systemImage: "gearshape")
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .offset(x: self.offset)
-            .gesture(
-                DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                    .onChanged { value in
-                        // Only allow left swipe (negative translation)
-                        if value.translation.width < 0 {
-                            self.offset = max(value.translation.width, -130) // Limit to -130 points
-                            self.showingActions = self.offset < -60
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.smooth(duration: 0.3)) {
-                            if value.translation.width < -60 {
-                                // Show actions
-                                self.offset = -130
-                                self.showingActions = true
-                            } else {
-                                // Snap back
-                                self.offset = 0
-                                self.showingActions = false
-                            }
-                        }
-                    }
-            )
-            .onTapGesture {
-                if showingActions {
-                    // Hide actions if they're showing
-                    withAnimation(.smooth(duration: 0.3)) {
-                        self.offset = 0
-                        self.showingActions = false
-                    }
-                } else {
-                    // Mock copy action
-                    toast = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        toast = false
-                    }
-                }
+            .accessibilityIdentifier("settingsButton")
+        }
+        if usesCompactList && search.isEmpty && syncManager.accounts.count > 1 {
+            ToolbarItem(placement: .topBarTrailing) {
+                EditButton()
             }
         }
-        .clipped()
+        #endif
+        ToolbarItem(placement: .primaryAction) {
+            Button { sheet = .add(nil) } label: {
+                Label("Add Account", systemImage: "plus")
+            }
+            .accessibilityIdentifier("addAccountButton")
+            .help("Add a new account")
+        }
+    }
+
+    @ViewBuilder
+    private var syncBanner: some View {
+        if syncManager.syncState.isError || syncManager.syncState == .offline {
+            SyncStatusBanner(syncState: syncManager.syncState) {
+                Task { await syncManager.refresh() }
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    @ViewBuilder
+    private var copiedToast: some View {
+        if copiedAccountID != nil {
+            Label("Copied", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .symbolRenderingMode(.multicolor)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .glassEffect(.regular, in: .capsule)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("copiedToast")
+                .task(id: copyCount) {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    withAnimation(.smooth(duration: 0.3)) { copiedAccountID = nil }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func sheetContent(_ sheet: AccountSheet) -> some View {
+        switch sheet {
+        case .add(let prefill):
+            AddingPageView(prefill: prefill)
+                .environmentObject(syncManager)
+        case .edit(let account):
+            AddingPageView(editingAccount: account)
+                .environmentObject(syncManager)
+        case .settings:
+            NavigationStack {
+                SettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { self.sheet = nil }
+                        }
+                    }
+            }
+        }
+    }
+
+    private var deleteTitle: String {
+        guard let deleting else { return "" }
+        return String(localized: "Delete \(deleting.displayTitle)?")
+    }
+
+    // MARK: - Actions
+
+    private func copy(_ account: OtpModel) {
+        Task {
+            let value = await syncManager.useCode(for: account)
+            ClipboardManager.copy(value)
+            withAnimation(.smooth(duration: 0.25)) {
+                copiedAccountID = account.id
+            }
+            copyCount += 1
+            AccessibilityNotification.Announcement("Code copied").post()
+        }
     }
 }
 
-// MARK: - Sync Status UI Components
+// MARK: - Sync Status
 
-@available(iOS 26.0, macOS 26.0, *)
 struct SyncStatusBanner: View {
     let syncState: SyncState
     var onRetry: (() -> Void)?
-    
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: syncState.systemImage)
-                .font(.subheadline)
                 .foregroundStyle(.orange)
-            
             Text(bannerMessage)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
-            
-            Spacer()
-            
+                .frame(maxWidth: .infinity, alignment: .leading)
             if syncState == .iCloudDisabled {
-                Button("Settings") {
-                    openSettings()
-                }
-                .font(.subheadline)
-                .fontWeight(.medium)
-            } else if syncState.isError || syncState == .offline {
-                Button("Retry") {
-                    onRetry?()
-                }
-                .font(.subheadline)
-                .fontWeight(.medium)
+                Button("Settings") { SystemSettings.openAppSettings() }
+                    .font(.subheadline.weight(.medium))
+            } else {
+                Button("Retry") { onRetry?() }
+                    .font(.subheadline.weight(.medium))
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.orange.opacity(0.15))
-        }
+        .background(.orange.opacity(0.15), in: .rect(cornerRadius: 12, style: .continuous))
         .padding(.horizontal)
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
-    
+
     private var bannerMessage: String {
         switch syncState {
         case .iCloudDisabled:
-            return "iCloud sync is disabled. Sign in to sync across devices."
+            String(localized: "iCloud sync is off. Sign in to iCloud to sync across devices.")
         case .error(let message):
-            return message
+            message
         case .offline:
-            return "You're offline. Changes will sync when connected."
+            String(localized: "You're offline. Changes will sync when you reconnect.")
         default:
-            return ""
+            ""
         }
     }
-    
-    private func openSettings() {
-        #if os(iOS)
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
-        }
-        #elseif os(macOS)
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preferences.AppleIDPrefPane") {
-            NSWorkspace.shared.open(url)
-        }
-        #endif
-    }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(SyncManager.shared)
 }

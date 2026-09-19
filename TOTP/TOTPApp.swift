@@ -8,6 +8,7 @@
 import SwiftUI
 import WidgetKit
 import CloudKit
+import os
 
 #if canImport(UIKit)
 import UIKit
@@ -15,25 +16,26 @@ import UIKit
 
 #if canImport(AppKit)
 import AppKit
-import ServiceManagement
 #endif
 
-@available(iOS 26.0, macOS 26.0, *)
+private let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "App")
+
 @main
 struct TOTPApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #elseif os(macOS)
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) var appDelegate
-    @StateObject private var macSettings = MacOSAppSettings.shared
     #endif
-    
+
     @StateObject private var syncManager = SyncManager.shared
-    
+    @StateObject private var lock = AppLockManager.shared
+
     var body: some Scene {
         WindowGroup(id: "main") {
             ContentView()
                 .environmentObject(syncManager)
+                .appLock(lock)
                 .onOpenURL { url in
                     handleURL(url)
                 }
@@ -42,56 +44,63 @@ struct TOTPApp: App {
                 }
         }
         #if os(macOS)
-        .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
-        .defaultSize(width: 800, height: 600)
-        .defaultLaunchBehavior(.suppressed)
+        .defaultSize(width: 820, height: 600)
+        .defaultLaunchBehavior(AppEnvironment.isUITesting ? .presented : .suppressed)
         #endif
         .commands {
-            CommandGroup(replacing: .newItem) {}
-            CommandGroup(after: .newItem) {
-                Button("Add Account") {
-                    NotificationCenter.default.post(name: .addAccount, object: nil)
-                }
-                .keyboardShortcut("n", modifiers: .command)
-            }
+            AccountCommands()
         }
-        
+
         #if os(macOS)
-        // Menu bar icon with TOTP list popover
+        // Menu bar icon with the list of codes. The icon is static on purpose: macOS 27
+        // hosts all status items in one window, and frequently changing items are costly.
         MenuBarExtra("TOTP Authenticator", systemImage: "lock.shield.fill") {
             MenuBarView()
                 .environmentObject(syncManager)
         }
         .menuBarExtraStyle(.window)
-        
+
         // macOS Settings window (Cmd+,)
         Settings {
             SettingsView()
         }
         #endif
     }
-    
+
     private func handleURL(_ url: URL) {
-        guard url.scheme == "totp" else { return }
-        
-        if url.host == "copy" {
-            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            let code = components?.queryItems?.first(where: { $0.name == "code" })?.value ?? ""
-                        
-            // Copy to clipboard
-            #if canImport(UIKit)
-            UIPasteboard.general.string = code
-            #elseif canImport(AppKit)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(code, forType: .string)
-            #endif
-            
-            // Refresh widget timeline so it shows updated code when user returns
-            WidgetCenter.shared.reloadTimelines(ofKind: "TOTP_Widget")
-            
-            // Show notification or feedback
-            print("Copied TOTP code to clipboard: \(code)")
+        switch url.scheme?.lowercased() {
+        case "otpauth":
+            do {
+                AppRouter.shared.pendingImport = try OtpAuthURL(url: url)
+            } catch {
+                AppRouter.shared.importError = error.localizedDescription
+            }
+        case "totp":
+            // Legacy widget link (≤ 3.x): copy the value it carried, then refresh widgets.
+            if url.host == "copy",
+               let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "code" })?.value {
+                ClipboardManager.copy(code)
+            }
+            WidgetCenter.shared.reloadAllTimelines()
+        default:
+            break
+        }
+    }
+}
+
+/// File ▸ Add Account (⌘N) — also shown in the iPadOS menu bar.
+struct AccountCommands: Commands {
+    @FocusedValue(\.addAccountAction) private var addAccount
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Add Account…") {
+                addAccount?()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(addAccount == nil)
         }
     }
 }
@@ -99,22 +108,19 @@ struct TOTPApp: App {
 // MARK: - App Delegate for Remote Notifications
 
 #if os(iOS)
-@available(iOS 26.0, *)
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Register for remote notifications (CloudKit silent push)
-        application.registerForRemoteNotifications()
+        if !AppEnvironment.isUITesting {
+            application.registerForRemoteNotifications()
+        }
         return true
     }
-    
-    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("CloudKit: Registered for remote notifications with token")
-    }
-    
+
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("CloudKit: Failed to register for remote notifications: \(error)")
+        logger.error("Remote notification registration failed: \(error.localizedDescription, privacy: .public)")
     }
-    
+
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         Task {
             let handled = await SyncManager.shared.handleRemoteNotification(userInfo: userInfo)
@@ -127,384 +133,38 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 // MARK: - macOS App Delegate for Remote Notifications & Lifecycle
 
 #if os(macOS)
-@available(macOS 26.0, *)
 class MacAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Register for remote notifications (CloudKit silent push)
-        NSApplication.shared.registerForRemoteNotifications()
-        
-        // Apply dock icon visibility preference
+        if !AppEnvironment.isUITesting {
+            NSApplication.shared.registerForRemoteNotifications()
+        }
         MacOSAppSettings.shared.applyDockIconPolicy()
     }
-    
-    func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("CloudKit: Registered for remote notifications with token")
-    }
-    
+
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("CloudKit: Failed to register for remote notifications: \(error)")
+        logger.error("Remote notification registration failed: \(error.localizedDescription, privacy: .public)")
     }
-    
+
     func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
         Task {
             _ = await SyncManager.shared.handleRemoteNotification(userInfo: userInfo)
         }
     }
-    
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            // Re-open the main window when clicking dock icon
-            for window in sender.windows {
-                if window.canBecomeMain {
-                    window.makeKeyAndOrderFront(self)
-                    break
-                }
+            for window in sender.windows where window.canBecomeMain {
+                window.makeKeyAndOrderFront(self)
+                break
             }
         }
         return true
     }
-    
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        // Don't quit — hide to menu bar instead
+        // Don't quit — keep running in the menu bar
         MacOSAppSettings.shared.applyDockIconPolicy()
         return false
     }
 }
 #endif
-
-extension Notification.Name {
-    static let addAccount = Notification.Name("addAccount")
-}
-
-#if os(iOS)
-struct TOTPApp_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            // Empty state preview
-            EmptyStatePreview()
-                .previewDisplayName("Empty State")
-                .preferredColorScheme(.light)
-            
-            EmptyStatePreview()
-                .previewDisplayName("Empty State - Dark")
-                .preferredColorScheme(.dark)
-            
-            // With TOTP data preview
-            WithDataPreview()
-                .previewDisplayName("With TOTP Data")
-                .preferredColorScheme(.light)
-            
-            WithDataPreview()
-                .previewDisplayName("With TOTP Data - Dark")
-                .preferredColorScheme(.dark)
-            
-            // Loading state preview
-            LoadingStatePreview()
-                .previewDisplayName("Loading State")
-                .preferredColorScheme(.light)
-            
-            // iPad preview with data
-            WithDataPreview()
-                .previewDisplayName("iPad - TOTP Data")
-                .previewDevice("iPad Pro (12.9-inch) (6th generation)")
-                .preferredColorScheme(.light)
-        }
-    }
-}
-
-// Empty state preview
-@available(iOS 26.0, *)
-struct EmptyStatePreview: View {
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                VStack {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            VStack(spacing: 20) {
-                                Image(systemName: "lock.shield")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.secondary)
-                                VStack(spacing: 8) {
-                                    Text("No TOTP accounts")
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                    Text("Add your first account to get started")
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, minHeight: geometry.size.height)
-                        }
-                        .refreshable {
-                            // Mock refresh
-                        }
-                    }
-                }
-                
-                // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {}) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-            }
-            .navigationTitle("TOTP Passwords")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
-// With data preview
-@available(iOS 26.0, *)
-struct WithDataPreview: View {
-    private let sampleAccounts = [
-        ("Google", "john.doe@gmail.com", "123456"),
-        ("GitHub", "GitHub", "789012"),
-        ("Amazon", "AWS Console", "345678"),
-        ("Microsoft", "work@company.com", "901234"),
-        ("Discord", "Discord", "567890")
-    ]
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                VStack {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: geometry.size.width > 768 ? 3 : 1),
-                                alignment: .center,
-                                spacing: 12
-                            ) {
-                                ForEach(Array(sampleAccounts.enumerated()), id: \.offset) { index, account in
-                                    MockTOTPCard(
-                                        issuer: account.0,
-                                        name: account.1,
-                                        code: account.2
-                                    )
-                                }
-                            }
-                            .padding(.top)
-                            .padding(.horizontal, geometry.size.width > 768 ? 40 : 20)
-                            
-                            Spacer()
-                                .frame(height: 20)
-                        }
-                        .refreshable {
-                            // Mock refresh
-                        }
-                    }
-                }
-                
-                // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {}) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-            }
-            .navigationTitle("TOTP Passwords")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
-// Loading state preview
-@available(iOS 26.0, *)
-struct LoadingStatePreview: View {
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // GitHub-style gray background
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                VStack {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            VStack {
-                                Spacer()
-                                    .frame(height: 100)
-                                
-                                VStack {
-                                    ProgressView()
-                                        .scaleEffect(1.2)
-                                    Text("Loading accounts...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .padding(.top, 8)
-                                }
-                                .frame(maxWidth: .infinity)
-                                
-                                Spacer()
-                            }
-                        }
-                        .refreshable {
-                            // Mock refresh
-                        }
-                    }
-                }
-                
-                // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {}) {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                                .frame(width: 52, height: 52)
-                        }
-                        .buttonStyle(.plain)
-                        .background {
-                            Circle()
-                                .fill(.background)
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.8),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .glassEffect(.regular.interactive())
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 32)
-                    }
-                }
-            }
-            .navigationTitle("TOTP Passwords")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
-// Mock TOTP card component
-@available(iOS 26.0, *)
-struct MockTOTPCard: View {
-    let issuer: String
-    let name: String
-    let code: String
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(issuer)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    Text(name)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                Circle()
-                    .fill(Color.blue)
-                    .frame(width: 12, height: 12)
-            }
-            
-            HStack {
-                Text(code)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .tracking(2)
-                Spacer()
-                ProgressView(value: 0.7)
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .frame(width: 24, height: 24)
-            }
-        }
-        .padding()
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(.systemBackground))
-        }
-        .glassEffect(.regular.interactive())
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-#endif // os(iOS)

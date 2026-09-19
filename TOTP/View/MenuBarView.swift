@@ -9,17 +9,14 @@
 import SwiftUI
 import AppKit
 
-@available(macOS 26.0, *)
 struct MenuBarView: View {
     @EnvironmentObject private var syncManager: SyncManager
+    @ObservedObject private var lock = AppLockManager.shared
     @Environment(\.openWindow) private var openWindow
     @State private var searchText = ""
     @State private var copiedAccountId: UUID?
-    @State private var tickCounter = 0
 
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    /// Fixed height per account row, so the overall list height is deterministic.
+    /// Height per account row, so the overall list height is deterministic.
     private let rowHeight: CGFloat = 52
     private let rowSpacing: CGFloat = 2
 
@@ -33,34 +30,29 @@ struct MenuBarView: View {
     }
 
     private var filteredAccounts: [OtpModel] {
-        let accounts = syncManager.accounts
-        let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if search.isEmpty { return accounts }
-        return accounts.filter {
-            $0.issuer?.localizedCaseInsensitiveContains(search) ?? false
-            || $0.name?.localizedCaseInsensitiveContains(search) ?? false
-        }
+        syncManager.accounts.filter { $0.matches(search: searchText) }
     }
 
     /// The account rows as a plain `VStack`. A `VStack` always reports a definite
     /// height, so it renders reliably inside the `.window`-style MenuBarExtra —
     /// unlike a `ScrollView`, whose ideal height along its scroll axis is ~0, which
     /// makes it collapse to nothing when the popover sizes itself to fit its content.
-    @ViewBuilder
     private var accountRows: some View {
-        VStack(spacing: rowSpacing) {
-            ForEach(filteredAccounts) { account in
-                MenuBarAccountRow(
-                    account: account,
-                    isCopied: copiedAccountId == account.id,
-                    tickCounter: tickCounter
-                ) {
-                    copyCode(for: account)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(spacing: rowSpacing) {
+                ForEach(filteredAccounts) { account in
+                    MenuBarAccountRow(
+                        account: account,
+                        date: context.date,
+                        isCopied: copiedAccountId == account.id
+                    ) {
+                        copyCode(for: account)
+                    }
+                    .frame(height: rowHeight)
                 }
-                .frame(height: rowHeight)
             }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
     }
 
     var body: some View {
@@ -69,146 +61,65 @@ struct MenuBarView: View {
             HStack {
                 Image(systemName: "lock.shield.fill")
                     .font(.title3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .cyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundStyle(.tint)
                 Text("TOTP Authenticator")
                     .font(.headline)
-                    .fontWeight(.semibold)
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 8)
-            
-            // Search field
-            if syncManager.accounts.count > 3 {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                    TextField("Search accounts...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.subheadline)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-            }
-            
-            Divider()
-            
-            // Account list
-            if filteredAccounts.isEmpty {
-                VStack(spacing: 12) {
-                    if syncManager.accounts.isEmpty {
-                        Image(systemName: "lock.shield")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.secondary)
-                        Text("No accounts")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text("Open the app to add accounts")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.secondary)
-                        Text("No results")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-            } else if naturalListHeight <= maxListHeight {
-                // Everything fits — render the rows directly (no ScrollView), exactly
-                // like the footer below, which is why it renders reliably here.
-                accountRows
+
+            if lock.isLocked {
+                lockedContent
             } else {
-                // Too many accounts to fit — scroll, with an explicit height so the
-                // ScrollView has a concrete size instead of collapsing.
-                ScrollView {
-                    accountRows
+                // Search field
+                if syncManager.accounts.count > 3 {
+                    TextField("Search accounts", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
                 }
-                .frame(height: maxListHeight)
+
+                Divider()
+
+                // Account list
+                if filteredAccounts.isEmpty {
+                    emptyContent
+                } else if naturalListHeight <= maxListHeight {
+                    // Everything fits — render the rows directly (no ScrollView).
+                    accountRows
+                } else {
+                    // Too many accounts to fit — scroll, with an explicit height so the
+                    // ScrollView has a concrete size instead of collapsing.
+                    ScrollView {
+                        accountRows
+                    }
+                    .frame(height: maxListHeight)
+                }
             }
-            
+
             Divider()
-            
+
             // Footer actions
             VStack(spacing: 0) {
-                Button(action: {
+                footerButton("Open TOTP", systemImage: "macwindow", shortcut: "o") {
                     MacOSAppSettings.shared.showMainWindow(openWindow: openWindow)
-                }) {
-                    HStack {
-                        Image(systemName: "macwindow")
-                            .font(.subheadline)
-                        Text("Open Main Window")
-                            .font(.subheadline)
-                        Spacer()
-                        Text("⌘O")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+                }
+                SettingsLink {
+                    footerLabel("Settings…", systemImage: "gearshape", shortcut: ",")
                 }
                 .buttonStyle(.plain)
-                .onHover { isHovered in
-                    if isHovered {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
-                
+                .keyboardShortcut(",", modifiers: .command)
                 Divider()
                     .padding(.horizontal, 12)
-                
-                Button(action: {
+                footerButton("Quit TOTP", systemImage: "power", shortcut: "q") {
                     NSApplication.shared.terminate(nil)
-                }) {
-                    HStack {
-                        Image(systemName: "power")
-                            .font(.subheadline)
-                        Text("Quit TOTP")
-                            .font(.subheadline)
-                        Spacer()
-                        Text("⌘Q")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { isHovered in
-                    if isHovered {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
                 }
             }
             .padding(.vertical, 4)
         }
         .frame(width: 320)
-        .onReceive(timer) { _ in
-            tickCounter += 1
-        }
         .task {
             // The main window is suppressed at launch (`.defaultLaunchBehavior(.suppressed)`),
             // so `initializeSync()` may not have run yet when the app starts straight into the
@@ -219,16 +130,81 @@ struct MenuBarView: View {
             }
         }
     }
-    
-    private func copyCode(for account: OtpModel) {
-        let value = account.generateAutoFillValue()
-        PlatformPasteboard.copyToClipboard(value)
-        
-        withAnimation(.smooth(duration: 0.2)) {
-            copiedAccountId = account.id
+
+    // MARK: - Subviews
+
+    private var lockedContent: some View {
+        VStack(spacing: 10) {
+            Divider()
+            Image(systemName: "lock.fill")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+            Text("Codes are locked")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await lock.unlock() }
+            } label: {
+                Label("Unlock with \(lock.methodName)", systemImage: lock.methodSymbol)
+            }
+            .buttonStyle(.glassProminent)
+            .keyboardShortcut(.defaultAction)
+            .padding(.bottom, 16)
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        .frame(maxWidth: .infinity)
+    }
+
+    private var emptyContent: some View {
+        VStack(spacing: 8) {
+            Image(systemName: syncManager.accounts.isEmpty ? "lock.shield" : "magnifyingglass")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text(syncManager.accounts.isEmpty ? "No accounts" : "No results")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if syncManager.accounts.isEmpty {
+                Text("Open TOTP to add accounts")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
+    private func footerButton(_ title: LocalizedStringKey, systemImage: String, shortcut: Character, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            footerLabel(title, systemImage: systemImage, shortcut: shortcut)
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(KeyEquivalent(shortcut), modifiers: .command)
+    }
+
+    private func footerLabel(_ title: LocalizedStringKey, systemImage: String, shortcut: Character) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline)
+            Spacer()
+            Text("⌘\(String(shortcut).uppercased())")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Actions
+
+    private func copyCode(for account: OtpModel) {
+        Task {
+            let value = await syncManager.useCode(for: account)
+            ClipboardManager.copy(value)
+            withAnimation(.smooth(duration: 0.2)) {
+                copiedAccountId = account.id
+            }
+            try? await Task.sleep(for: .seconds(1.5))
             withAnimation(.smooth(duration: 0.3)) {
                 if copiedAccountId == account.id {
                     copiedAccountId = nil
@@ -240,109 +216,53 @@ struct MenuBarView: View {
 
 // MARK: - Account Row
 
-@available(macOS 26.0, *)
 struct MenuBarAccountRow: View {
     let account: OtpModel
+    let date: Date
     let isCopied: Bool
-    let tickCounter: Int
     let onTap: () -> Void
-    
+
     @State private var isHovered = false
-    
-    private var currentCode: String {
-        // Recalculates every time tickCounter changes (every second)
-        _ = tickCounter
-        return account.generateCode()
-    }
-    
-    private var displayCode: String {
-        let code = currentCode
-        // Insert a space in the middle for readability (e.g., "123 456")
-        if code.count == 6 {
-            let mid = code.index(code.startIndex, offsetBy: 3)
-            return "\(code[code.startIndex..<mid]) \(code[mid...])"
-        }
-        return code
-    }
-    
-    private var countdown: Int {
-        _ = tickCounter
-        return account.entry.get_display_value()
-    }
-    
-    private var progress: Double {
-        _ = tickCounter
-        if case let .totp(_, _, interval) = account.entry {
-            let time = Date().timeIntervalSince1970
-            let nextUpdate = Double(ceil(time / interval) * interval)
-            return 1.0 - ((nextUpdate - time) / interval)
-        }
-        return 0
-    }
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 10) {
-                // Countdown circle
-                ZStack {
-                    Circle()
-                        .stroke(.quaternary, lineWidth: 2)
-                        .frame(width: 32, height: 32)
-                    
-                    Circle()
-                        .trim(from: 0, to: CGFloat(progress))
-                        .stroke(
-                            LinearGradient(
-                                colors: [.blue, .cyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                        )
-                        .frame(width: 32, height: 32)
-                        .rotationEffect(.degrees(-90))
-                    
-                    Text("\(countdown)")
-                        .font(.system(.caption2, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
-                }
-                
+                CountdownIndicator(entry: account.entry, date: date)
+                    .frame(width: 32, height: 32)
+                    .scaleEffect(32 / 44)
+
                 // Account info
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(account.issuer ?? "Unknown")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    
-                    if let name = account.name, !name.isEmpty {
-                        Text(name)
+                    HStack(spacing: 4) {
+                        Text(account.displayTitle)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        if account.hasPrefix {
+                            Image(systemName: "key.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .help("A fixed prefix is added before the code when copying")
+                        }
+                    }
+                    if let subtitle = account.displaySubtitle {
+                        Text(subtitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Code or copied indicator
                 if isCopied {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                        Text("Copied")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.green)
-                    }
-                    .transition(.scale.combined(with: .opacity))
+                    Label("Copied", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
                 } else {
-                    Text(displayCode)
-                        .font(.system(.subheadline, design: .monospaced))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                    Text(account.code(at: date).groupedOTP)
+                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
                         .contentTransition(.numericText())
                 }
             }
@@ -361,6 +281,8 @@ struct MenuBarAccountRow: View {
                 isHovered = hovering
             }
         }
+        .accessibilityLabel("\(account.displayTitle), \(account.code(at: date))")
+        .accessibilityHint("Copies the code")
     }
 }
 #endif
