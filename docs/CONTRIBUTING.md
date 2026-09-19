@@ -25,9 +25,8 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ### Prerequisites
 
-- macOS 14.0 or later
-- Xcode 16.0 or later
-- Swift 5.9 or later
+- macOS 27 or later
+- Xcode 27 or later (iOS / macOS 27 SDKs)
 - An Apple Developer account (for testing on devices)
 
 ### Fork and Clone

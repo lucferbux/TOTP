@@ -22,25 +22,31 @@ A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS a
 - Universal purchase across all platforms
 
 ### 🎨 Modern UI/UX
-- Responsive layout (single column on iPhone, grid on iPad)
-- Material design with blur effects
-- Dark mode support
-- Haptic feedback
-- Swipe-to-reveal actions
-- Context menu support
-- Pull-to-refresh
-- Floating action button
+- Liquid Glass design for iOS / iPadOS / macOS 27
+- Adaptive layout driven by size classes: list on compact widths (iPhone, iPhone Duo folded), card grid on regular widths (iPad, iPhone Duo unfolded, Mac); all orientations
+- Native swipe actions, context menus, search, pull-to-refresh and drag to reorder
+- Dynamic Type, VoiceOver labels and haptic feedback
+- Fixed prefix (PIN) per account, added on copy and AutoFill (e.g. Red Hat PIN + token)
 
 ### ☁️ Sync & Backup
 - iCloud sync via CloudKit
 - App Groups for widget data sharing
 - Encrypted backups
 
-### ⚡ Widget Support
-- Home screen widgets (small, medium, large)
-- Real-time 30-second updates
-- Account selection
-- One-tap code access
+### ⚡ Widgets, Controls & Shortcuts
+- Home Screen widgets (small, medium, large) and Lock Screen widgets
+- Tap a widget to copy the code (prefix included)
+- Control Center / Action button control to copy a code in one tap
+- Siri, Shortcuts and Spotlight: "Copy my TOTP code for …", "Get code"
+
+### 📷 Setup
+- Scan the setup QR code with the camera, pick a QR screenshot, or paste an `otpauth://` link
+- SHA-1, SHA-256 and SHA-512; 6–10 digits; custom periods
+
+### 🔑 AutoFill & Security
+- AutoFill credential provider on iPhone, iPad **and Mac**: fills one-time-code fields, and password fields with PIN + code
+- Optional Face ID / Touch ID / Optic ID lock
+- Copied codes are cleared from the clipboard automatically (configurable)
 
 ## Screenshots
 
@@ -51,9 +57,8 @@ A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS a
 ## Installation
 
 ### Requirements
-- iOS 18.2+ / macOS 14+
-- Xcode 16+
-- Swift 5.9+
+- iOS / iPadOS 27+ / macOS 27+
+- Xcode 27+
 
 ### Build from Source
 
@@ -73,12 +78,10 @@ Coming soon to the App Store.
 
 ### Adding an Account
 
-1. Tap the **+** button (or use ⌘N on macOS)
-2. Choose TOTP or HOTP mode
-3. Enter your secret key (Base32 encoded)
-4. Configure interval and digits if needed
-5. Add issuer and account name
-6. Tap **Add Account**
+1. Tap **+** (or ⌘N)
+2. Scan the QR code, choose a QR image, or paste the `otpauth://` link — or enter the Base32 secret manually
+3. Optionally add a fixed prefix (PIN) and AutoFill domains
+4. Tap **Add**
 
 ### Copying Codes
 
@@ -88,40 +91,34 @@ Coming soon to the App Store.
 
 ### Managing Accounts
 
-- **Swipe left** to reveal Edit and Delete buttons
-- **Long press** to access context menu
+- **Swipe** a row for Copy, Edit and Delete (iPhone), or **long press / right-click** for the context menu
+- **Edit** to reorder
 - **Pull down** to refresh accounts
 
 ## Architecture
 
 ```
-TOTP/
-├── Generator/              # OTP code generation
-│   ├── HOTP.swift         # HMAC-based OTP (RFC 4226)
-│   └── OTP.swift          # OTP entry types
-├── Model/                  # Data layer
-│   ├── OtpModel.swift     # Core account model
-│   ├── SharedDataManager.swift  # Local storage
-│   └── CloudKitDataManager.swift  # iCloud sync
-├── View/                   # UI layer
-│   ├── ContentView.swift  # Main list view
-│   ├── TotpView.swift     # Account card
-│   └── AddingPageView.swift  # Add account form
-├── Helper/                 # Utilities
-│   ├── Data+Base32.swift  # Base32 decoding
-│   └── PlatformUtilities.swift  # Cross-platform helpers
-└── TOTPApp.swift          # App entry point
+Shared/            # Compiled into the app, widget and AutoFill targets
+├── OTP/           # HOTP/TOTP (RFC 4226 / 6238, SHA-1/256/512)
+├── Model/         # OtpModel, encrypted AccountStore, key manager, Base32, otpauth:// parser
+└── Platform/      # ClipboardManager + shared preferences
+SharedIntents/     # App Intents (app + widget): AccountEntity, Get/Copy Code
+TOTP/              # App: views, SyncManager, CloudKit, app lock, Siri phrases
+TOTP Widget/       # Widgets and the Copy Code control
+TOTP AutoFill/     # Credential provider extension (iOS + macOS)
 ```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md).
 
 ### Key Technologies
 
 | Component | Technology |
 |-----------|------------|
 | UI | SwiftUI |
-| Cryptography | CryptoKit (HMAC-SHA1, ChaChaPoly) |
+| Cryptography | CryptoKit (HMAC-SHA1/256/512, ChaChaPoly) |
 | Storage | UserDefaults + Keychain |
 | Sync | CloudKit |
-| Widget | WidgetKit |
+| Widget | WidgetKit, App Intents |
 | Testing | Swift Testing |
 
 ## Security
@@ -129,7 +126,7 @@ TOTP/
 ### How Keys Are Protected
 
 1. **Encryption**: All OTP secret keys are encrypted using ChaChaPoly before storage
-2. **Key Management**: The master encryption key is stored in the iOS/macOS Keychain
+2. **Key Management**: The master encryption key lives in the App Group container (readable by the widget and AutoFill extensions, protected until first unlock)
 3. **App Groups**: Widget access uses shared encrypted storage with the same key
 4. **No Plaintext**: Keys are never stored or transmitted in plaintext
 
@@ -138,7 +135,6 @@ TOTP/
 - Enable device passcode/biometrics
 - Keep your device updated
 - Never share your secret keys
-- Use the app's export feature for backups
 
 ## Development
 
@@ -146,10 +142,10 @@ TOTP/
 
 ```bash
 # Run all tests
-xcodebuild test -scheme TOTP -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -scheme TOTP -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 
-# Run specific test file
-swift test --filter TOTPTests
+# Unit tests only
+xcodebuild test -scheme TOTP -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:TOTPTests
 ```
 
 ### Code Style
@@ -170,8 +166,6 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 See [RFE.md](docs/RFE.md) for the full feature roadmap including:
 
-- 🔜 QR Code scanning
-- 🔜 Biometric app lock
 - 🔜 Apple Watch app
 - 🔜 Import/Export functionality
 

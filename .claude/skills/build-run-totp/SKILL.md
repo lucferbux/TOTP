@@ -5,14 +5,14 @@ description: Build and launch the TOTP authenticator app on iOS/iPadOS Simulator
 
 # Build & Run TOTP
 
-Native SwiftUI app, `TOTP.xcodeproj` (no workspace, no SPM). Scheme `TOTP`, deployment iOS/macOS **26.0+**. Two run surfaces: **iOS/iPadOS Simulator** and **macOS**.
+Native SwiftUI app, `TOTP.xcodeproj` (no workspace, no SPM). Scheme `TOTP`, deployment iOS/macOS **27.0+**. Two run surfaces: **iOS/iPadOS Simulator** and **macOS**.
 
 ## 1. Pick a destination
 
 ```bash
 xcrun simctl list devices available        # choose a real device name
 ```
-Defaults that exist on this machine: `iPhone 16 Pro`, `iPhone 16`, `iPad Pro 11-inch (M4)`.
+Defaults that exist on this machine: `iPhone 18 Pro`, `iPhone 17`, `iPad Pro 11-inch (M5)`.
 
 ## 2. Build
 
@@ -21,7 +21,7 @@ Pipe through `xcbeautify` if installed (`command -v xcbeautify`), otherwise run 
 ```bash
 # iOS / iPadOS Simulator
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 
 # macOS
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
@@ -34,7 +34,7 @@ A build-only sanity check without a device: `-destination 'generic/platform=iOS 
 
 ### iOS Simulator
 ```bash
-DEV="iPhone 16 Pro"
+DEV="iPhone 18 Pro"
 xcrun simctl boot "$DEV" 2>/dev/null; open -a Simulator
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
   -destination "platform=iOS Simulator,name=$DEV" \

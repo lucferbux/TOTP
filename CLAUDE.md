@@ -8,11 +8,10 @@ Guidance for Claude Code (and other AI agents) working in this repository. This 
 
 - **Language / mode:** Swift (Swift 5 language mode — `SWIFT_VERSION = 5.0`)
 - **UI:** SwiftUI with the **iOS 26 "Liquid Glass"** design language
-- **Deployment targets:** iOS/iPadOS **26.0+**, macOS **26.0+** (visionOS is also a supported platform)
-- **Toolchain:** Xcode **26.x** (this machine: Xcode 26.5)
-- **Crypto:** CryptoKit — `HMAC<Insecure.SHA1>` for OTP, `ChaChaPoly` for at-rest encryption
+- **Deployment targets:** iOS/iPadOS **27.0+**, macOS **27.0+** (visionOS 27 is also a supported platform)
+- **Toolchain:** Xcode **27.x** (this machine: Xcode 27.0)
+- **Crypto:** CryptoKit — HMAC SHA-1/256/512 for OTP, `ChaChaPoly` for at-rest encryption
 
-> ⚠️ [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) still list older requirements (iOS 18.2 / macOS 14 / Xcode 16 / Swift 5.9). Those are **stale** — trust this file and the Xcode project settings instead.
 
 ## Build, Run & Test
 
@@ -22,7 +21,7 @@ The project file is `TOTP.xcodeproj` (no `.xcworkspace`, no SPM/Cocoapods).
 |--------|--------|-----------|
 | Main app | `TOTP` | `com.lucferbux.TOTP` |
 | Widget extension | `TOTP WidgetExtension` | `com.lucferbux.TOTP.TOTP-Widget` |
-| AutoFill extension | `TOTP Autofill` | `com.lucferbux.TOTP.TOTP-Autofill` |
+| AutoFill extension (iOS + macOS) | (via `TOTP`) | `com.lucferbux.TOTP.TOTP-Autofill` |
 | Unit tests | (via `TOTP`) → `TOTPTests` | `com.lucferbux.TOTPTests` |
 | UI tests | (via `TOTP`) → `TOTPUITests` | `com.lucferbux.TOTPUITests` |
 
@@ -32,7 +31,7 @@ xcodebuild -list -project TOTP.xcodeproj
 
 # Build for iOS Simulator
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 
 # Build for macOS
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
@@ -40,15 +39,15 @@ xcodebuild build -project TOTP.xcodeproj -scheme TOTP \
 
 # Run the full test suite (unit + UI) on iOS Simulator
 xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 
 # Run only the unit tests
 xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
   -only-testing:TOTPTests
 ```
 
-- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M4)`.
+- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M5)`.
 - Prefer the project's **`build-run-totp`** and **`test-totp`** skills — they wrap these commands, pick a live simulator, and pipe through `xcbeautify` when available.
 - CloudKit, AutoFill, App Groups, and Keychain sharing require a signing team and provisioned containers; they **do not work in unsigned simulator builds**. Don't treat sync/AutoFill failures in a bare simulator as regressions.
 
@@ -65,31 +64,26 @@ View (SwiftUI)  →  SyncManager  →  SharedDataManager (local)   →  UserDefa
 ### Project structure
 
 ```
+Shared/                    # Compiled into app + widget + AutoFill (file-system synchronized group)
+├── OTP/HOTP.swift         # hotpCode() → zero-padded String; OtpAlgorithm (SHA1/256/512)
+├── OTP/OTP.swift          # OtpEntry (.hotp/.totp + algorithm), code(at:), countdown helpers, CodeTimeline
+├── Model/OtpModel.swift   # Account model; autoFillValue() = prefix + code; AutoFill domain matching
+├── Model/AccountStore.swift        # StoredOtpAccount + ChaChaPoly codec; read-only loader for extensions
+├── Model/EncryptionKeyManager.swift# Single owner of the at-rest key
+├── Model/OtpAuthURL.swift # otpauth:// parse/build
+├── Model/Data+Base32.swift
+└── Platform/ClipboardManager.swift # Every copy goes here (auto-clear); AppPreferences (App Group)
+SharedIntents/             # App + widget: AccountEntity (IndexedEntity), GetCodeIntent, CopyCodeIntent
 TOTP/
-├── TOTPApp.swift          # @main entry; iOS scenes + macOS MenuBarExtra/Settings + MacAppDelegate
-├── Generator/             # OTP math (pure, no platform deps)
-│   ├── HOTP.swift         # hotpCode() — RFC 4226 HMAC-SHA1 + dynamic truncation
-│   └── OTP.swift          # OtpEntry enum: .hotp / .totp; code(); get_display_value()
-├── Model/                 # Data + persistence + sync
-│   ├── OtpModel.swift             # Identifiable account model (id/issuer/name/prefix/entry)
-│   ├── SharedDataManager.swift    # Encrypted local store (App Group UserDefaults). @Published accounts
-│   ├── CloudKitDataManager.swift  # CloudKit CRUD + account status + push
-│   ├── CloudKitOtpModel.swift     # CKRecord <-> model mapping
-│   └── SyncManager.swift          # Orchestrates local⇄cloud (last-write-wins), AutoFill identities, widget reload
-├── View/                  # SwiftUI views
-│   ├── ContentView.swift          # Main list/grid
-│   ├── TotpView.swift             # Single account card (copy, swipe, context menu)
-│   ├── AddingPageView.swift       # Add/edit form
-│   ├── SettingsView.swift         # macOS ⌘, settings window
-│   └── MenuBarView.swift          # macOS menu bar popover
-├── Helper/
-│   ├── PlatformUtilities.swift    # PlatformPasteboard / PlatformColors cross-platform shims
-│   ├── EncryptionKeyManager.swift # Keychain-backed SymmetricKey
-│   ├── Data+Base32.swift          # Base32 encode/decode
-│   └── MacOSAppSettings.swift     # Launch-at-login (SMAppService), Dock policy
-TOTP Widget/               # WidgetKit extension (AppIntent timeline, CopyTOTPCodeIntent)
-TOTP AutoFill/             # ASCredentialProvider extension (CredentialProviderViewController, OTPSelectionView)
-TOTPTests/ , TOTPUITests/  # Swift Testing unit tests + XCUITest UI tests
+├── TOTPApp.swift          # @main; WindowGroup + commands (⌘N via FocusedValues) + macOS MenuBarExtra/Settings
+├── Model/                 # SharedDataManager (local), CloudKitDataManager, CloudKitOtpModel, SyncManager
+├── View/                  # ContentView (List ⇄ adaptive grid by size class), AccountCodeView, AddingPageView,
+│                          # QRScannerView, SettingsView (iOS sheet + macOS ⌘,), MenuBarView (macOS)
+├── Intents/TOTPShortcuts.swift  # AppShortcutsProvider (app only)
+└── Helper/                # AppLockManager (LocalAuthentication), PlatformUtilities, MacOSAppSettings
+TOTP Widget/               # Single + multi account widgets, Lock Screen families, CopyCodeControl (Control Center)
+TOTP AutoFill/             # ASCredentialProviderViewController (iOS + macOS), OTPSelectionView
+TOTPTests/ , TOTPUITests/  # Swift Testing unit tests + XCUITest UI tests (`-UITestMode`)
 docs/                      # ARCHITECTURE.md, CONTRIBUTING.md, RFE.md (roadmap)
 ```
 
@@ -104,30 +98,35 @@ If you add a target or change an identifier, update **every** `*.entitlements` f
 
 ## Coding Standards
 
-### iOS 26 design language (REQUIRED)
+### OS 27 / Liquid Glass design language (REQUIRED)
+
+The minimum OS is 27, so no `@available` gating is needed for 26/27 APIs.
 
 ```swift
-// Gate every new view/type that touches iOS 26 APIs:
-@available(iOS 26.0, macOS 26.0, *)
-struct MyView: View { ... }
+// Prefer system components; they get Liquid Glass automatically:
+NavigationStack + .searchable + .toolbar { ToolbarItem(placement: .primaryAction) … }
+List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
+.buttonStyle(.glassProminent)                  // prominent call-to-action buttons
 
-// Native card surface (Journal-app style) — NOT glass:
-.padding()
-.background {
-    RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(Color(.secondarySystemGroupedBackground))   // use PlatformColors on shared code
-}
-.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+// Layout adapts through size classes only — never idiom, orientation or screen size
+// (iPhone Duo: outer display compact, inner display regular×regular, ignores orientation locks):
+@Environment(\.horizontalSizeClass) var sizeClass  // compact → List, regular → adaptive LazyVGrid
+GridItem(.adaptive(minimum: 300, maximum: 480))
 
-// Liquid Glass ONLY on the floating action button (FAB), never on cards:
-.glassEffect(.regular.interactive())
+// Cards (regular-width grid) — native surface, NOT glass:
+.background { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(PlatformColors.secondarySystemGroupedBackground) }
+
+// Liquid Glass only on floating, transient chrome (toasts, overlays), never on cards:
+.glassEffect(.regular, in: .capsule)
 
 // Modern modifiers:
+TimelineView(.periodic(from: .now, by: 1))      // never Timer.publish for live codes
 .foregroundStyle(.secondary)                    // never .foregroundColor
 .animation(.smooth(duration: 0.3), value: x)    // never .spring()
 .contentTransition(.numericText())              // for changing codes
-.symbolEffect(.pulse.byLayer, options: .repeating)
-.sensoryFeedback(.impact, trigger: value)
+.sensoryFeedback(.success, trigger: value)
+@ScaledMetric                                   // sizes that follow Dynamic Type
+#Preview                                        // PreviewProvider is deprecated in 27
 ```
 
 ### Cross-platform first
@@ -141,15 +140,15 @@ import AppKit
 #endif
 
 // Route platform differences through the existing shims — don't reach for UIKit/AppKit directly:
-PlatformPasteboard.copyToClipboard(code)
-PlatformColors.secondarySystemBackground
+ClipboardManager.copy(value)            // always — applies auto-clear
+PlatformColors.secondarySystemGroupedBackground
 // iOS-only UI: #if os(iOS) ... ; macOS-only (hover, menu bar): #if os(macOS) ...
 ```
 
 ### Naming
 
 - Views `*View`, models `*Model`, managers `*Manager`, extensions `Type+Feature.swift`.
-- Types/properties in `lowerCamelCase`/`UpperCamelCase` per the Swift API Design Guidelines. (Note: some existing OTP APIs use `snake_case` like `get_display_value()` — match the surrounding file when editing, but prefer camelCase for new APIs.)
+- Types/properties in `lowerCamelCase`/`UpperCamelCase` per the Swift API Design Guidelines.
 
 ### State management
 
@@ -158,33 +157,38 @@ PlatformColors.secondarySystemBackground
 ## Security (non-negotiable)
 
 - OTP secret keys are **always** `ChaChaPoly`-sealed before they touch any persistent store (UserDefaults, CloudKit). Plaintext keys live in memory only while generating a code.
-- The symmetric key is generated once and stored in the **Keychain** (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, shared via the access group). Never hard-code or derive keys from constants.
-- **Never** log, `print`, or put OTP keys / generated codes into analytics, error messages, or screenshots.
+- The symmetric key is generated once by `EncryptionKeyManager` and stored as a file in the App Group container (protection `completeUntilFirstUserAuthentication`) so the widget and AutoFill can read it; older Keychain copies are migrated. Extensions only read it (`EncryptionKeyManager.existingKey()`), never create it. Never hard-code or derive keys from constants.
+- **Never** log, `print`, or put OTP keys / prefixes / generated codes into analytics, error messages, or screenshots. Use `os.Logger` without account data.
+- The prefix (PIN) is never displayed; the UI shows a "PIN" badge only. App Intent entities expose issuer/name only.
 - Never write a secret to `UserDefaults` unencrypted. The widget and AutoFill extension decrypt independently using the shared Keychain key.
 
 ## Subsystem notes
 
-- **OTP math** (`Generator/`) is pure and platform-free — keep it that way so it stays unit-testable. HOTP mutates and increments its counter on each `code()`; TOTP derives the counter from `Date()`.
+- **OTP math** (`Shared/OTP/`) is pure and platform-free — keep it that way so it stays unit-testable. `code(at:)` never mutates; HOTP is advanced explicitly via `SyncManager.useCode(for:)` (which persists the counter). Codes are zero-padded `String`s — never format them from integers.
+- **Shared code**: anything the widget/AutoFill need goes in `Shared/` (or `SharedIntents/` for App Intents). Don't duplicate models in extensions.
 - **Sync** (`SyncManager`): local-first, then CloudKit with **last-write-wins** merge; debounced; reloads widget timelines (`WidgetCenter.shared.reloadAllTimelines()`) and refreshes `ASCredentialIdentityStore` after every mutation. Use `SyncState` for UI status. Account mutations should go through `SyncManager`, not `SharedDataManager` directly, so cloud + widget + AutoFill stay consistent.
-- **Widget** (`TOTP Widget/`): `AppIntentTimelineProvider` emits entries every 30s for ~5 min (`policy: .atEnd`); it can't reach the clipboard (uses App Intents / URL schemes). Gate widget views with the same `@available` as the app.
-- **AutoFill** (`TOTP AutoFill/`): `ASOneTimeCodeCredentialIdentity` (+ optional `ASPasswordCredentialIdentity` when an account has a prefix). Service identifiers come from associated domains, falling back to a normalized issuer.
-- **macOS**: `MenuBarExtra` (`.window` style) menu bar mode, ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
+- **Widget** (`TOTP Widget/`): `AppIntentTimelineProvider` emits entries aligned to period boundaries (`CodeTimeline`) for 10 periods (`policy: .atEnd`); codes are computed from `entry.date`. Tap-to-copy is `Button(intent: CopyCodeIntent)`. Widgets/intents/controls only list TOTP accounts (HOTP counters must be advanced by the app). Codes use `.privacySensitive()`.
+- **AutoFill** (`TOTP AutoFill/`, iOS + macOS): `ASOneTimeCodeCredentialIdentity` (+ `ASPasswordCredentialIdentity` when an account has a prefix). One-time-code requests complete with `ASOneTimeCodeCredential`; password requests with `ASPasswordCredential(password: prefix + code)`. Service identifiers come from associated domains, falling back to a normalized issuer.
+- **CloudKit schema**: the optional `algorithm` field is only written for non-SHA-1 accounts. New fields must be deployed to the Production schema in the CloudKit Console before release.
+- **macOS**: `MenuBarExtra` (`.window` style) menu bar mode with a **static** icon (macOS 27 hosts all status items in one window; don't animate it), ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
+- **App lock** (`AppLockManager`): optional, off by default, stored in the App Group; locks on background (iOS) or screen lock/sleep (macOS).
 
 ## Testing
 
 - Framework: **Swift Testing** (`import Testing`, `@Test`, `#expect`) for unit tests; **XCUITest** for UI tests.
-- HOTP **must** be validated against RFC 4226 test vectors (see `TOTPTests/TOTPTests.swift`). Any change to OTP generation requires those vectors to still pass.
+- HOTP/TOTP **must** be validated against the RFC 4226 and RFC 6238 (SHA-1/256/512) vectors in `TOTPTests/OTPGeneratorTests.swift`. Any change to OTP generation requires those vectors to still pass.
+- UI tests launch with `-UITestMode` (`AppEnvironment.isUITesting`): seeded in-memory accounts, no CloudKit, no lock, no AutoFill identity writes. Use accessibility identifiers (`account-<Issuer>`, `addAccountButton`, `saveButton`, …).
 - Add regression tests for bug fixes; add RFC/round-trip tests for crypto changes (encrypt→decrypt should be identity).
 
 ## Do / Don't
 
-**Do:** keep cross-platform parity (build iOS *and* macOS); add `@available(iOS 26.0, macOS 26.0, *)` to new views; route platform code through the shims; encrypt before persisting; run the suite after touching `Generator/` or `Model/`; update previews when editing views.
+**Do:** keep cross-platform parity (build iOS *and* macOS); adapt with size classes; route platform code through the shims; encrypt before persisting; run the suite after touching `Shared/` or `Model/`; update `#Preview`s when editing views.
 
-**Don't:** add third-party dependencies; use `.foregroundColor` / `.spring()` / `.shadow()` (use `.foregroundStyle` / `.smooth` / background contrast); put `.glassEffect()` on cards; store or log secrets in plaintext; change an identifier in only one place; assume CloudKit/AutoFill work in an unsigned simulator build.
+**Don't:** add third-party dependencies; use `.foregroundColor` / `.spring()` / `.shadow()` / `PreviewProvider` / `Timer.publish`; branch on device idiom, orientation or screen size; put `.glassEffect()` on cards; store or log secrets in plaintext; change an identifier in only one place; assume CloudKit/AutoFill work in an unsigned simulator build.
 
 ## Conventions
 
-- **Commits:** Conventional Commits — `type(scope): subject`. Types: `feat|fix|docs|style|refactor|test|chore`. Scopes: `app|widget|autofill|otp|storage|sync|ui|security|macos`. (e.g. `fix(otp): correct HOTP counter increment`).
+- **Commits:** Conventional Commits — `type(scope): subject`. Types: `feat|fix|docs|style|refactor|test|chore`. Scopes: `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`. (e.g. `fix(otp): correct HOTP counter increment`).
 - **Roadmap / feature status:** [docs/RFE.md](docs/RFE.md).
 - Don't commit or push unless asked. Branch before committing on `main`.
 

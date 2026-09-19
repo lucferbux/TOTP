@@ -12,7 +12,7 @@ description: Run the TOTP app's unit and UI test suites (Swift Testing + XCUITes
 ## Run
 
 ```bash
-DEV="iPhone 16 Pro"   # or: xcrun simctl list devices available
+DEV="iPhone 18 Pro"   # or: xcrun simctl list devices available
 
 # Whole suite (unit + UI)
 xcodebuild test -project TOTP.xcodeproj -scheme TOTP \

@@ -40,7 +40,7 @@ This document tracks planned features, enhancements, and future improvements for
 - [x] **Pull to Refresh** - Reload accounts gesture
 - [x] **Swipe Actions** - Swipe-to-reveal edit/delete
 - [x] **Context Menu** - Long press for actions
-- [x] **Floating Action Button** - Quick add on iOS
+- [x] **Adaptive Layout (4.0)** - Size-class driven list/grid for iPhone, iPhone Duo, iPad and Mac; all orientations
 - [x] **Haptic Feedback** - Tactile response on copy
 - [x] **Copy Toast** - Visual confirmation on copy
 
@@ -54,11 +54,10 @@ This document tracks planned features, enhancements, and future improvements for
 
 ## 🚧 In Progress
 
-### QR Code Scanning
-- [ ] Camera integration for QR scanning
-- [ ] Parse `otpauth://` URLs automatically
-- [ ] Support Google Authenticator format
-- [ ] Support Microsoft Authenticator format
+### QR Code Scanning (4.0)
+- [x] Camera integration for QR scanning (VisionKit) and QR images (Vision)
+- [x] Parse `otpauth://` URLs automatically (links, paste, deep links)
+- [ ] Google Authenticator migration format (`otpauth-migration://`)
 
 ---
 
@@ -73,17 +72,17 @@ This document tracks planned features, enhancements, and future improvements for
 - [ ] **iCloud Keychain Integration** - Optional sync method
 
 #### Security Enhancements
-- [ ] **Biometric Lock** - Face ID / Touch ID app lock
+- [x] **Biometric Lock** - Face ID / Touch ID / Optic ID app lock (4.0)
 - [ ] **App Lock Timeout** - Configurable lock delay
-- [ ] **Clipboard Auto-Clear** - Clear code after 30 seconds
+- [x] **Clipboard Auto-Clear** - Configurable 30 s / 1 min / 2 min (4.0)
 - [ ] **Screenshot Prevention** - Secure view content
 
 ### P1 - High Priority
 
 #### Account Management
-- [ ] **Account Reordering** - Drag to reorder accounts
+- [x] **Account Reordering** - Drag to reorder accounts (4.0)
 - [ ] **Account Groups/Folders** - Organize by category
-- [ ] **Account Search** - Search by issuer or name
+- [x] **Account Search** - Search by issuer or name (4.0)
 - [ ] **Account Icons** - Custom or auto-fetched icons
 - [ ] **Duplicate Detection** - Warn on duplicate accounts
 
@@ -95,7 +94,7 @@ This document tracks planned features, enhancements, and future improvements for
 
 #### Widget Improvements
 - [ ] **Multi-Account Widget** - Show multiple codes
-- [ ] **Lock Screen Widget** - iOS 16+ lock screen support
+- [x] **Lock Screen Widget** - iOS 16+ lock screen support (4.0)
 - [ ] **Watch App** - Apple Watch companion
 - [ ] **Widget Tap to Copy** - Direct copy without app launch
 
@@ -110,14 +109,14 @@ This document tracks planned features, enhancements, and future improvements for
 - [x] **Menu Bar App** - macOS menu bar quick access
 
 #### Account Features
-- [ ] **Custom Prefix** - Add prefix to copied code
+- [x] **Custom Prefix** - Add prefix to copied code
 - [ ] **Notes Field** - Add notes to accounts
 - [ ] **Account Color** - Custom color per account
 - [ ] **Last Used Timestamp** - Track usage frequency
 
 #### Advanced OTP
 - [ ] **Steam Guard** - Steam mobile authenticator format
-- [ ] **Custom Algorithms** - SHA-256, SHA-512 support
+- [x] **Custom Algorithms** - SHA-256, SHA-512 support (4.0)
 - [ ] **Variable Time Offset** - Handle clock drift
 - [ ] **HOTP Counter Sync** - Manual counter adjustment
 
@@ -126,7 +125,7 @@ This document tracks planned features, enhancements, and future improvements for
 #### Platform Expansion
 - [x] **macOS Menu Bar App** - Standalone menu bar utility
 - [ ] **Safari Extension** - Auto-fill OTP codes
-- [ ] **Shortcuts Integration** - Siri Shortcuts support
+- [x] **Shortcuts Integration** - Siri Shortcuts support (4.0)
 - [ ] **CarPlay Support** - Emergency access (read-only)
 
 #### Enterprise Features

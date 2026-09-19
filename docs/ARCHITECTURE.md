@@ -1,5 +1,12 @@
 # TOTP Authenticator - Technical Documentation
 
+> **4.0 update (OS 27):** OTP math, the account model, the encrypted store codec (`AccountStore`), the key manager,
+> Base32 and `otpauth://` parsing now live in `Shared/` and are compiled into the app, widget and AutoFill targets
+> (no more per-extension copies). App Intents live in `SharedIntents/`. The card view is `AccountCodeView`
+> (`TotpView` was removed). The at-rest key is a file in the App Group container (migrated from the Keychain).
+> Codes are zero-padded strings and support SHA-1/256/512. See [CLAUDE.md](../CLAUDE.md) for the current layout;
+> diagrams below predate 4.0 in places.
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -34,7 +41,7 @@ The TOTP Authenticator is a native iOS/macOS application that generates time-bas
 ┌─────────────────────────────────────────────────────────────┐
 │                     Presentation Layer                       │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
-│  │ ContentView  │ │  TotpView    │ │  AddingPageView      │ │
+│  │ ContentView  │ │  AccountCode…│ │  AddingPageView      │ │
 │  └──────────────┘ └──────────────┘ └──────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │                      Business Logic                          │
