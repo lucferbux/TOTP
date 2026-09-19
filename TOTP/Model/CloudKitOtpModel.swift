@@ -25,6 +25,9 @@ public class CloudKitOtpModel: ObservableObject {
     @Published public var createdDate: Date
     @Published public var modifiedDate: Date
     @Published public var associatedDomains: [String]?
+    /// Hash algorithm raw value; `nil` means SHA-1. Only written for non-SHA-1 accounts so
+    /// existing records (and the production schema) stay untouched.
+    @Published public var algorithm: String?
     
     // CloudKit record reference
     public var record: CKRecord?
@@ -41,7 +44,8 @@ public class CloudKitOtpModel: ObservableObject {
         counter: Int64 = 0,
         createdDate: Date = Date(),
         modifiedDate: Date = Date(),
-        associatedDomains: [String]? = nil
+        associatedDomains: [String]? = nil,
+        algorithm: String? = nil
     ) {
         self.id = id
         self.issuer = issuer
@@ -55,6 +59,7 @@ public class CloudKitOtpModel: ObservableObject {
         self.createdDate = createdDate
         self.modifiedDate = modifiedDate
         self.associatedDomains = associatedDomains
+        self.algorithm = algorithm
     }
     
     // Initialize from CloudKit record
@@ -81,7 +86,8 @@ public class CloudKitOtpModel: ObservableObject {
             counter: counter,
             createdDate: createdDate,
             modifiedDate: modifiedDate,
-            associatedDomains: record["associatedDomains"] as? [String]
+            associatedDomains: record["associatedDomains"] as? [String],
+            algorithm: record["algorithm"] as? String
         )
         self.record = record
     }
@@ -101,6 +107,11 @@ public class CloudKitOtpModel: ObservableObject {
         record["createdDate"] = createdDate
         record["modifiedDate"] = Date() // Always update modified date when saving
         record["associatedDomains"] = associatedDomains
+        if let algorithm {
+            record["algorithm"] = algorithm
+        } else if record["algorithm"] != nil {
+            record["algorithm"] = nil
+        }
         
         self.record = record
         return record
@@ -110,12 +121,10 @@ public class CloudKitOtpModel: ObservableObject {
     public func toOtpModel() throws -> OtpModel {
         let decryptedKey = try EncryptionKeyManager.shared.decryptData(encryptedKey)
         
-        let entry: OtpEntry
-        if isHotp {
-            entry = .hotp(key: decryptedKey, digits: digits, counter: UInt64(max(0, counter)))
-        } else {
-            entry = .totp(key: decryptedKey, digits: digits, interval: interval)
-        }
+        let algorithm = algorithm.flatMap(OtpAlgorithm.init(lenient:)) ?? .sha1
+        let entry: OtpEntry = isHotp
+            ? .hotp(key: decryptedKey, digits: digits, counter: UInt64(max(0, counter)), algorithm: algorithm)
+            : .totp(key: decryptedKey, digits: digits, interval: interval, algorithm: algorithm)
         
         return OtpModel(
             id: UUID(uuidString: id) ?? UUID(),
@@ -129,38 +138,27 @@ public class CloudKitOtpModel: ObservableObject {
     
     // Create from local OtpModel
     public static func from(otpModel: OtpModel) throws -> CloudKitOtpModel {
-        var key: Data
-        var isHotp: Bool
-        var digits: Int
-        var interval: Double = 30.0
-        var counter: Int64 = 0
-        switch otpModel.entry {
-        case let .hotp(k, d, c):
-            key = k
-            isHotp = true
-            digits = d
-            counter = Int64(c)
-        case let .totp(k, d, i):
-            key = k
-            isHotp = false
-            digits = d
-            interval = i
-        }
-        
-        let encryptedKey = try EncryptionKeyManager.shared.encryptData(key)
-        
-        return CloudKitOtpModel(
+        let model = CloudKitOtpModel(
             id: otpModel.id.uuidString,
-            issuer: otpModel.issuer,
-            name: otpModel.name,
-            prefix: otpModel.prefix,
-            encryptedKey: encryptedKey,
-            isHotp: isHotp,
-            digits: digits,
-            interval: interval,
-            counter: counter,
-            associatedDomains: otpModel.associatedDomains
+            encryptedKey: Data()
         )
+        try model.apply(otpModel)
+        return model
+    }
+    
+    /// Copies every field of `otpModel` (encrypting the secret) onto this record model.
+    public func apply(_ otpModel: OtpModel) throws {
+        let entry = otpModel.entry
+        issuer = otpModel.issuer
+        name = otpModel.name
+        prefix = otpModel.prefix
+        associatedDomains = otpModel.associatedDomains
+        encryptedKey = try EncryptionKeyManager.shared.encryptData(entry.key)
+        isHotp = entry.isHotp
+        digits = entry.digits
+        interval = entry.interval ?? 30
+        counter = Int64(clamping: entry.counter ?? 0)
+        algorithm = entry.algorithm == .sha1 ? nil : entry.algorithm.rawValue
     }
 }
 

@@ -2,390 +2,153 @@
 //  SharedDataManager.swift
 //  TOTP
 //
-//  Shared data manager for TOTP accounts using App Groups
+//  Encrypted local store for TOTP accounts (App Group UserDefaults), shared with the
+//  widget and AutoFill extensions through `AccountStore`.
 //
 
 import Foundation
 import Combine
 import CryptoKit
+import os
 
-public class SharedDataManager: ObservableObject, @unchecked Sendable {
+/// Launch-time environment switches.
+public enum AppEnvironment {
+    /// `-UITestMode`: in-memory seeded data, no CloudKit, no app lock, no AutoFill identity writes.
+    public static let isUITesting = ProcessInfo.processInfo.arguments.contains("-UITestMode")
+}
+
+public final class SharedDataManager: ObservableObject, @unchecked Sendable {
     public static let shared = SharedDataManager()
-    
-    private let suiteName = "group.com.lucferbux.TOTP"
+
+    private static let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Storage")
+
     private let userDefaults: UserDefaults
-    private let accountsKey = "stored_totp_accounts"
-    
+    private let encryptionKey: SymmetricKey
+
     @Published public var accounts: [OtpModel] = []
     @Published public var isLoading = false
     @Published public var error: SharedDataError?
-    
-    // Encryption key for sensitive data
-    private let encryptionKey: SymmetricKey
-    
+
     private init() {
-        // Use App Group UserDefaults for widget sharing
-        self.userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-        
-        // Generate or retrieve encryption key from shared file
-        self.encryptionKey = Self.getOrCreateEncryptionKey()
-        
+        if AppEnvironment.isUITesting {
+            let suite = "com.lucferbux.TOTP.uitests"
+            let defaults = UserDefaults(suiteName: suite) ?? .standard
+            defaults.removePersistentDomain(forName: suite)
+            self.userDefaults = defaults
+            self.encryptionKey = SymmetricKey(size: .bits256)
+            self.accounts = Self.uiTestSeed
+            persist()
+        } else {
+            self.userDefaults = AppGroup.defaults
+            self.encryptionKey = EncryptionKeyManager.shared.encryptionKey
+            loadAccounts()
+        }
+    }
+
+    /// Designated initialiser for unit tests.
+    init(userDefaults: UserDefaults, encryptionKey: SymmetricKey) {
+        self.userDefaults = userDefaults
+        self.encryptionKey = encryptionKey
         loadAccounts()
     }
-    
+
     // MARK: - Data Operations
-    
+
     public func loadAccounts() {
         isLoading = true
         defer { isLoading = false }
-        
+
+        guard let data = userDefaults.data(forKey: AccountStore.accountsKey) else {
+            accounts = []
+            return
+        }
         do {
-            guard let data = userDefaults.data(forKey: accountsKey) else {
-                self.accounts = []
-                return
-            }
-            
-            let decoder = JSONDecoder()
-            let storedAccounts = try decoder.decode([StoredOtpAccount].self, from: data)
-            
-            var loadedAccounts: [OtpModel] = []
-            
-            for storedAccount in storedAccounts {
-                do {
-                    let decryptedKey = try decryptData(storedAccount.encryptedKey)
-                    
-                    let entry: OtpEntry
-                    if storedAccount.isHotp {
-                        entry = .hotp(key: decryptedKey, digits: storedAccount.digits, counter: UInt64(max(0, storedAccount.counter)))
-                    } else {
-                        entry = .totp(key: decryptedKey, digits: storedAccount.digits, interval: storedAccount.interval)
-                    }
-                    
-                    // Restore the original ID from storage
-                    let accountId = UUID(uuidString: storedAccount.id) ?? UUID()
-                    
-                    let otpModel = OtpModel(
-                        id: accountId,
-                        issuer: storedAccount.issuer,
-                        name: storedAccount.name,
-                        prefix: storedAccount.prefix,
-                        entry: entry,
-                        associatedDomains: storedAccount.associatedDomains
-                    )
-                    
-                    loadedAccounts.append(otpModel)
-                } catch {
-                    print("Failed to decrypt account: \(error)")
-                    // Skip corrupted accounts
-                }
-            }
-            
-            DispatchQueue.main.async {
-                self.accounts = loadedAccounts
-            }
-            
+            accounts = try AccountStore.decode(data, key: encryptionKey)
         } catch {
-            DispatchQueue.main.async {
-                self.error = .loadFailed(error)
-            }
+            Self.logger.error("Failed to load accounts: \(error.localizedDescription, privacy: .public)")
+            self.error = .loadFailed(error)
         }
     }
-    
-    public func saveAccounts() {
-        print("DEBUG saveAccounts: Starting save with \(accounts.count) accounts")
-        do {
-            var storedAccounts: [StoredOtpAccount] = []
-            
-            for account in accounts {
-                print("DEBUG saveAccounts: Saving account - id: \(account.id), issuer: \(account.issuer ?? "nil"), name: \(account.name ?? "nil")")
-                var key: Data
-                var isHotp: Bool
-                var digits: Int
-                var interval: Double = 30.0
-                var counter: Int64 = 0
-                
-                switch account.entry {
-                case let .hotp(k, d, c):
-                    key = k
-                    isHotp = true
-                    digits = d
-                    counter = Int64(c)
-                case let .totp(k, d, i):
-                    key = k
-                    isHotp = false
-                    digits = d
-                    interval = i
-                }
-                
-                let encryptedKey = try encryptData(key)
-                
-                let storedAccount = StoredOtpAccount(
-                    id: account.id.uuidString,
-                    issuer: account.issuer,
-                    name: account.name,
-                    prefix: account.prefix,
-                    encryptedKey: encryptedKey,
-                    isHotp: isHotp,
-                    digits: digits,
-                    interval: interval,
-                    counter: counter,
-                    createdDate: Date(),
-                    modifiedDate: Date(),
-                    associatedDomains: account.associatedDomains
-                )
-                
-                storedAccounts.append(storedAccount)
-            }
-            
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(storedAccounts)
-            userDefaults.set(data, forKey: accountsKey)
-            userDefaults.synchronize()
-            print("DEBUG saveAccounts: Save completed, wrote \(data.count) bytes")
-            
-        } catch {
-            DispatchQueue.main.async {
-                self.error = .saveFailed(error)
-            }
-        }
+
+    /// Writes the current `accounts` array. Returns `false` (and sets `error`) on failure.
+    @discardableResult
+    public func saveAccounts() -> Bool {
+        persist()
     }
-    
+
     public func addAccount(_ account: OtpModel) {
-        DispatchQueue.main.async {
-            self.accounts.append(account)
-            self.saveAccounts()
-        }
+        accounts.append(account)
+        persist()
     }
-    
+
     public func saveAccount(_ account: OtpModel) async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.main.async { [self] in
-                self.accounts.append(account)
-                self.saveAccounts()
-                
-                // Check if save was successful by monitoring error state
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
-                    if let error = self.error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume()
-                    }
-                }
-            }
-        }
+        accounts.append(account)
+        if !persist(), let error { throw error }
     }
-    
-    public func deleteAccount(_ account: OtpModel) {
-        DispatchQueue.main.async {
-            self.accounts.removeAll { $0.id == account.id }
-            self.saveAccounts()
-        }
-    }
-    
+
     public func updateAccount(_ account: OtpModel) async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.main.async { [self] in
-                print("DEBUG updateAccount: Looking for account with ID: \(account.id)")
-                print("DEBUG updateAccount: Current accounts count: \(self.accounts.count)")
-                print("DEBUG updateAccount: Current account IDs: \(self.accounts.map { $0.id })")
-                
-                if let index = self.accounts.firstIndex(where: { $0.id == account.id }) {
-                    print("DEBUG updateAccount: Found at index \(index)")
-                    self.accounts[index] = account
-                    self.saveAccounts()
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
-                        if let error = self.error {
-                            continuation.resume(throwing: error)
-                        } else {
-                            print("DEBUG updateAccount: Save completed successfully")
-                            continuation.resume()
-                        }
-                    }
-                } else {
-                    print("DEBUG updateAccount: Account NOT FOUND!")
-                    continuation.resume(throwing: NSError(domain: "SharedDataManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Account not found"]))
-                }
-            }
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            throw SharedDataError.accountNotFound
         }
+        accounts[index] = account
+        if !persist(), let error { throw error }
     }
-    
+
+    public func deleteAccount(_ account: OtpModel) {
+        deleteAccount(withId: account.id)
+    }
+
     public func deleteAccount(withId id: UUID) {
-        DispatchQueue.main.async {
-            self.accounts.removeAll { $0.id == id }
-            self.saveAccounts()
-        }
+        accounts.removeAll { $0.id == id }
+        persist()
     }
-    
+
+    /// Reorders accounts (drag to reorder); the order is persisted locally.
+    public func moveAccounts(fromOffsets source: IndexSet, toOffset destination: Int) {
+        accounts.move(fromOffsets: source, toOffset: destination)
+        persist()
+    }
+
     // MARK: - Encryption
-    
+
     public func encryptData(_ data: Data) throws -> Data {
-        return try ChaChaPoly.seal(data, using: encryptionKey).combined
+        try AccountCrypto.seal(data, using: encryptionKey)
     }
-    
+
     public func decryptData(_ encryptedData: Data) throws -> Data {
-        let sealedBox = try ChaChaPoly.SealedBox(combined: encryptedData)
-        return try ChaChaPoly.open(sealedBox, using: encryptionKey)
+        try AccountCrypto.open(encryptedData, using: encryptionKey)
     }
-    
-    // MARK: - Shared File-based Key Management
-    
-    private static let keyFileName = ".totp-encryption-key"
-    
-    private static func getSharedContainerURL() -> URL? {
-        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.lucferbux.TOTP")
-    }
-    
-    private static func getKeyFileURL() -> URL? {
-        return getSharedContainerURL()?.appendingPathComponent(keyFileName)
-    }
-    
-    private static func getOrCreateEncryptionKey() -> SymmetricKey {
-        // First try to load from shared file (for widget compatibility)
-        if let key = loadKeyFromSharedFile() {
-            return key
-        }
-        
-        // Try Keychain as fallback (for migration from older versions)
-        if let key = loadKeyFromKeychain() {
-            // Migrate to shared file for widget access
-            saveKeyToSharedFile(key)
-            return key
-        }
-        
-        // Generate new key and save to shared file
-        let newKey = SymmetricKey(size: .bits256)
-        saveKeyToSharedFile(newKey)
-        
-        return newKey
-    }
-    
-    private static func loadKeyFromSharedFile() -> SymmetricKey? {
-        guard let keyFileURL = getKeyFileURL() else { return nil }
-        
-        do {
-            let keyData = try Data(contentsOf: keyFileURL)
-            return SymmetricKey(data: keyData)
-        } catch {
-            return nil
-        }
-    }
-    
-    private static func saveKeyToSharedFile(_ key: SymmetricKey) {
-        guard let keyFileURL = getKeyFileURL() else { return }
-        
-        let keyData = key.withUnsafeBytes { Data($0) }
-        
-        do {
-            // Write file without complete protection so widget can access it
-            try keyData.write(to: keyFileURL, options: [.atomic])
-            #if os(iOS)
-            // Set file protection to allow access after first unlock (widget compatible)
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: keyFileURL.path
-            )
-            #endif
-        } catch {
-            // Silently fail - encryption will still work, just won't persist
-        }
-    }
-    
-    private static func loadKeyFromKeychain() -> SymmetricKey? {
-        let service = "TOTP-SharedData-Encryption"
-        let account = "master-key"
-        
-        // Try to load existing key from Keychain (without access group first)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        var status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        if status == errSecSuccess,
-           let keyData = result as? Data {
-            return SymmetricKey(data: keyData)
-        }
-        
-        // Try with access group (for keys created with older versions)
-        let queryWithGroup: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: "group.com.lucferbux.TOTP",
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        status = SecItemCopyMatching(queryWithGroup as CFDictionary, &result)
-        
-        if status == errSecSuccess,
-           let keyData = result as? Data {
-            return SymmetricKey(data: keyData)
-        }
-        
-        return nil
-    }
-    
-    // Public method for widget access - uses shared file
+
     public static func getSharedEncryptionKey() -> SymmetricKey? {
-        return loadKeyFromSharedFile()
+        EncryptionKeyManager.existingKey()
     }
-}
 
-// MARK: - Storage Model
+    // MARK: - Private
 
-private struct StoredOtpAccount: Codable {
-    let id: String
-    let issuer: String?
-    let name: String?
-    let prefix: String?
-    let encryptedKey: Data
-    let isHotp: Bool
-    let digits: Int
-    let interval: Double
-    let counter: Int64
-    let createdDate: Date
-    let modifiedDate: Date
-    let associatedDomains: [String]?
-    
-    // Custom init for backward compatibility
-    init(id: String, issuer: String?, name: String?, prefix: String?, encryptedKey: Data, isHotp: Bool, digits: Int, interval: Double, counter: Int64, createdDate: Date, modifiedDate: Date, associatedDomains: [String]? = nil) {
-        self.id = id
-        self.issuer = issuer
-        self.name = name
-        self.prefix = prefix
-        self.encryptedKey = encryptedKey
-        self.isHotp = isHotp
-        self.digits = digits
-        self.interval = interval
-        self.counter = counter
-        self.createdDate = createdDate
-        self.modifiedDate = modifiedDate
-        self.associatedDomains = associatedDomains
+    @discardableResult
+    private func persist() -> Bool {
+        do {
+            let previous = AccountStore.storedRecords(in: userDefaults)
+            let data = try AccountStore.encode(accounts, key: encryptionKey, previous: previous)
+            userDefaults.set(data, forKey: AccountStore.accountsKey)
+            error = nil
+            return true
+        } catch {
+            Self.logger.error("Failed to save accounts: \(error.localizedDescription, privacy: .public)")
+            self.error = .saveFailed(error)
+            return false
+        }
     }
-    
-    // Codable conformance with backward compatibility
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        issuer = try container.decodeIfPresent(String.self, forKey: .issuer)
-        name = try container.decodeIfPresent(String.self, forKey: .name)
-        prefix = try container.decodeIfPresent(String.self, forKey: .prefix)
-        encryptedKey = try container.decode(Data.self, forKey: .encryptedKey)
-        isHotp = try container.decode(Bool.self, forKey: .isHotp)
-        digits = try container.decode(Int.self, forKey: .digits)
-        interval = try container.decode(Double.self, forKey: .interval)
-        counter = try container.decode(Int64.self, forKey: .counter)
-        createdDate = try container.decode(Date.self, forKey: .createdDate)
-        modifiedDate = try container.decode(Date.self, forKey: .modifiedDate)
-        // Backward compatibility: associatedDomains might not exist in older data
-        associatedDomains = try container.decodeIfPresent([String].self, forKey: .associatedDomains)
+
+    /// Deterministic accounts for UI tests (RFC 6238 test secret; no real credentials).
+    static var uiTestSeed: [OtpModel] {
+        let rfcSecret = Data("12345678901234567890".utf8)
+        return [
+            OtpModel(issuer: "Example Corp", name: "user@example.com", prefix: "1234",
+                     entry: .totp(key: rfcSecret, digits: 6, interval: 30), associatedDomains: ["sso.example.com"]),
+            OtpModel(issuer: "GitHub", name: "octocat", entry: .totp(key: rfcSecret, digits: 6, interval: 30)),
+            OtpModel(issuer: "Counter Bank", name: "hotp", entry: .hotp(key: rfcSecret, digits: 6, counter: 0))
+        ]
     }
 }
 
@@ -394,32 +157,36 @@ private struct StoredOtpAccount: Codable {
 public enum SharedDataError: LocalizedError, Identifiable {
     case loadFailed(Error)
     case saveFailed(Error)
+    case accountNotFound
     case encryptionFailed
     case decryptionFailed
     case unknown(Error)
-    
+
     public var id: String {
         switch self {
-        case .loadFailed: return "loadFailed"
-        case .saveFailed: return "saveFailed"
-        case .encryptionFailed: return "encryptionFailed"
-        case .decryptionFailed: return "decryptionFailed"
-        case .unknown: return "unknown"
+        case .loadFailed: "loadFailed"
+        case .saveFailed: "saveFailed"
+        case .accountNotFound: "accountNotFound"
+        case .encryptionFailed: "encryptionFailed"
+        case .decryptionFailed: "decryptionFailed"
+        case .unknown: "unknown"
         }
     }
-    
+
     public var errorDescription: String? {
         switch self {
         case .loadFailed(let error):
-            return "Failed to load accounts: \(error.localizedDescription)"
+            String(localized: "Failed to load accounts: \(error.localizedDescription)")
         case .saveFailed(let error):
-            return "Failed to save accounts: \(error.localizedDescription)"
+            String(localized: "Failed to save accounts: \(error.localizedDescription)")
+        case .accountNotFound:
+            String(localized: "The account no longer exists.")
         case .encryptionFailed:
-            return "Failed to encrypt account data"
+            String(localized: "Failed to encrypt account data")
         case .decryptionFailed:
-            return "Failed to decrypt account data"
+            String(localized: "Failed to decrypt account data")
         case .unknown(let error):
-            return "An unknown error occurred: \(error.localizedDescription)"
+            String(localized: "An unknown error occurred: \(error.localizedDescription)")
         }
     }
 }

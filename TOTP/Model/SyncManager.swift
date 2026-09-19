@@ -10,6 +10,10 @@ import CloudKit
 import Combine
 import WidgetKit
 import AuthenticationServices
+import CoreSpotlight
+import os
+
+private let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Sync")
 
 /// Sync state for UI display
 public enum SyncState: Equatable {
@@ -67,7 +71,6 @@ public enum SyncState: Equatable {
 }
 
 /// Manages synchronization between local storage (SharedDataManager) and CloudKit
-@available(iOS 26.0, macOS 26.0, *)
 public class SyncManager: ObservableObject {
     public static let shared = SyncManager()
     
@@ -86,9 +89,6 @@ public class SyncManager: ObservableObject {
     
     // Cancellables for Combine subscriptions
     private var cancellables = Set<AnyCancellable>()
-    
-    // Sync debouncing
-    private var syncTask: Task<Void, Never>?
     
     private init() {
         setupObservers()
@@ -169,12 +169,19 @@ public class SyncManager: ObservableObject {
     /// Initializes sync on app launch
     @MainActor
     public func initializeSync() async {
+        if AppEnvironment.isUITesting {
+            accounts = localManager.accounts
+            syncState = .idle
+            return
+        }
+        
         isLoading = true
         syncState = .syncing
         
         // Load local accounts first (fast)
         localManager.loadAccounts()
         accounts = localManager.accounts
+        await indexForSpotlight()
         
         // Check iCloud status
         await cloudManager.checkAccountStatus()
@@ -216,7 +223,7 @@ public class SyncManager: ObservableObject {
             let cloudAccounts = try cloudManager.getOtpModels()
             
             // Merge using last-write-wins strategy
-            let mergedAccounts = mergeAccounts(local: localAccounts, cloud: cloudAccounts)
+            let mergedAccounts = Self.mergeAccounts(local: localAccounts, cloud: cloudAccounts)
             
             // Update local storage with merged result
             await updateLocalStorage(with: mergedAccounts)
@@ -224,22 +231,19 @@ public class SyncManager: ObservableObject {
             // Upload any local-only accounts to cloud
             await uploadLocalOnlyAccounts(localAccounts: localAccounts, cloudAccounts: cloudAccounts)
             
-            // Refresh widget
-            WidgetCenter.shared.reloadAllTimelines()
-            
-            // Sync credential identities for AutoFill
-            await syncCredentialIdentities()
+            await afterMutation()
             
             syncState = .synced(Date())
             
         } catch {
-            print("SyncManager: Sync failed: \(error)")
+            logger.error("Sync failed: \(error.localizedDescription, privacy: .public)")
             syncState = .error(error.localizedDescription)
         }
     }
     
-    /// Merges local and cloud accounts using last-write-wins strategy
-    private func mergeAccounts(local: [OtpModel], cloud: [OtpModel]) -> [OtpModel] {
+    /// Merges local and cloud accounts. Accounts are matched by issuer + name and the local copy wins;
+    /// cloud-only accounts are added.
+    static func mergeAccounts(local: [OtpModel], cloud: [OtpModel]) -> [OtpModel] {
         var merged: [UUID: OtpModel] = [:]
         
         // Add all local accounts
@@ -294,9 +298,8 @@ public class SyncManager: ObservableObject {
             if !existsInCloud {
                 do {
                     try await cloudManager.addOtpModel(localAccount)
-                    print("SyncManager: Uploaded local account to cloud: \(localAccount.issuer ?? "Unknown")")
                 } catch {
-                    print("SyncManager: Failed to upload account: \(error)")
+                    logger.error("Failed to upload account: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
@@ -317,16 +320,12 @@ public class SyncManager: ObservableObject {
                 try await cloudManager.addOtpModel(account)
                 syncState = .synced(Date())
             } catch {
-                print("SyncManager: Failed to sync new account to cloud: \(error)")
+                logger.error("Failed to sync new account to cloud: \(error.localizedDescription, privacy: .public)")
                 // Local save succeeded, so don't fail completely
             }
         }
         
-        // Refresh widget
-        WidgetCenter.shared.reloadAllTimelines()
-        
-        // Sync credential identities for AutoFill
-        await syncCredentialIdentities()
+        await afterMutation()
     }
     
     /// Updates an existing account and syncs to cloud
@@ -342,15 +341,11 @@ public class SyncManager: ObservableObject {
                 try await cloudManager.updateOtpModel(account)
                 syncState = .synced(Date())
             } catch {
-                print("SyncManager: Failed to sync account update to cloud: \(error)")
+                logger.error("Failed to sync account update to cloud: \(error.localizedDescription, privacy: .public)")
             }
         }
         
-        // Refresh widget
-        WidgetCenter.shared.reloadAllTimelines()
-        
-        // Sync credential identities for AutoFill
-        await syncCredentialIdentities()
+        await afterMutation()
     }
     
     /// Deletes an account and syncs to cloud
@@ -366,15 +361,56 @@ public class SyncManager: ObservableObject {
                 try await cloudManager.deleteOtpModel(withId: account.id.uuidString)
                 syncState = .synced(Date())
             } catch {
-                print("SyncManager: Failed to sync account deletion to cloud: \(error)")
+                logger.error("Failed to sync account deletion to cloud: \(error.localizedDescription, privacy: .public)")
             }
         }
         
-        // Refresh widget
+        await afterMutation()
+    }
+    
+    /// Persists a new order (drag to reorder).
+    @MainActor
+    public func moveAccounts(fromOffsets source: IndexSet, toOffset destination: Int) {
+        localManager.moveAccounts(fromOffsets: source, toOffset: destination)
+        accounts = localManager.accounts
         WidgetCenter.shared.reloadAllTimelines()
-        
-        // Sync credential identities for AutoFill
+    }
+    
+    /// Returns the value to copy (prefix + code) and, for HOTP, advances and saves the counter
+    /// so the same code is never produced twice.
+    @MainActor
+    public func useCode(for account: OtpModel) async -> String {
+        let current = accounts.first { $0.id == account.id } ?? account
+        let value = current.autoFillValue()
+        if current.entry.isHotp {
+            var updated = current
+            updated.entry = current.entry.advanced()
+            try? await updateAccount(updated)
+        }
+        return value
+    }
+    
+    /// Keeps widgets, AutoFill and Spotlight consistent after any change.
+    @MainActor
+    private func afterMutation() async {
+        WidgetCenter.shared.reloadAllTimelines()
         await syncCredentialIdentities()
+        await indexForSpotlight()
+    }
+    
+    // MARK: - Spotlight
+    
+    /// Donates account names (never secrets) to Spotlight so "Copy code for …" is searchable.
+    @MainActor
+    public func indexForSpotlight() async {
+        guard !AppEnvironment.isUITesting else { return }
+        let entities = accounts.filter { !$0.entry.isHotp }.map(AccountEntity.init(model:))
+        do {
+            try await CSSearchableIndex.default().deleteAppEntities(ofType: AccountEntity.self)
+            try await CSSearchableIndex.default().indexAppEntities(entities)
+        } catch {
+            logger.error("Spotlight indexing failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
     
     // MARK: - Manual Sync
@@ -411,14 +447,12 @@ public class SyncManager: ObservableObject {
     /// Syncs credential identities to ASCredentialIdentityStore for AutoFill
     @MainActor
     public func syncCredentialIdentities() async {
+        guard !AppEnvironment.isUITesting else { return }
         let store = ASCredentialIdentityStore.shared
         
         // Check if store is enabled
         let state = await store.state()
-        guard state.isEnabled else {
-            print("SyncManager: Credential identity store is not enabled")
-            return
-        }
+        guard state.isEnabled else { return }
         
         // Create identities for all accounts
         var identities: [ASCredentialIdentity] = []
@@ -452,22 +486,23 @@ public class SyncManager: ObservableObject {
         // Replace all identities in the store
         do {
             try await store.replaceCredentialIdentities(identities)
-            print("SyncManager: Synced \(identities.count) credential identities")
         } catch {
-            print("SyncManager: Failed to sync credential identities: \(error)")
+            logger.error("Failed to sync credential identities: \(error.localizedDescription, privacy: .public)")
         }
     }
     
     /// Creates a service identifier for an account
-    private func createServiceIdentifier(for account: OtpModel) -> ASCredentialServiceIdentifier {
-        // Use the first associated domain, or fallback to issuer
+    static func serviceIdentifier(for account: OtpModel) -> ASCredentialServiceIdentifier {
         if let domains = account.associatedDomains, let firstDomain = domains.first {
             return ASCredentialServiceIdentifier(identifier: firstDomain, type: .domain)
         }
-        
         // Fallback to issuer as a pseudo-domain
         let identifier = account.issuer?.lowercased().replacingOccurrences(of: " ", with: "") ?? "unknown"
         return ASCredentialServiceIdentifier(identifier: identifier, type: .domain)
+    }
+    
+    private func createServiceIdentifier(for account: OtpModel) -> ASCredentialServiceIdentifier {
+        Self.serviceIdentifier(for: account)
     }
 }
 

@@ -9,6 +9,9 @@ import Foundation
 import CloudKit
 import CryptoKit
 import Combine
+import os
+
+private let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "CloudKit")
 
 public class CloudKitDataManager: ObservableObject {
     public static let shared = CloudKitDataManager()
@@ -72,12 +75,12 @@ public class CloudKitDataManager: ObservableObject {
                 subscription.notificationInfo = notificationInfo
                 
                 try await privateDatabase.save(subscription)
-                print("CloudKit: Registered for remote notifications")
+                logger.info("Registered for remote notifications")
             }
             
             hasRegisteredSubscription = true
         } catch {
-            print("CloudKit: Failed to register subscription: \(error)")
+            logger.error("Failed to register subscription: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -90,7 +93,7 @@ public class CloudKitDataManager: ObservableObject {
         }
         
         if notification.subscriptionID == subscriptionID {
-            print("CloudKit: Received remote notification, fetching changes")
+            logger.info("Received remote notification, fetching changes")
             await loadAccounts()
             return true
         }
@@ -129,7 +132,7 @@ public class CloudKitDataManager: ObservableObject {
                         loadedAccounts.append(model)
                     }
                 case .failure(let error):
-                    print("CloudKit: Failed to load record: \(error)")
+                    logger.error("Failed to load record: \(error.localizedDescription, privacy: .public)")
                 }
             }
             
@@ -146,6 +149,11 @@ public class CloudKitDataManager: ObservableObject {
     
     @MainActor
     public func saveAccount(_ account: CloudKitOtpModel) async throws {
+        try await saveAccount(account, retryOnConflict: true)
+    }
+    
+    @MainActor
+    private func saveAccount(_ account: CloudKitOtpModel, retryOnConflict: Bool) async throws {
         guard accountStatus == .available else {
             throw CloudKitError.accountNotAvailable
         }
@@ -172,11 +180,11 @@ public class CloudKitDataManager: ObservableObject {
             
         } catch let error as CKError {
             // Handle server record changed conflict
-            if error.code == .serverRecordChanged {
+            if error.code == .serverRecordChanged && retryOnConflict {
                 // Last-write-wins: force overwrite
                 if let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
                     account.record = serverRecord
-                    try await saveAccount(account)
+                    try await saveAccount(account, retryOnConflict: false)
                     return
                 }
             }
@@ -255,8 +263,17 @@ public class CloudKitDataManager: ObservableObject {
     
     // MARK: - Convenience Methods
     
+    /// Decrypted cloud accounts. Records that can't be decrypted with this device's key are skipped
+    /// instead of failing the whole sync.
     public func getOtpModels() throws -> [OtpModel] {
-        return try accounts.compactMap { try $0.toOtpModel() }
+        accounts.compactMap { record in
+            do {
+                return try record.toOtpModel()
+            } catch {
+                logger.error("Skipping cloud record that could not be decrypted")
+                return nil
+            }
+        }
     }
     
     @MainActor
@@ -270,24 +287,7 @@ public class CloudKitDataManager: ObservableObject {
         // Find existing account or create new
         if let existingIndex = accounts.firstIndex(where: { $0.id == otpModel.id.uuidString }) {
             let cloudKitModel = accounts[existingIndex]
-            // Update the CloudKit model
-            cloudKitModel.issuer = otpModel.issuer
-            cloudKitModel.name = otpModel.name
-            cloudKitModel.prefix = otpModel.prefix
-            
-            // Update entry data
-            switch otpModel.entry {
-            case let .hotp(key, digits, counter):
-                cloudKitModel.encryptedKey = try encryptData(key)
-                cloudKitModel.isHotp = true
-                cloudKitModel.digits = digits
-                cloudKitModel.counter = Int64(counter)
-            case let .totp(key, digits, interval):
-                cloudKitModel.encryptedKey = try encryptData(key)
-                cloudKitModel.isHotp = false
-                cloudKitModel.digits = digits
-                cloudKitModel.interval = interval
-            }
+            try cloudKitModel.apply(otpModel)
             
             try await saveAccount(cloudKitModel)
         } else {
