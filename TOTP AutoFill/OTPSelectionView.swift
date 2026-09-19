@@ -2,188 +2,142 @@
 //  OTPSelectionView.swift
 //  TOTP AutoFill
 //
-//  SwiftUI view for selecting an OTP account during AutoFill
-//  Note: Uses OtpModel defined in CredentialProviderViewController.swift
+//  Account picker shown by the credential provider.
 //
 
 import SwiftUI
-import Combine
 
-@available(iOS 26.0, macOS 26.0, *)
 struct OTPSelectionView: View {
     let accounts: [OtpModel]
+    /// Accounts matching the website being filled; shown first.
+    var suggested: [OtpModel] = []
     let onSelect: (OtpModel) -> Void
     let onCancel: () -> Void
-    
+
     @State private var searchText = ""
-    
-    var filteredAccounts: [OtpModel] {
-        if searchText.isEmpty {
-            return accounts
-        }
-        return accounts.filter { account in
-            let issuer = account.issuer?.lowercased() ?? ""
-            let name = account.name?.lowercased() ?? ""
-            let search = searchText.lowercased()
-            return issuer.contains(search) || name.contains(search)
-        }
+
+    private var others: [OtpModel] {
+        let suggestedIDs = Set(suggested.map(\.id))
+        return accounts.filter { !suggestedIDs.contains($0.id) && $0.matches(search: searchText) }
     }
-    
+
+    private var filteredSuggested: [OtpModel] {
+        suggested.filter { $0.matches(search: searchText) }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if accounts.isEmpty {
-                    emptyStateView
+                    ContentUnavailableView(
+                        "No Accounts",
+                        systemImage: "lock.shield",
+                        description: Text("Add accounts in the TOTP app to use AutoFill.")
+                    )
+                } else if filteredSuggested.isEmpty && others.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
-                    accountListView
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        List {
+                            if !filteredSuggested.isEmpty {
+                                Section("Suggested") {
+                                    rows(filteredSuggested, date: context.date)
+                                }
+                            }
+                            if !others.isEmpty {
+                                Section(filteredSuggested.isEmpty ? "Accounts" : "Other Accounts") {
+                                    rows(others, date: context.date)
+                                }
+                            }
+                        }
+                        #if os(iOS)
+                        .listStyle(.insetGrouped)
+                        #else
+                        .listStyle(.inset)
+                        #endif
+                    }
                 }
             }
-            .navigationTitle("Select Account")
+            .navigationTitle("Choose Account")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onCancel()
-                    }
+                    Button("Cancel", role: .cancel, action: onCancel)
                 }
             }
             .searchable(text: $searchText, prompt: "Search accounts")
         }
-    }
-    
-    private var emptyStateView: some View {
-        ContentUnavailableView(
-            "No Accounts",
-            systemImage: "lock.shield",
-            description: Text("Add accounts in the TOTP app to use AutoFill.")
-        )
-    }
-    
-    private var accountListView: some View {
-        List(filteredAccounts) { account in
-            AccountRowView(account: account)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onSelect(account)
-                }
-        }
-#if os(iOS)
-        .listStyle(.insetGrouped)
-        #else
-        .listStyle(.inset)
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 360)
         #endif
+    }
+
+    private func rows(_ accounts: [OtpModel], date: Date) -> some View {
+        ForEach(accounts) { account in
+            Button {
+                onSelect(account)
+            } label: {
+                AccountRowView(account: account, date: date)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
-@available(iOS 26.0, macOS 26.0, *)
 struct AccountRowView: View {
     let account: OtpModel
-    
-    @State private var currentCode: String = ""
-    @State private var timeRemaining: Int = 30
-    
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
+    let date: Date
+
+    @ScaledMetric(relativeTo: .headline) private var badgeSize: CGFloat = 40
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Account icon
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.15))
-                    .frame(width: 44, height: 44)
-                
-                Text(accountInitial)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.accentColor)
-            }
-            
-            // Account info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(account.issuer ?? "Unknown")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                
-                if let name = account.name, !name.isEmpty {
-                    Text(name)
+        HStack(spacing: 14) {
+            Text(String(account.displayTitle.prefix(1)).uppercased())
+                .font(.headline)
+                .foregroundStyle(.tint)
+                .frame(width: badgeSize, height: badgeSize)
+                .background(.tint.opacity(0.15), in: .circle)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(account.displayTitle)
+                        .font(.headline)
+                    if account.hasPrefix {
+                        Image(systemName: "key.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Includes prefix")
+                    }
+                }
+                if let subtitle = account.displaySubtitle {
+                    Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Spacer()
-            
-            // Code display
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(formattedCode)
-                    .font(.system(.title3, design: .monospaced))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(account.code(at: date).groupedOTP)
+                    .font(.system(.title3, design: .monospaced, weight: .semibold))
                     .contentTransition(.numericText())
-                
-                // Time remaining indicator
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text("\(timeRemaining)s")
+                if !account.entry.isHotp {
+                    Text("\(account.entry.secondsRemaining(at: date)) s")
                         .font(.caption)
                         .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 8)
-        .onAppear {
-            updateCode()
-            updateTimeRemaining()
-        }
-        .onReceive(timer) { _ in
-            updateCode()
-            updateTimeRemaining()
-        }
-    }
-    
-    private var accountInitial: String {
-        let text = account.issuer ?? account.name ?? "?"
-        return String(text.prefix(1)).uppercased()
-    }
-    
-    private var formattedCode: String {
-        let code = currentCode
-        if code.count == 6 {
-            return "\(code.prefix(3)) \(code.suffix(3))"
-        } else if code.count == 8 {
-            return "\(code.prefix(4)) \(code.suffix(4))"
-        }
-        return code
-    }
-    
-    private func updateCode() {
-        withAnimation(.smooth(duration: 0.3)) {
-            currentCode = account.generateCode()
-        }
-    }
-    
-    private func updateTimeRemaining() {
-        switch account.entry {
-        case .totp(_, _, let interval):
-            let currentTime = Date().timeIntervalSince1970
-            let remaining = Int(interval) - Int(currentTime.truncatingRemainder(dividingBy: interval))
-            timeRemaining = remaining
-        case .hotp:
-            timeRemaining = 0
-        }
+        .padding(.vertical, 4)
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
     }
 }
 
 #Preview {
-    if #available(iOS 26.0, macOS 26.0, *) {
-        OTPSelectionView(
-            accounts: [],
-            onSelect: { _ in },
-            onCancel: { }
-        )
-    }
+    OTPSelectionView(accounts: [], onSelect: { _ in }, onCancel: {})
 }
