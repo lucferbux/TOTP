@@ -2,126 +2,138 @@
 //  TOTPUITests.swift
 //  TOTPUITests
 //
-//  Created by Lucas Fernández Aragón on 4/3/25.
+//  Runs the app with `-UITestMode`: seeded in-memory accounts, no iCloud, no app lock.
+//  Seed: "Example Corp" (with prefix), "GitHub", "Counter Bank" (HOTP).
 //
 
 import XCTest
 
 final class TOTPUITests: XCTestCase {
+    private var app: XCUIApplication!
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["-UITestMode"]
+        app.launch()
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    private func account(_ title: String) -> XCUIElement {
+        app.buttons["account-\(title)"].firstMatch
     }
 
-    @MainActor
-    func testInitialAppLaunch() throws {
-        let app = XCUIApplication()
-        app.launch()
-        
-        // Test that the app launches with initial account
-        let accountElement = app.staticTexts["Red Hat"]
-        XCTAssertTrue(accountElement.exists, "Initial Red Hat account should be visible")
-        
-        // Test that the help text exists
-        let helpText = app.staticTexts["Click account to copy the current code to your clipboard."]
-        XCTAssertTrue(helpText.exists, "Help text should be visible")
+    private func openActions(for title: String) {
+        let element = account(title)
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
+        element.press(forDuration: 1.2)
     }
-    
-    @MainActor
-    func testAddNewAccount() throws {
-        let app = XCUIApplication()
-        app.launch()
-        
-        // Open add account form
-        app.images["plus.circle.fill"].tap()
-        
-        // Fill in the form
-        let otpKeyTextField = app.secureTextFields["OTP Key"]
-        XCTAssertTrue(otpKeyTextField.waitForExistence(timeout: 2), "OTP Key field should be visible")
-        otpKeyTextField.tap()
-        otpKeyTextField.typeText("testsecretkey")
-        
-        let issuerField = app.textFields["Issuer"]
-        XCTAssertTrue(issuerField.exists, "Issuer field should be visible")
-        issuerField.tap()
-        issuerField.typeText("TestIssuer")
-        
-        let accountNameField = app.textFields["Account Name"]
-        XCTAssertTrue(accountNameField.exists, "Account Name field should be visible")
-        accountNameField.tap()
-        accountNameField.typeText("test@example.com")
-        
-        // Submit the form
-        app.buttons["Add"].tap()
-        
-        // Verify new account appears
-        let newAccountElement = app.staticTexts["TestIssuer"]
-        XCTAssertTrue(newAccountElement.waitForExistence(timeout: 2), "New TestIssuer account should be visible")
+
+    // MARK: - Tests
+
+    func testLaunchShowsSeededAccounts() {
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 5))
+        XCTAssertTrue(account("GitHub").exists)
+        XCTAssertTrue(account("Counter Bank").exists)
+        XCTAssertTrue(app.buttons["addAccountButton"].exists)
     }
-    
-    @MainActor
-    func testCopyCode() throws {
-        let app = XCUIApplication()
-        app.launch()
-        
-        // Find the TOTP card for Red Hat
-        let redHatText = app.staticTexts["Red Hat"]
-        XCTAssertTrue(redHatText.exists, "Red Hat account should be visible")
-        
-        // Tap directly on the text element to copy the code
-        redHatText.tap()
-        
-        // Verify toast appears
-        let toast = app.staticTexts["Code copied to clipboard"]
-        XCTAssertTrue(toast.waitForExistence(timeout: 2), "Toast notification should appear after copying code")
+
+    func testCopyShowsConfirmation() {
+        let row = account("GitHub")
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        // The row's accessibility label reports the copied state
+        let copied = NSPredicate(format: "label CONTAINS 'Copied'")
+        expectation(for: copied, evaluatedWith: row)
+        waitForExpectations(timeout: 3)
     }
-    
-    
-    @MainActor
-    func testHotpMode() throws {
-        let app = XCUIApplication()
-        app.launch()
-        
-        // Open add account form
-        app.images["plus.circle.fill"].tap()
-        
-        // Switch to HOTP mode
-        app.buttons["HOTP"].tap()
-        
-        // Verify HOTP specific fields appear
-        let counterStepper = app.staticTexts["Counter: 0"]
-        XCTAssertTrue(counterStepper.exists, "Counter field should be visible in HOTP mode")
-        
-        // Increment counter
-        app.buttons["Increment"].firstMatch.tap()
-        let incrementedCounter = app.staticTexts["Counter: 1"]
-        XCTAssertTrue(incrementedCounter.waitForExistence(timeout: 2), "Counter should increment to 1")
-        
-        // Fill other fields
-        app.secureTextFields["OTP Key"].tap()
-        app.secureTextFields["OTP Key"].typeText("hotptestkey")
-        
-        app.textFields["Issuer"].tap()
-        app.textFields["Issuer"].typeText("HOTP Test")
-        
-        // Add the HOTP account
-        app.buttons["Add"].tap()
-        
-        // Verify HOTP account was added
-        let hotpAccount = app.staticTexts["HOTP Test"]
-        XCTAssertTrue(hotpAccount.waitForExistence(timeout: 2), "HOTP Test account should be visible")
+
+    func testSearchFiltersAccounts() {
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("git")
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 3))
+        XCTAssertFalse(account("Example Corp").exists)
     }
-    
-    @MainActor
-    func testLaunchPerformance() throws {
-        if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
-            measure(metrics: [XCTApplicationLaunchMetric()]) {
-                XCUIApplication().launch()
-            }
-        }
+
+    func testAddAccountManually() {
+        app.buttons["addAccountButton"].tap()
+
+        let issuer = app.textFields["issuerField"]
+        XCTAssertTrue(issuer.waitForExistence(timeout: 5))
+        issuer.tap()
+        issuer.typeText("Acme")
+
+        // Reveal the field: typing into secure fields is unreliable in the simulator
+        app.buttons["Show Secret Key"].tap()
+        let secret = app.textFields["secretField"]
+        secret.tap()
+        secret.typeText("JBSWY3DPEHPK3PXP")
+
+        app.buttons["saveButton"].tap()
+        XCTAssertTrue(account("Acme").waitForExistence(timeout: 5))
     }
+
+    func testInvalidSecretShowsError() {
+        app.buttons["addAccountButton"].tap()
+        let secret = app.secureTextFields["secretField"]
+        XCTAssertTrue(secret.waitForExistence(timeout: 5))
+        secret.tap()
+        secret.typeText("NOT-VALID-189")
+        app.buttons["saveButton"].tap()
+        XCTAssertTrue(app.alerts["Can't Save Account"].waitForExistence(timeout: 3))
+        app.alerts.buttons["OK"].tap()
+        app.buttons["cancelButton"].tap()
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 3))
+    }
+
+    func testEditAccount() {
+        openActions(for: "GitHub")
+        app.buttons["editAction"].firstMatch.tap()
+
+        let issuer = app.textFields["issuerField"]
+        XCTAssertTrue(issuer.waitForExistence(timeout: 5))
+        issuer.tap()
+        issuer.typeText(" Enterprise")
+        app.buttons["saveButton"].tap()
+
+        XCTAssertTrue(account("GitHub Enterprise").waitForExistence(timeout: 5))
+    }
+
+    func testDeleteAccount() {
+        openActions(for: "Counter Bank")
+        app.buttons["deleteAction"].firstMatch.tap()
+        let confirm = app.buttons["confirmDeleteButton"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.firstMatch.tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: account("Counter Bank"))
+        waitForExpectations(timeout: 5)
+    }
+
+    func testOtpAuthLinkPrefillsForm() {
+        app.open(URL(string: "otpauth://totp/Linked%20Service:me@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Linked%20Service")!)
+        let issuer = app.textFields["issuerField"]
+        XCTAssertTrue(issuer.waitForExistence(timeout: 5))
+        XCTAssertEqual(issuer.value as? String, "Linked Service")
+        app.buttons["saveButton"].tap()
+        XCTAssertTrue(account("Linked Service").waitForExistence(timeout: 5))
+    }
+
+    #if os(iOS)
+    func testSettingsSheet() {
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.switches["appLockToggle"].exists || app.buttons["appLockToggle"].exists)
+        app.buttons["Done"].tap()
+    }
+
+    func testRotationKeepsContent() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 5))
+    }
+    #endif
 }
