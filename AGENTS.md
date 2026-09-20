@@ -78,7 +78,7 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 10. New CloudKit fields must be deployed to the Production schema before release; write optional
     fields only when they differ from the default.
 11. Read CloudKit through zone change tokens, never `CKQuery` — queries need indexes that an
-    auto-created schema lacks, and they can't report deletions.
+    auto-created schema lacks, and they can't report deletions. See `docs/CLOUDKIT.md`.
 12. Never block syncing or launch on another subsystem (Spotlight, push registration); make those
     fire-and-forget. Log failures with `os.Logger` instead of swallowing them.
 
