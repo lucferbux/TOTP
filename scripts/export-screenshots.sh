@@ -134,6 +134,11 @@ copy_site "iphone-69-01-codes.png"  "iphone-codes.png"
 copy_site "iphone-69-03-select.png" "iphone-select.png"
 copy_site "ipad-13-01-codes.png"    "ipad-grid.png"
 
+copy_docs() { [ -f "$1" ] && cp "$1" "docs/assets/$2" && echo "   docs/assets/$2"; }
+copy_docs "$OUT/iphone-69-01-codes.png"                "screenshot-iphone.png"
+copy_docs "$OUT/ipad-13-01-codes.png"                  "screenshot-ipad.png"
+copy_docs "fastlane/screenshots_mac/en-US/01-codes.png" "screenshot-macos.png"
+
 echo
 echo "Sizes (App Store Connect rejects anything else):"
 for f in "$OUT"/*.png; do
