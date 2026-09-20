@@ -167,7 +167,7 @@ public struct AddingPageView: View {
 
     private var accountSection: some View {
         Section("Account") {
-            TextField("Issuer", text: $issuer, prompt: Text("e.g. Red Hat"))
+            TextField("Issuer", text: $issuer, prompt: Text("e.g. Example Corp"))
                 .textContentType(.organizationName)
                 .autocorrectionDisabled()
                 .accessibilityIdentifier("issuerField")
@@ -245,13 +245,13 @@ public struct AddingPageView: View {
         } header: {
             Text("Fixed Prefix (PIN)")
         } footer: {
-            Text("Added before the code when you copy it or use AutoFill, for services such as Red Hat that expect PIN + code. It's never shown on screen.")
+            Text("Added before the code when you copy it or use AutoFill, for services that expect a PIN followed by the code. It's never shown on screen.")
         }
     }
 
     private var autoFillSection: some View {
         Section {
-            TextField("Domains", text: $domainsText, prompt: Text("e.g. sso.redhat.com"))
+            TextField("Domains", text: $domainsText, prompt: Text("e.g. sso.example.com"))
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .keyboardType(.URL)

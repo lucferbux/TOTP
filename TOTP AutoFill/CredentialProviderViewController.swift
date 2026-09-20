@@ -3,7 +3,7 @@
 //  TOTP AutoFill
 //
 //  Credential Provider extension (iOS, iPadOS and macOS). Fills either a one-time-code field
-//  or a password field with prefix + code, which is what Red Hat–style PIN+token logins expect.
+//  or a password field with prefix + code, which is what PIN + token logins expect.
 //
 
 import AuthenticationServices

@@ -9,7 +9,7 @@ public struct OtpModel: Identifiable, Hashable, Sendable {
     public let id: UUID
     public var issuer: String?
     public var name: String?
-    /// Fixed text typed before the code (e.g. a Red Hat PIN). Never displayed in the UI.
+    /// Fixed text typed before the code (e.g. a login PIN). Never displayed in the UI.
     public var prefix: String?
     public var entry: OtpEntry
 
@@ -58,7 +58,7 @@ public struct OtpModel: Identifiable, Hashable, Sendable {
 
     /// Whether this account belongs to one of the AutoFill service identifiers (domains or URLs).
     /// Matches exact hosts and subdomains of the account's associated domains, falling back to
-    /// the issuer as a pseudo-domain ("Red Hat" → "redhat").
+    /// the issuer as a pseudo-domain ("Example Corp" → "examplecorp").
     public func matchesAutoFill(serviceIdentifiers: [String]) -> Bool {
         let hosts = serviceIdentifiers.compactMap(Self.host(from:))
         guard !hosts.isEmpty else { return false }

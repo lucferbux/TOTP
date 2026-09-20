@@ -15,7 +15,7 @@ struct OtpModelTests {
 
     @Test("AutoFill value is prefix + zero-padded code (regression: leading zeros were dropped)")
     func autoFillValueKeepsZeros() {
-        let account = OtpModel(issuer: "Red Hat", name: "user", prefix: "PIN!",
+        let account = OtpModel(issuer: "Example Corp", name: "user", prefix: "PIN!",
                                entry: .totp(key: secret, digits: 8, interval: 30))
         let date = Date(timeIntervalSince1970: 1111111109) // SHA-1 code 07081804
         #expect(account.autoFillValue(at: date) == "PIN!07081804")
@@ -57,17 +57,17 @@ struct OtpModelTests {
 
     @Test("Search matches issuer and name, case-insensitively")
     func search() {
-        let account = OtpModel(issuer: "Red Hat", name: "lucas@example.com", entry: .totp(key: secret, digits: 6, interval: 30))
+        let account = OtpModel(issuer: "Example Corp", name: "user@example.net", entry: .totp(key: secret, digits: 6, interval: 30))
         #expect(account.matches(search: ""))
-        #expect(account.matches(search: "red"))
+        #expect(account.matches(search: "corp"))
         #expect(account.matches(search: "EXAMPLE"))
         #expect(!account.matches(search: "github"))
     }
 
     @Test("AutoFill domain matching", arguments: [
-        (["sso.redhat.com"], ["https://sso.redhat.com/auth/realms"], true),
-        (["redhat.com"], ["sso.redhat.com"], true),
-        (["sso.redhat.com"], ["redhat.com"], true),
+        (["sso.example.com"], ["https://sso.example.com/auth/realms"], true),
+        (["example.com"], ["sso.example.com"], true),
+        (["sso.example.com"], ["example.com"], true),
         (["www.github.com"], ["github.com"], true),
         (["github.com"], ["notgithub.com"], false),
         (["example.org"], ["example.com"], false)
@@ -77,12 +77,18 @@ struct OtpModelTests {
         #expect(account.matchesAutoFill(serviceIdentifiers: identifiers) == expected)
     }
 
-    @Test("Issuer is used when no domains are set")
+    @Test("Issuer is used as a pseudo-domain when no domains are set")
     func issuerFallback() {
-        let account = OtpModel(issuer: "Red Hat", entry: .totp(key: secret, digits: 6, interval: 30))
-        #expect(account.matchesAutoFill(serviceIdentifiers: ["sso.redhat.com"]))
+        // The issuer is normalised ("Example Corp" → "examplecorp") and matched against host segments
+        let account = OtpModel(issuer: "Example", entry: .totp(key: secret, digits: 6, interval: 30))
+        #expect(account.matchesAutoFill(serviceIdentifiers: ["sso.example.com"]))
         #expect(!account.matchesAutoFill(serviceIdentifiers: ["github.com"]))
         #expect(!account.matchesAutoFill(serviceIdentifiers: []))
+
+        // A multi-word issuer only matches a host segment spelled the same way
+        let twoWords = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+        #expect(twoWords.matchesAutoFill(serviceIdentifiers: ["sso.examplecorp.com"]))
+        #expect(!twoWords.matchesAutoFill(serviceIdentifiers: ["sso.example.com"]))
     }
 }
 
@@ -144,9 +150,9 @@ struct OtpAuthURLTests {
 
     @Test("Issuer comes from the label when the parameter is missing")
     func labelIssuer() throws {
-        let url = try OtpAuthURL(string: "otpauth://totp/Red%20Hat:lucas?secret=JBSWY3DPEHPK3PXP")
-        #expect(url.issuer == "Red Hat")
-        #expect(url.name == "lucas")
+        let url = try OtpAuthURL(string: "otpauth://totp/Example%20Corp:user?secret=JBSWY3DPEHPK3PXP")
+        #expect(url.issuer == "Example Corp")
+        #expect(url.name == "user")
     }
 
     @Test("HOTP needs a counter")
@@ -183,10 +189,10 @@ struct OtpAuthURLTests {
 
     @Test("makeModel carries prefix and domains")
     func makeModel() throws {
-        let parsed = try OtpAuthURL(string: "otpauth://totp/Red%20Hat:me?secret=JBSWY3DPEHPK3PXP")
-        let model = parsed.makeModel(prefix: "1234", associatedDomains: ["sso.redhat.com"])
+        let parsed = try OtpAuthURL(string: "otpauth://totp/Example%20Corp:me?secret=JBSWY3DPEHPK3PXP")
+        let model = parsed.makeModel(prefix: "1234", associatedDomains: ["sso.example.com"])
         #expect(model.prefix == "1234")
-        #expect(model.issuer == "Red Hat")
-        #expect(model.associatedDomains == ["sso.redhat.com"])
+        #expect(model.issuer == "Example Corp")
+        #expect(model.associatedDomains == ["sso.example.com"])
     }
 }
