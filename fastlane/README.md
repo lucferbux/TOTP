@@ -28,11 +28,21 @@ export ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_XXXXXXXXXX.p8
 ## Lanes
 
 ```bash
-fastlane metadata      # push text + screenshots for both platforms (no binary, no submission)
-fastlane metadata_text # text only — quicker while iterating on copy
-fastlane precheck_all  # Apple's own metadata checks before you push
-fastlane screenshots   # regenerate screenshots from the UI tests
+fastlane metadata           # push text + screenshots for both platforms (no binary, no submission)
+fastlane metadata_text      # text only — quicker while iterating on copy
+fastlane screenshots_upload # screenshots only, skipping deliver's metadata step
+fastlane precheck_all       # Apple's own metadata checks before you push
+fastlane screenshots        # regenerate screenshots from the UI tests
 ```
+
+`screenshots_upload` exists because deliver's metadata step dies with "No data" when the app has no
+App Store review detail yet (fastlane #20538), and it can't create one without a contact phone
+number. Fill in `review_information/phone_number.txt` and `email_address.txt` and `metadata` works
+on its own again.
+
+Two things no lane does: **attaching the build** to the version, and **`release_notes`** on a first
+version — App Store Connect rejects `whatsNew` until there is a released version to describe changes
+against.
 
 ## Things the API cannot do
 

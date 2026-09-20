@@ -8,7 +8,7 @@
 # Apple's required classes (everything smaller is scaled automatically):
 #   iPhone 6.9"  1320×2868   → fastlane/screenshots/en-US  (deliver picks the display type by pixel size)
 #   iPad   13"   2064×2752
-#   Mac          16:10       → see the note at the end; captured manually
+#   Mac          2880×1800   → fastlane/screenshots_mac/en-US (needs Screen Recording permission)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -80,6 +80,54 @@ PY
 capture "iPhone 18 Pro Max" "iphone-69"
 capture "iPad Pro 13-inch (M5)" "ipad-13"
 
+# --- macOS -------------------------------------------------------------------------------------
+# No UI-test automation here (that needs Accessibility permission). Instead the app positions its
+# own window at 1440x900 points in -ScreenshotMode, which captures at 2880x1800 — an accepted size,
+# and -ScreenshotScene opens it directly in the state each shot needs.
+# Needs Screen Recording permission for whatever runs this script.
+capture_mac() {
+    local out_mac="fastlane/screenshots_mac/en-US"
+    mkdir -p "$out_mac"
+    echo "==> macOS"
+    if ! xcodebuild build -project "$PROJECT" -scheme "$SCHEME" -destination 'platform=macOS' \
+            -derivedDataPath "$TMP/dd-mac" >"$TMP/mac.log" 2>&1; then
+        echo "   build FAILED — see $TMP/mac.log"; return 1
+    fi
+    local app
+    app=$(find "$TMP/dd-mac/Build/Products" -maxdepth 2 -name 'TOTP.app' -path '*Debug*' | head -1)
+
+    # One launch per shot: every screenshot in an App Store set must be the same size, so the
+    # window is always 1440x900 points and only its contents change. The app reports where AppKit
+    # actually put it (it clamps against the menu bar), so the capture never has to assume a rect.
+    local frame_file="$HOME/Library/Group Containers/group.com.lucferbux.TOTP/screenshot-window-frame"
+    shoot_mac() {
+        local name="$1" scene="$2"
+        pkill -x TOTP 2>/dev/null || true
+        rm -f "$frame_file"
+        sleep 2
+        if [ -n "$scene" ]; then
+            open -n "$app" --args -ScreenshotMode -ScreenshotScene "$scene"
+        else
+            open -n "$app" --args -ScreenshotMode
+        fi
+        sleep 13
+        local rect="100,100,1440,900"
+        [ -s "$frame_file" ] && rect=$(cat "$frame_file")
+        screencapture -x -R "$rect" "$out_mac/$name.png"
+        pkill -x TOTP 2>/dev/null || true
+        if [ -s "$out_mac/$name.png" ]; then
+            printf '   %-18s %s (rect %s)\n' "$name.png" "$(sips -g pixelWidth -g pixelHeight "$out_mac/$name.png" | awk '/pixel/{printf "%s ", $2}')" "$rect"
+        else
+            echo "   $name capture FAILED — grant Screen Recording to the app running this script"
+        fi
+    }
+
+    shoot_mac "01-codes"  ""
+    shoot_mac "02-select" "select"
+    shoot_mac "03-add"    "add"
+}
+capture_mac
+
 # A few for the website and the README
 copy_site() { [ -f "$OUT/$1" ] && cp "$OUT/$1" "$SITE/$2" && echo "   site/$2"; }
 copy_site "iphone-69-01-codes.png"  "iphone-codes.png"
@@ -94,10 +142,12 @@ done
 
 cat <<'NOTE'
 
-Mac screenshots are not captured here: macOS UI testing needs automation permission, and
-`screencapture` needs Screen Recording. Take three shots of the Mac app by hand (⌘⇧4, space, click
-the window), then run:
-    sips -z 1800 2880 --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-mac.png
-Accepted Mac sizes are 1280×800, 1440×900, 2560×1600 or 2880×1800.
+Mac capture needs Screen Recording permission for whatever runs this script (System Settings ▸
+Privacy & Security ▸ Screen & System Audio Recording). It needs no Accessibility permission: each
+shot relaunches the app with -ScreenshotScene, which opens it straight in that state, and the app
+writes the window's real frame to the App Group container for the capture to use.
+
+If it was skipped, take the shots by hand (⌘⇧4 then space, click the window) and pad them:
+    sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-codes.png
 NOTE
 [ "$KEEP" = "--keep" ] || rm -rf "$TMP"

@@ -55,7 +55,7 @@ struct TOTPApp: App {
         #if os(macOS)
         // Menu bar icon with the list of codes. The icon is static on purpose: macOS 27
         // hosts all status items in one window, and frequently changing items are costly.
-        MenuBarExtra("TOTP Authenticator", systemImage: "lock.shield.fill") {
+        MenuBarExtra("TOTP Password", systemImage: "lock.shield.fill") {
             MenuBarView()
                 .environmentObject(syncManager)
         }
@@ -139,7 +139,75 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
         MacOSAppSettings.shared.applyDockIconPolicy()
         // The main window is suppressed at launch, so start syncing here rather than from a view.
         Task { @MainActor in SyncManager.shared.startIfNeeded() }
+        #if DEBUG
+        positionWindowForScreenshotsIfNeeded()
+        #endif
     }
+
+    #if DEBUG
+    /// Puts the window at a known place and size so `scripts/export-screenshots.sh` can capture it
+    /// without needing Accessibility permission. 1440x900 points captures at 2880x1800 — an
+    /// App Store–accepted Mac size.
+    private func positionWindowForScreenshotsIfNeeded() {
+        guard AppEnvironment.isTakingScreenshots else { return }
+        // Always the primary (menu bar) display: its frame origin is (0, 0), which is the space
+        // `screencapture -R` works in. `NSScreen.main` is the *focused* screen, so on a machine
+        // with a second display it silently puts the window in another coordinate space.
+        guard let screen = NSScreen.screens.first else { return }
+
+        let size = CGSize(width: 1440, height: 900)
+        let insetFromTop: CGFloat = 100
+
+        // A scene can end up with a second, empty main window on top of the real one. The window
+        // we want is the one carrying the toolbar; the rest are ordered out so they can't be shot.
+        func mainWindows() -> [NSWindow] {
+            let titled = NSApp.windows.filter {
+                $0.isVisible && $0.canBecomeMain && $0.styleMask.contains(.titled) && !($0 is NSPanel)
+            }
+            let withToolbar = titled.filter { $0.toolbar != nil }
+            guard !withToolbar.isEmpty else { return titled }
+            for extra in titled where extra.toolbar == nil {
+                extra.orderOut(nil)
+            }
+            return withToolbar
+        }
+
+        // Applied several times because presenting a sheet or entering select mode rebuilds the
+        // toolbar afterwards, and SwiftUI re-lays out the window once that happens.
+        for delay in [1.5, 4.0, 7.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let frame = CGRect(x: screen.frame.minX + 100,
+                                   y: screen.frame.maxY - insetFromTop - size.height,
+                                   width: size.width, height: size.height)
+                for window in mainWindows() {
+                    window.setFrame(frame, display: true)
+                }
+                NSApp.activate(ignoringOtherApps: true)
+                mainWindows().last?.makeKeyAndOrderFront(nil)
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 9.5) {
+            // AppKit keeps the origin (bottom-left) when SwiftUI makes the window taller than we
+            // asked, so it grows upwards. Re-anchor the top edge without touching the size.
+            for window in mainWindows() {
+                window.setFrameOrigin(CGPoint(
+                    x: screen.frame.minX + 100,
+                    y: screen.frame.maxY - insetFromTop - window.frame.height
+                ))
+            }
+            // Report where the window actually ended up — AppKit can still clamp it — in
+            // screencapture's coordinates: points, origin at the top-left of the primary display.
+            guard let window = mainWindows().last,
+                  let container = FileManager.default.containerURL(
+                      forSecurityApplicationGroupIdentifier: AppGroup.identifier) else { return }
+            let frame = window.frame
+            let report = "\(Int(frame.minX)),\(Int(screen.frame.maxY - frame.maxY)),\(Int(size.width)),\(Int(size.height))\n"
+            try? report.write(to: container.appendingPathComponent("screenshot-window-frame"),
+                              atomically: true, encoding: .utf8)
+        }
+    }
+    #endif
 
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         logger.error("Remote notification registration failed: \(error.localizedDescription, privacy: .public)")

@@ -51,7 +51,7 @@ $EDITOR fastlane/metadata/ios/en-US/release_notes.txt
 cp fastlane/metadata/ios/en-US/release_notes.txt fastlane/metadata/mac/en-US/release_notes.txt
 
 # 4. Screenshots, if the UI changed
-scripts/export-screenshots.sh     # iPhone + iPad; Mac shots are manual, see below
+scripts/export-screenshots.sh     # iPhone + iPad + Mac
 
 # 5. Archive and upload the binaries (the release-totp skill has the full commands)
 
@@ -64,11 +64,25 @@ Then open App Store Connect, check both versions, attach the builds and submit b
 
 ## Mac screenshots
 
-macOS UI tests need automation permission and `screencapture` needs Screen Recording, so these are
-captured by hand: ⌘⇧4 then space, click the window, then pad to an accepted 16:10 size:
+macOS UI tests need Accessibility permission, which the script doesn't have, so the Mac shots are
+driven from launch arguments instead of clicks. `scripts/export-screenshots.sh` relaunches the app
+once per shot with `-ScreenshotMode -ScreenshotScene <name>` (`select`, `add`, or nothing for the
+plain list); `ContentView.applyScreenshotScene()` opens that state directly. Both flags are
+`#if DEBUG` only — a release build ignores them.
+
+The app sizes its own window to 1440×900 points, which captures at 2880×1800. AppKit can still
+move it (the menu bar clamps it, and `NSScreen.main` is the *focused* screen, not necessarily the
+one being captured), so the app writes the frame it actually ended up with to
+`~/Library/Group Containers/group.com.lucferbux.TOTP/screenshot-window-frame` and the script
+captures exactly that rect.
+
+The one permission this does need is **Screen Recording**, for whatever runs the script
+(System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording). Without it the captures
+come out empty and the script says so. To fall back to doing it by hand — ⌘⇧4, space, click the
+window — pad the result to an accepted size:
 
 ```bash
-sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-mac.png
+sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-codes.png
 ```
 
 Accepted Mac sizes: 1280×800, 1440×900, 2560×1600, 2880×1800.
@@ -76,6 +90,14 @@ Accepted Mac sizes: 1280×800, 1440×900, 2560×1600, 2880×1800.
 ## Notes
 
 - **Screenshots are per platform**, and are not shared by Universal Purchase.
+- **`release_notes` (What's New) can't be set on a first version** — App Store Connect rejects
+  `whatsNew` with `STATE_ERROR` until the app has a released version to describe changes against.
+- **The build is attached separately from the metadata.** `fastlane metadata` never picks one; set
+  it in App Store Connect, or PATCH `/v1/appStoreVersions/{id}/relationships/build`.
+- **App Review contact details** (`fastlane/metadata/*/review_information/`) need a
+  `phone_number.txt` and `email_address.txt`. Without them the review-detail record can't be
+  created, and deliver's metadata step then dies with "No data" (fastlane #20538) — which is why
+  the `screenshots_upload` lane exists as a `skip_metadata` path around it.
 - **`promotional_text`** can be changed without shipping a new version; everything else on the
   version cannot.
 - A new CloudKit field needs *Deploy Schema Changes* in the CloudKit Console before release — see

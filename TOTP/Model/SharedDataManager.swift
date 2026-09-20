@@ -33,6 +33,21 @@ public enum AppEnvironment {
         return false
         #endif
     }()
+
+    /// `-ScreenshotScene <name>`: the state the app should open in for one App Store screenshot.
+    /// The Mac shots are taken by `scripts/export-screenshots.sh`, which can't drive the UI
+    /// (clicking needs Accessibility permission), so each shot launches straight into its state.
+    public static let screenshotScene: String? = {
+        #if DEBUG
+        guard isTakingScreenshots else { return nil }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-ScreenshotScene"),
+              arguments.index(after: flag) < arguments.endIndex else { return nil }
+        return arguments[arguments.index(after: flag)]
+        #else
+        return nil
+        #endif
+    }()
 }
 
 public final class SharedDataManager: ObservableObject, @unchecked Sendable {
@@ -240,7 +255,10 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
             account("Contoso Cloud", "admin@contoso.example", secret: "abcdefghij1234567890", domain: "login.contoso.example"),
             account("Fabrikam Mail", "you@fabrikam.example", secret: "qrstuvwxyz0987654321"),
             account("Acme Bank", "personal", secret: "0987654321zyxwvutsrq"),
-            account("Tailspin Dev", "deploy-bot", secret: "mnopqrstuv5647382910")
+            account("Tailspin Dev", "deploy-bot", secret: "mnopqrstuv5647382910"),
+            account("Woodgrove Bank", "you@woodgrove.example", secret: "5647382910mnopqrstuv"),
+            account("Proseware VPN", "l.fernandez", secret: "vutsrqponm0192837465", prefix: "77"),
+            account("Adatum Hosting", "root", secret: "1029384756zyxwvutsrq")
         ]
     }
 

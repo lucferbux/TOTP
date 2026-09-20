@@ -5,7 +5,7 @@ conventions. [AGENTS.md](AGENTS.md) is the portable summary for other agents —
 
 ## Project Overview
 
-**TOTP Authenticator** — a native, multi-platform SwiftUI authenticator that generates 2FA codes per **RFC 4226 (HOTP)** and **RFC 6238 (TOTP)**. Single codebase shipping to **iPhone, iPad, and Mac** (Universal Purchase), with **iCloud/CloudKit sync**, a **home-screen Widget**, an **AutoFill credential provider**, and a **macOS menu bar** mode. No third-party dependencies — 100% Apple frameworks.
+**TOTP Password** — a native, multi-platform SwiftUI authenticator that generates 2FA codes per **RFC 4226 (HOTP)** and **RFC 6238 (TOTP)**. Single codebase shipping to **iPhone, iPad, and Mac** (Universal Purchase), with **iCloud/CloudKit sync**, a **home-screen Widget**, an **AutoFill credential provider**, and a **macOS menu bar** mode. No third-party dependencies — 100% Apple frameworks.
 
 - **Language / mode:** Swift (Swift 5 language mode — `SWIFT_VERSION = 5.0`)
 - **UI:** SwiftUI with the **iOS 26 "Liquid Glass"** design language
@@ -225,7 +225,7 @@ PlatformColors.secondarySystemGroupedBackground
   - `build-run-totp` — build & launch on the iOS Simulator or macOS (the built-in `/run` and `verify` skills discover it).
   - `test-totp` — run the unit / UI suites.
   - `release-totp` — version bump, archive and App Store Connect upload (pre-flight checks included).
-- **App Store metadata** (`fastlane/`): listing copy lives in `fastlane/metadata/{ios,mac}/en-US/*.txt` and is pushed with `fastlane metadata`. App-level fields (name, subtitle, privacy URL, categories) are shared across platforms by App Store Connect, so they live **only** in the iOS tree — duplicating them lets one lane overwrite the other platform. No lane ever submits for review. Screenshots come from `scripts/export-screenshots.sh`. See [docs/RELEASE.md](docs/RELEASE.md).
+- **App Store metadata** (`fastlane/`): listing copy lives in `fastlane/metadata/{ios,mac}/en-US/*.txt` and is pushed with `fastlane metadata`. App-level fields (name, subtitle, privacy URL, categories) are shared across platforms by App Store Connect, so they live **only** in the iOS tree — duplicating them lets one lane overwrite the other platform. No lane ever submits for review. Screenshots come from `scripts/export-screenshots.sh`: iPhone and iPad from the UI tests, Mac by relaunching the app per shot with `-ScreenshotMode -ScreenshotScene <select|add>` (both `#if DEBUG` only) because macOS UI automation needs Accessibility permission. The app reports the window frame it actually got to the App Group container, so the capture never assumes a rect. `whatsNew` can't be set on a first version, and the build is attached separately from the metadata. See [docs/RELEASE.md](docs/RELEASE.md).
 - **Website** (`site/`): landing page, privacy policy and support page, published to GitHub Pages by `.github/workflows/pages.yml`. Never switch Pages to the `docs/` folder — Jekyll would publish the internal architecture docs as indexable pages.
 - **Hooks** (`scripts/swift-guardrails.sh`, wired as a `PostToolUse` hook for `Write|Edit`):
   warns after editing a Swift file that uses `.foregroundColor`, `.spring()`, `.shadow()`,

@@ -6,7 +6,7 @@ Guide for AI coding agents working in this repository. Claude Code additionally 
 
 ## What this project is
 
-**TOTP Authenticator** — a native SwiftUI authenticator (RFC 4226 HOTP / RFC 6238 TOTP) shipping
+**TOTP Password** — a native SwiftUI authenticator (RFC 4226 HOTP / RFC 6238 TOTP) shipping
 from one codebase to iPhone, iPad and Mac (Universal Purchase), with iCloud/CloudKit sync, widgets
 and a Control, an AutoFill credential provider, Siri/Shortcuts/Spotlight intents, and a macOS menu
 bar mode. **No third-party dependencies — 100% Apple frameworks.**
@@ -105,16 +105,20 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 **Release**
 20. Listing copy lives in `fastlane/metadata/`; app-level fields (name, subtitle, privacy URL,
     categories) only in the iOS tree, since App Store Connect shares them across platforms.
-21. No automation submits for review — lanes leave drafts for a human.
+21. No automation submits for review — lanes leave drafts for a human. Attaching the build is a
+    separate step from pushing metadata, and `whatsNew` can't be set on a first version.
 22. The website is `site/`, published by GitHub Actions. Never point Pages at `docs/`.
+23. Screenshots come from `scripts/export-screenshots.sh`. The Mac shots are driven by
+    `-ScreenshotMode -ScreenshotScene <name>` (debug-only launch arguments) rather than UI
+    automation, which would need Accessibility permission.
 
 **Workflow**
-23. Conventional Commits: `type(scope): subject` with
+24. Conventional Commits: `type(scope): subject` with
     types `feat|fix|docs|style|refactor|test|chore` and
     scopes `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`.
-24. Don't commit or push unless asked. Branch before committing on `main`.
-25. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
-26. Don't add third-party dependencies, and don't change an identifier in only one place.
+25. Don't commit or push unless asked. Branch before committing on `main`.
+26. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
+27. Don't add third-party dependencies, and don't change an identifier in only one place.
 
 ## Release
 

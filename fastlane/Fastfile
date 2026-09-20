@@ -5,6 +5,8 @@
 
 # This project ships no analytics; don't send any from its tooling either.
 opt_out_usage
+# fastlane/README.md is written by hand — don't let a lane run replace it with the generated one.
+skip_docs
 
 default_platform(:ios)
 
@@ -26,11 +28,21 @@ def asc_key
   )
 end
 
+# MARKETING_VERSION straight from the project. (fastlane's get_version_number can't parse the
+# Xcode 27 pbxproj format — issue #30223 — so read it directly.)
+def marketing_version
+  pbxproj = File.read("../TOTP.xcodeproj/project.pbxproj")
+  version = pbxproj[/MARKETING_VERSION = ([0-9.]+);/, 1]
+  UI.user_error!("Couldn't read MARKETING_VERSION from the project") if version.nil?
+  version
+end
+
 # Shared deliver options. `platform` is "ios" or "osx" — deliver has no "macos".
 def deliver_options(platform:, metadata_path:, screenshots_path:, skip_screenshots:)
   {
     api_key: asc_key,
     platform: platform,
+    app_version: marketing_version,   # the version record still has to be told which version it is
     metadata_path: metadata_path,
     screenshots_path: screenshots_path,
     skip_binary_upload: true,       # binaries come from xcodebuild, see .claude/skills/release-totp
@@ -50,6 +62,44 @@ end
 
 lane :metadata_text do
   push_metadata(skip_screenshots: true)
+end
+
+# Screenshots only. Also the way round fastlane #20538: deliver's metadata step crashes with
+# "No data" when an app has no App Store review detail yet, which it can't create without a
+# contact phone number.
+lane :screenshots_upload do
+  UI.message("Uploading iOS screenshots…")
+  upload_to_app_store(
+    api_key: asc_key,
+    platform: "ios",
+    app_version: marketing_version,
+    # Still needed with skip_metadata: deliver validates this folder's layout either way.
+    metadata_path: "./fastlane/metadata/ios",
+    screenshots_path: "./fastlane/screenshots",
+    skip_binary_upload: true,
+    skip_metadata: true,
+    skip_screenshots: false,
+    submit_for_review: false,
+    force: true,
+    overwrite_screenshots: true,
+    run_precheck_before_submit: false
+  )
+
+  UI.message("Uploading macOS screenshots…")
+  upload_to_app_store(
+    api_key: asc_key,
+    platform: "osx",
+    app_version: marketing_version,
+    metadata_path: "./fastlane/metadata/mac",
+    screenshots_path: "./fastlane/screenshots_mac",
+    skip_binary_upload: true,
+    skip_metadata: true,
+    skip_screenshots: false,
+    submit_for_review: false,
+    force: true,
+    overwrite_screenshots: true,
+    run_precheck_before_submit: false
+  )
 end
 
 def push_metadata(skip_screenshots:)
@@ -74,8 +124,9 @@ end
 
 # Apple's own checks (trademarks, placeholder text, broken URLs) before anything is pushed.
 lane :precheck_all do
-  check_app_store_metadata(api_key: asc_key, platform: "ios", default_rule_level: :warn)
-  check_app_store_metadata(api_key: asc_key, platform: "osx", default_rule_level: :warn)
+  # include_in_app_purchases: precheck can't read IAPs with an API key, and this app has none.
+  check_app_store_metadata(api_key: asc_key, platform: "ios", default_rule_level: :warn, include_in_app_purchases: false)
+  check_app_store_metadata(api_key: asc_key, platform: "osx", default_rule_level: :warn, include_in_app_purchases: false)
 end
 
 # Regenerates App Store screenshots from the UI tests.

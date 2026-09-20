@@ -85,6 +85,9 @@ public struct ContentView: View {
                 .refreshable { await syncManager.refresh() }
         }
         .focusedSceneValue(\.addAccountAction, AddAccountAction { sheet = .add(nil) })
+        #if DEBUG
+        .task { applyScreenshotScene() }
+        #endif
         .sensoryFeedback(.success, trigger: copyCount)
         .sheet(item: $sheet) { sheet in
             sheetContent(sheet)
@@ -290,6 +293,22 @@ public struct ContentView: View {
     }
 
     // MARK: - Chrome
+
+    #if DEBUG
+    /// Opens the state named by `-ScreenshotScene` so `scripts/export-screenshots.sh` can shoot the
+    /// Mac listing without Accessibility permission. Debug-only: release builds ignore the argument.
+    private func applyScreenshotScene() {
+        switch AppEnvironment.screenshotScene {
+        case "select":
+            isSelecting = true
+            selection = Set(syncManager.accounts.prefix(3).map(\.id))
+        case "add":
+            sheet = .add(nil)
+        default:
+            break
+        }
+    }
+    #endif
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
