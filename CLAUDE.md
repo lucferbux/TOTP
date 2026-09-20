@@ -127,8 +127,10 @@ GridItem(.adaptive(minimum: 300, maximum: 480))
 // Cards (regular-width grid) — native surface, NOT glass:
 .background { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(PlatformColors.secondarySystemGroupedBackground) }
 
-// Liquid Glass only on floating, transient chrome (toasts, overlays), never on cards:
-.glassEffect(.regular, in: .capsule)
+// Liquid Glass only on floating, transient chrome (toasts, overlays), never on cards.
+// Use the shared helpers — the raw modifiers don't exist on visionOS:
+.floatingGlass(in: .capsule)      // instead of .glassEffect(.regular, in:)
+.prominentActionStyle()           // instead of .buttonStyle(.glassProminent)
 
 // Modern modifiers:
 TimelineView(.periodic(from: .now, by: 1))      // never Timer.publish for live codes

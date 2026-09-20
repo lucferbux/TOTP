@@ -83,21 +83,24 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
     outer display compact, inner display regular and it ignores orientation locks).
 12. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
     `ContentUnavailableView`, `Form`); they get Liquid Glass for free.
-13. `.glassEffect()` only on floating, transient chrome — never on cards or list rows.
+13. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
+    shared helpers `floatingGlass(in:)` / `prominentActionStyle()`, which fall back on visionOS.
 14. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
     Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider` or `Timer.publish`.
 15. Every interactive element needs an accessibility label; list rows and controls that tests drive
     need a stable `accessibilityIdentifier`.
-16. Keep iOS and macOS at parity; route platform differences through the existing shims
+16. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
+    visionOS build keeps compiling.
+17. Keep iOS and macOS at parity; route platform differences through the existing shims
     (`PlatformColors`, `ClipboardManager`, `SystemSettings`).
 
 **Workflow**
-17. Conventional Commits: `type(scope): subject` with
+18. Conventional Commits: `type(scope): subject` with
     types `feat|fix|docs|style|refactor|test|chore` and
     scopes `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`.
-18. Don't commit or push unless asked. Branch before committing on `main`.
-19. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
-20. Don't add third-party dependencies, and don't change an identifier in only one place.
+19. Don't commit or push unless asked. Branch before committing on `main`.
+20. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
+21. Don't add third-party dependencies, and don't change an identifier in only one place.
 
 ## Release
 
