@@ -1,0 +1,24 @@
+No account, sign-in or demo credentials are needed — the app works offline as soon as it opens.
+
+ADDING A TEST ACCOUNT
+Tap + and paste this link (it is the RFC 6238 test vector, not a real account):
+otpauth://totp/Example%20Corp:reviewer@example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Example%20Corp
+A six-digit code appears immediately and refreshes every 30 seconds. Tap the row to copy it.
+
+THE PIN PREFIX
+Editing an account shows a "Fixed Prefix (PIN)" field. Some workplace logins require a fixed PIN typed directly before the generated code; when one is set, the app copies and fills PIN + code together. It is deliberately never displayed — accounts that have one show a small "PIN" badge.
+
+AUTOFILL MUST BE ENABLED MANUALLY
+The credential provider only appears after it is turned on:
+iOS/iPadOS: Settings > General > AutoFill & Passwords > enable "TOTP"
+macOS: System Settings > General > AutoFill & Passwords > enable "TOTP"
+Without that step the extension is inactive, which can look like it is not working.
+
+ICLOUD SYNC
+Accounts sync through the user's own private CloudKit database. It cannot be demonstrated end-to-end on a single device, and the developer has no access to that data.
+
+MAC APP
+The Mac app runs in the menu bar and its main window is hidden at launch by design. Click the menu bar icon (a shield) to see the codes, or use "Open TOTP" in that menu.
+
+ENCRYPTION
+Only Apple-provided cryptography is used (CryptoKit HMAC for RFC 4226/6238 codes and ChaChaPoly to encrypt data at rest), so the app qualifies for the export-compliance exemption. ITSAppUsesNonExemptEncryption is set to NO in the bundle.

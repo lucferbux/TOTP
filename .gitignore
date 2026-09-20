@@ -19,3 +19,13 @@ DerivedData/
 
 # Claude Code — personal, machine-local overrides (shared config lives in settings.json)
 .claude/settings.local.json
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output
+# App Store Connect API keys must never be committed
+**/AuthKey_*.p8
+# Generated screenshots (regenerate with scripts/export-screenshots.sh)
+fastlane/screenshots/**/*.png
+fastlane/screenshots_mac/**/*.png

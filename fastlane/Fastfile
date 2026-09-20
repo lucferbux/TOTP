@@ -1,0 +1,84 @@
+# Metadata for the App Store listing. Binaries are still archived and uploaded by the
+# `release-totp` skill with xcodebuild — these lanes only touch text and screenshots.
+#
+# Nothing here submits for review: every lane leaves the version in Prepare for Submission.
+
+# This project ships no analytics; don't send any from its tooling either.
+opt_out_usage
+
+default_platform(:ios)
+
+# The App Store Connect API key. Never store the .p8 in the repo.
+def asc_key
+  key_id    = ENV["ASC_KEY_ID"]
+  issuer_id = ENV["ASC_ISSUER_ID"]
+  key_path  = File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
+
+  UI.user_error!("Set ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH — see fastlane/README.md") if key_id.nil? || issuer_id.nil?
+  UI.user_error!("No API key at #{key_path}") unless File.exist?(key_path)
+
+  app_store_connect_api_key(
+    key_id: key_id,
+    issuer_id: issuer_id,
+    key_filepath: key_path,
+    duration: 1200,
+    in_house: false
+  )
+end
+
+# Shared deliver options. `platform` is "ios" or "osx" — deliver has no "macos".
+def deliver_options(platform:, metadata_path:, screenshots_path:, skip_screenshots:)
+  {
+    api_key: asc_key,
+    platform: platform,
+    metadata_path: metadata_path,
+    screenshots_path: screenshots_path,
+    skip_binary_upload: true,       # binaries come from xcodebuild, see .claude/skills/release-totp
+    skip_screenshots: skip_screenshots,
+    skip_app_version_update: false,
+    submit_for_review: false,       # never auto-submit; a human reviews the draft
+    automatic_release: false,
+    force: true,                    # no interactive HTML preview
+    precheck_include_in_app_purchases: false,
+    run_precheck_before_submit: false
+  }
+end
+
+lane :metadata do
+  push_metadata(skip_screenshots: false)
+end
+
+lane :metadata_text do
+  push_metadata(skip_screenshots: true)
+end
+
+def push_metadata(skip_screenshots:)
+  UI.message("Pushing iOS metadata…")
+  upload_to_app_store(**deliver_options(
+    platform: "ios",
+    metadata_path: "./fastlane/metadata/ios",
+    screenshots_path: "./fastlane/screenshots",
+    skip_screenshots: skip_screenshots
+  ))
+
+  UI.message("Pushing macOS metadata…")
+  upload_to_app_store(**deliver_options(
+    platform: "osx",
+    metadata_path: "./fastlane/metadata/mac",
+    screenshots_path: "./fastlane/screenshots_mac",
+    skip_screenshots: skip_screenshots
+  ))
+
+  UI.success("Both versions updated as drafts. Review them in App Store Connect before submitting.")
+end
+
+# Apple's own checks (trademarks, placeholder text, broken URLs) before anything is pushed.
+lane :precheck_all do
+  check_app_store_metadata(api_key: asc_key, platform: "ios", default_rule_level: :warn)
+  check_app_store_metadata(api_key: asc_key, platform: "osx", default_rule_level: :warn)
+end
+
+# Regenerates App Store screenshots from the UI tests.
+lane :screenshots do
+  sh("../scripts/export-screenshots.sh")
+end

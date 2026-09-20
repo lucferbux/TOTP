@@ -1,0 +1,20 @@
+TOTP Authenticator puts your two-factor verification codes in the Mac menu bar — and on your iPhone and iPad too, from a single purchase.
+
+Click the menu bar icon and every code is there, with search and a one-click copy. Or leave it in the Dock, or both. It is a real Mac app: keyboard shortcuts, a proper Settings window, and a window that resizes the way you expect.
+
+A PIN IN FRONT OF THE CODE
+Some workplace logins expect a fixed PIN typed immediately before the generated code. Give an account a prefix and TOTP copies and fills the whole value in one step. The PIN is never shown on screen, and it is encrypted alongside the secret.
+
+FILLS CODES IN SAFARI
+Turn TOTP on under AutoFill & Passwords and your codes are offered as you sign in. Accounts that use a PIN can fill password fields with the PIN and code together.
+
+SET UP IN SECONDS
+Choose a screenshot of the QR code your service shows, paste an otpauth:// link, or type the secret in by hand. SHA-1, SHA-256 and SHA-512 are supported, with 6 to 10 digits and custom refresh periods.
+
+SYNC THAT STAYS YOURS
+Accounts sync through your own private iCloud database, encrypted before they leave the device with a key shared only through your iCloud Keychain. There is no account to create and no server of ours in the middle — because there is no server of ours at all.
+
+PRIVATE BY CONSTRUCTION
+No analytics. No advertising. No third-party code of any kind. The app makes no network requests of its own. Secrets are sealed with ChaChaPoly encryption before they are written anywhere, and are never logged. Turn on the app lock and Touch ID or your password is required before codes are shown — and before AutoFill, Shortcuts or the Control hand one over.
+
+The app is open source under the MIT licence, so every claim above can be checked in the code: github.com/lucferbux/TOTP

@@ -1,0 +1,1 @@
+2fa,totp,authenticator,otp,two factor,mfa,security,code,login,verification,offline,autofill

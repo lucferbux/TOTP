@@ -1,0 +1,8 @@
+Security and reliability release.
+
+• Your PIN prefix is now encrypted everywhere it is stored and synced, just like the secret itself. Existing accounts are migrated automatically.
+• Copied codes stay on the device you copied them on. You can allow sharing with your other Apple devices in Settings.
+• With the app lock on, AutoFill, Shortcuts and the Control Centre control now ask for Face ID, Touch ID or your passcode before handing over a code, and account names are kept out of Spotlight.
+• The lock now covers sheets and the app switcher, so nothing sensitive can be left on screen.
+• Hardened how the encryption key is stored and recovered, so a locked device can never be mistaken for a first run.
+• Added a privacy policy and support site, reachable from Settings.

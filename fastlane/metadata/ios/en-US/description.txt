@@ -1,0 +1,29 @@
+TOTP Authenticator generates the six-digit verification codes you need to sign in to the services you already use — on your iPhone, your iPad and your Mac, from a single purchase.
+
+It is built for one thing: getting the right code into the right field, quickly, without handing your secrets to anyone.
+
+A PIN IN FRONT OF THE CODE
+Some workplace logins expect a fixed PIN typed immediately before the generated code. Give an account a prefix and TOTP copies and fills the whole value in one step. The PIN is never shown on screen, and it is encrypted alongside the secret.
+
+FILLS CODES WHERE YOU SIGN IN
+Turn on AutoFill and your codes appear right above the keyboard on iPhone and iPad, and in Safari on the Mac. Accounts that use a PIN can fill password fields with the PIN and code together.
+
+ON YOUR HOME SCREEN AND IN CONTROL CENTRE
+Add a widget for the account you reach for most and tap it to copy the code. Put a control in Control Centre — or on the Action button — to copy a code without opening anything. Ask Siri, or build a Shortcut.
+
+A REAL MAC APP
+Not a phone app in a window. A menu bar icon keeps every code a click away, with search, keyboard shortcuts and a Settings window where you expect one.
+
+SET UP IN SECONDS
+Scan the QR code your service shows, choose a screenshot of it, paste an otpauth:// link, or type the secret in by hand. SHA-1, SHA-256 and SHA-512 are supported, with 6 to 10 digits and custom refresh periods.
+
+SYNC THAT STAYS YOURS
+Accounts sync through your own private iCloud database, encrypted before they leave the device with a key shared only through your iCloud Keychain. There is no account to create and no server of ours in the middle — because there is no server of ours at all.
+
+PRIVATE BY CONSTRUCTION
+No analytics. No advertising. No third-party code of any kind. The app makes no network requests of its own. Secrets are sealed with ChaChaPoly encryption before they are written anywhere, and are never logged. Turn on the app lock and Face ID, Touch ID or your passcode is required before codes are shown — and before AutoFill, Shortcuts or the Control hand one over.
+
+DESIGNED FOR THE PLATFORM
+Built entirely with Apple frameworks and the latest design language. It adapts to every size, from a narrow iPhone to a full-screen iPad or a resized Mac window, with full Dynamic Type, VoiceOver labels and Dark Mode.
+
+The app is open source under the MIT licence, so every claim above can be checked in the code: github.com/lucferbux/TOTP
