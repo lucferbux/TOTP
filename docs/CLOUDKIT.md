@@ -14,6 +14,20 @@ Record type: **`TOTPAccount`**
 - Secrets stay `ChaChaPoly`-sealed. The key is shared between the user's devices through **iCloud
   Keychain**; without it, one device cannot decrypt another's records.
 
+## Fields
+
+| Field | Contents |
+|---|---|
+| `encryptedKey` | the OTP secret, ChaChaPoly-sealed |
+| `encryptedPrefix` | the fixed prefix (PIN), ChaChaPoly-sealed — **added in 4.4** |
+| `prefix` | plaintext PIN written by ≤4.3. Still read, never written; cleared when a record is rewritten |
+| `issuer`, `name`, `associatedDomains` | metadata, stored as-is so sync is usable |
+| `isHotp`, `digits`, `interval`, `counter`, `algorithm`, dates | settings |
+
+⚠️ **4.4 adds `encryptedPrefix`.** Development creates it automatically the first time a record is
+saved; **Production needs one more *Deploy Schema Changes*** before the release goes out, or saving
+fails there.
+
 ## Releasing a schema change
 
 New fields only reach App Store / TestFlight users after they're deployed:
