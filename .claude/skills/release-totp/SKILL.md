@@ -74,9 +74,23 @@ Uploading is outward-facing and irreversible (a build number can never be reused
 the user before uploading** unless they already asked for it in this session. Report the exact
 error rather than working around signing failures.
 
-## 5. After uploading
+## 5. Push the listing metadata
+
+Binaries and metadata travel separately. After the upload:
+
+```bash
+fastlane precheck_all     # Apple's own checks on the copy
+fastlane metadata         # iOS + macOS, as drafts — never submits
+```
+
+Update `fastlane/metadata/{ios,mac}/en-US/release_notes.txt` first, and regenerate screenshots with
+`scripts/export-screenshots.sh` if the UI changed. Full checklist, including the one-time App
+Privacy / EU trader / age-rating steps that no API can do: [docs/RELEASE.md](../../../docs/RELEASE.md).
+
+## 6. After uploading
 
 - Commit the version bump (`chore(app): bump to <version> (<build>)`) and push if asked.
+- Check both versions in App Store Connect and submit by hand — no lane submits for review.
 - Remind the user of manual steps: deploy any new CloudKit fields from Development to Production in
   the CloudKit Console, and that App Store Connect processing takes a few minutes before the build
   appears in TestFlight.

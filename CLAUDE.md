@@ -175,7 +175,11 @@ PlatformColors.secondarySystemGroupedBackground
 
 - OTP secret keys are **always** `ChaChaPoly`-sealed before they touch any persistent store (UserDefaults, CloudKit). Plaintext keys live in memory only while generating a code.
 - The symmetric key is shared across the user's devices through **iCloud Keychain** (synchronizable item, service `TOTP-Shared-Encryption`), mirrored into the App Group container file for the extensions. Without a shared key, records uploaded by one device can't be decrypted by another. `decryptionKeys` keeps every previously used key so old data still opens, and saving re-seals it with the primary key. It is generated once by `EncryptionKeyManager` and stored as a file in the App Group container (protection `completeUntilFirstUserAuthentication`) so the widget and AutoFill can read it; older Keychain copies are migrated. Extensions only read it (`EncryptionKeyManager.existingKey()`), never create it. Never hard-code or derive keys from constants.
-- **Never** commit real credentials — no real issuers, usernames, PINs or secrets in code, previews, samples, tests, fixtures or docs. Use `Example Corp` / `user@example.com` / the RFC test secret.
+- **Never** commit real credentials — no real issuers, usernames, PINs or secrets in code, previews, samples, tests, fixtures or docs. Use `Example Corp` / `user@example.com` / the RFC test secret. Screenshots use fictional brands only (real ones belong to their owners — App Review 5.2.2).
+- **The prefix (PIN) is secret material**, exactly like the seed: sealed before it touches local storage or CloudKit, never logged, never displayed.
+- **Never mint an encryption key on a failed read.** `EncryptionKeyManager` separates *absent* from *unavailable*; only "absent everywhere" may create a key, writes use `SecItemUpdate` (deleting a synchronizable item removes it from every device), and an existing key file is never overwritten.
+- **Never drop ciphertext you can't read.** Undecryptable records are preserved byte-for-byte on save; a partially readable store is never re-sealed.
+- **Extensions honour the app lock**: with it on, AutoFill, Shortcuts and the Control authenticate before handing over a code.
 - **Never** log, `print`, or put OTP keys / prefixes / generated codes into analytics, error messages, or screenshots. Use `os.Logger` without account data.
 - The prefix (PIN) is never displayed; the UI shows a "PIN" badge only. App Intent entities expose issuer/name only.
 - Never write a secret to `UserDefaults` unencrypted. The widget and AutoFill extension decrypt independently using the shared Keychain key.
@@ -221,6 +225,8 @@ PlatformColors.secondarySystemGroupedBackground
   - `build-run-totp` — build & launch on the iOS Simulator or macOS (the built-in `/run` and `verify` skills discover it).
   - `test-totp` — run the unit / UI suites.
   - `release-totp` — version bump, archive and App Store Connect upload (pre-flight checks included).
+- **App Store metadata** (`fastlane/`): listing copy lives in `fastlane/metadata/{ios,mac}/en-US/*.txt` and is pushed with `fastlane metadata`. App-level fields (name, subtitle, privacy URL, categories) are shared across platforms by App Store Connect, so they live **only** in the iOS tree — duplicating them lets one lane overwrite the other platform. No lane ever submits for review. Screenshots come from `scripts/export-screenshots.sh`. See [docs/RELEASE.md](docs/RELEASE.md).
+- **Website** (`site/`): landing page, privacy policy and support page, published to GitHub Pages by `.github/workflows/pages.yml`. Never switch Pages to the `docs/` folder — Jekyll would publish the internal architecture docs as indexable pages.
 - **Hooks** (`scripts/swift-guardrails.sh`, wired as a `PostToolUse` hook for `Write|Edit`):
   warns after editing a Swift file that uses `.foregroundColor`, `.spring()`, `.shadow()`,
   `PreviewProvider`, `Timer.publish`, device/screen checks, `print(`, or a hard-coded secret.

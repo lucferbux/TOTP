@@ -65,8 +65,11 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
    fixtures. Use `os.Logger` without account data.
 3. Never commit real credentials, issuers, usernames or PINs — not in code, samples, previews,
    tests, fixtures or docs. Use `Example Corp` / `user@example.com` / `JBSWY3DPEHPK3PXP`.
-4. The prefix is never rendered on screen; show the "PIN" badge instead.
+4. The prefix is never rendered on screen; show the "PIN" badge instead. It is secret material:
+   sealed before storage or upload, never logged.
 5. Extensions only read the encryption key (`EncryptionKeyManager.existingKey()`), never create it.
+   A key is minted only when every source is positively absent — an unreadable source is not absent.
+   Never drop records you can't decrypt; write them back untouched.
 
 **Correctness**
 6. Codes are zero-padded `String`s. Never format a code from an integer — leading zeros matter,
@@ -99,13 +102,19 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 19. Keep iOS and macOS at parity; route platform differences through the existing shims
     (`PlatformColors`, `ClipboardManager`, `SystemSettings`).
 
+**Release**
+20. Listing copy lives in `fastlane/metadata/`; app-level fields (name, subtitle, privacy URL,
+    categories) only in the iOS tree, since App Store Connect shares them across platforms.
+21. No automation submits for review — lanes leave drafts for a human.
+22. The website is `site/`, published by GitHub Actions. Never point Pages at `docs/`.
+
 **Workflow**
-20. Conventional Commits: `type(scope): subject` with
+23. Conventional Commits: `type(scope): subject` with
     types `feat|fix|docs|style|refactor|test|chore` and
     scopes `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`.
-21. Don't commit or push unless asked. Branch before committing on `main`.
-22. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
-23. Don't add third-party dependencies, and don't change an identifier in only one place.
+24. Don't commit or push unless asked. Branch before committing on `main`.
+25. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
+26. Don't add third-party dependencies, and don't change an identifier in only one place.
 
 ## Release
 
