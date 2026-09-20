@@ -305,17 +305,28 @@ public struct ContentView: View {
                 selectButton
             }
         }
-        // Notes-style bottom bar: search on the left, add on the right
-        if isSelecting {
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItem(placement: .bottomBar) {
-                deleteSelectionButton
+        if usesCompactList {
+            // iPhone (and narrow splits): Notes-style bottom bar — search on the left, add on the right
+            if isSelecting {
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItem(placement: .bottomBar) {
+                    deleteSelectionButton
+                }
+            } else {
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                ToolbarSpacer(.fixed, placement: .bottomBar)
+                ToolbarItem(placement: .bottomBar) {
+                    addButton
+                }
             }
         } else {
-            DefaultToolbarItem(kind: .search, placement: .bottomBar)
-            ToolbarSpacer(.fixed, placement: .bottomBar)
-            ToolbarItem(placement: .bottomBar) {
-                addButton
+            // iPad / regular width: every action sits in the navigation bar next to Select
+            ToolbarItem(placement: .topBarTrailing) {
+                if isSelecting {
+                    deleteSelectionButton
+                } else {
+                    addButton
+                }
             }
         }
         #else
@@ -361,12 +372,13 @@ public struct ContentView: View {
         Button(role: .destructive) {
             confirmBatchDelete = true
         } label: {
-            // Text, not a Label: the bottom bar renders labels icon-only, which hides the count
-            Text(selection.isEmpty ? "Delete" : "Delete (\(selection.count))")
+            Label("Delete", systemImage: "trash")
         }
         .tint(.red)
         .disabled(selection.isEmpty)
         .accessibilityIdentifier("deleteSelectionButton")
+        // The glyph carries no count, so spell it out for VoiceOver (and for the UI tests)
+        .accessibilityLabel(selection.isEmpty ? Text("Delete") : Text("Delete \(selection.count) accounts"))
     }
 
     @ViewBuilder

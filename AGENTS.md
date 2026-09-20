@@ -92,7 +92,8 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 16. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
     Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider` or `Timer.publish`.
 17. Every interactive element needs an accessibility label; list rows and controls that tests drive
-    need a stable `accessibilityIdentifier`.
+    need a stable `accessibilityIdentifier`. Icon-only toolbar buttons must spell out any state the
+    glyph can't show (e.g. the trash button's selected count).
 18. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
     visionOS build keeps compiling.
 19. Keep iOS and macOS at parity; route platform differences through the existing shims

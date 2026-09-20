@@ -171,6 +171,19 @@ final class TOTPUITests: XCTestCase {
         let delete = app.buttons["deleteSelectionButton"]
         XCTAssertTrue(delete.waitForExistence(timeout: 3))
         XCTAssertFalse(delete.isEnabled)
+        // Adding is not offered while selecting, on either idiom
+        XCTAssertFalse(app.buttons["addAccountButton"].exists)
+    }
+
+    /// Add and Select must both be reachable without leaving the navigation bar.
+    func testAddAndSelectAreBothAvailable() {
+        let add = app.buttons["addAccountButton"]
+        let select = app.buttons["selectButton"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        XCTAssertTrue(select.exists)
+        XCTAssertTrue(add.isHittable)
+        XCTAssertTrue(select.isHittable)
+        attach("toolbar")
     }
 
     func testOtpAuthLinkPrefillsForm() {
@@ -185,9 +198,13 @@ final class TOTPUITests: XCTestCase {
     #if os(iOS)
     func testSettingsSheet() {
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.switches["appLockToggle"].exists || app.buttons["appLockToggle"].exists)
+        // The sheet shows "Settings" as an inline title on iPad and in a navigation bar on iPhone,
+        // so assert on the content instead of the chrome.
+        let lockToggle = app.descendants(matching: .any).matching(identifier: "appLockToggle").firstMatch
+        XCTAssertTrue(lockToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Settings"].exists || app.navigationBars["Settings"].exists)
         app.buttons["Done"].tap()
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 3))
     }
 
     func testRotationKeepsContent() {

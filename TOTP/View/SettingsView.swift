@@ -47,9 +47,11 @@ struct SettingsView: View {
 
     private var iCloudSection: some View {
         Section {
-            LabeledContent("Status") {
-                Label(syncManager.syncState.description, systemImage: syncManager.syncState.systemImage)
+            LabeledContent {
+                Text(syncManager.syncState.description)
                     .foregroundStyle(syncManager.syncState.isError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+            } label: {
+                Label("Status", systemImage: syncManager.syncState.systemImage)
             }
             LabeledContent("Accounts on This Device", value: "\(syncManager.accounts.count)")
             LabeledContent("Accounts in iCloud") {

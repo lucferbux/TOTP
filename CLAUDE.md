@@ -109,15 +109,19 @@ NavigationStack + .searchable + .toolbar { ToolbarItem(placement: .primaryAction
 List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 .buttonStyle(.glassProminent)                  // prominent call-to-action buttons
 
-// Toolbars (iOS): Notes-style bottom bar — search on the left, add on the right:
-.toolbar {
-    DefaultToolbarItem(kind: .search, placement: .bottomBar)
-    ToolbarSpacer(.fixed, placement: .bottomBar)
-    ToolbarItem(placement: .bottomBar) { addButton }
-}
-// Select mode ("Select" top-right) swaps the bottom bar for a destructive "Delete (n)" button and
-// the leading item for "Select All". On compact widths selection is driven by List(selection:) with
-// editMode active; the grid uses its own checkmarks so iPad/Mac behave the same.
+// Toolbars, by size class:
+//  • compact (iPhone) — Notes-style bottom bar: search on the left, add on the right
+//    .toolbar {
+//        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+//        ToolbarSpacer(.fixed, placement: .bottomBar)
+//        ToolbarItem(placement: .bottomBar) { addButton }
+//    }
+//  • regular (iPad, Mac) — every action lives in the navigation bar next to Select; search keeps
+//    its default toolbar position.
+// Select mode ("Select" top-right) replaces add with a destructive trash button and the leading
+// item with "Select All"; the trash carries an accessibilityLabel with the count, since the glyph
+// alone can't show it. On compact widths selection is driven by List(selection:) with editMode
+// active; the grid uses its own checkmarks so iPad/Mac behave the same.
 
 // Layout adapts through size classes only — never idiom, orientation or screen size
 // (iPhone Duo: outer display compact, inner display regular×regular, ignores orientation locks):
