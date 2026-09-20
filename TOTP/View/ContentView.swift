@@ -167,7 +167,7 @@ public struct ContentView: View {
             Text("Add an account by scanning its setup QR code or entering the secret key.")
         } actions: {
             Button("Add Account") { sheet = .add(nil) }
-                .buttonStyle(.glassProminent)
+                .prominentActionStyle()
                 .accessibilityIdentifier("emptyStateAddButton")
         }
     }
@@ -387,7 +387,7 @@ public struct ContentView: View {
                 .symbolRenderingMode(.multicolor)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
-                .glassEffect(.regular, in: .capsule)
+                .floatingGlass(in: .capsule)
                 .padding(.bottom, 12)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .accessibilityElement(children: .combine)

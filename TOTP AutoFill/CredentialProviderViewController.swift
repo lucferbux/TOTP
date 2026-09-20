@@ -176,7 +176,7 @@ struct ConfigurationView: View {
                 Text("Codes from the TOTP app, including any fixed prefix, now appear when you sign in. Manage accounts in the TOTP app.")
             } actions: {
                 Button("Done", action: onDone)
-                    .buttonStyle(.glassProminent)
+                    .prominentActionStyle()
                     .controlSize(.large)
             }
             .navigationTitle("AutoFill")

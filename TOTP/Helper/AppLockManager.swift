@@ -154,7 +154,7 @@ struct LockedView: View {
                 Label("Unlock with \(lock.methodName)", systemImage: lock.methodSymbol)
                     .padding(.horizontal, 8)
             }
-            .buttonStyle(.glassProminent)
+            .prominentActionStyle()
             .controlSize(.large)
             .accessibilityIdentifier("unlockButton")
         }

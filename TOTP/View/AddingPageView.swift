@@ -103,7 +103,7 @@ public struct AddingPageView: View {
                     ProgressView()
                         .controlSize(.large)
                         .padding(24)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                        .floatingGlass(in: .rect(cornerRadius: 20))
                 }
             }
         }

@@ -167,6 +167,7 @@ struct SingleAccountWidgetView: View {
         Group {
             if let account = entry.account, entry.state == .ready {
                 switch family {
+                #if os(iOS)
                 case .accessoryInline:
                     CopyButton(account: account) {
                         Text("\(account.displayTitle) \(account.code(at: entry.date).groupedOTP)")
@@ -203,6 +204,7 @@ struct SingleAccountWidgetView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                #endif
                 default:
                     CopyButton(account: account) {
                         SmallCodeView(account: account, date: entry.date)
@@ -311,8 +313,10 @@ struct WidgetMessageView: View {
 
     var body: some View {
         switch family {
+        #if os(iOS)
         case .accessoryInline, .accessoryCircular:
             Image(systemName: "lock.shield")
+        #endif
         default:
             VStack(spacing: 6) {
                 Image(systemName: state == .unavailable ? "lock.fill" : "lock.shield")

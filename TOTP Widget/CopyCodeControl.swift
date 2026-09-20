@@ -10,6 +10,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+// Controls (Control Center / Lock Screen / Action button) don't exist on visionOS.
+#if !os(visionOS)
+
 struct CopyCodeControl: ControlWidget {
     static let kind = "com.lucferbux.TOTP.CopyCodeControl"
 
@@ -69,3 +72,4 @@ struct CopyControlCodeIntent: AppIntent {
         return .result()
     }
 }
+#endif

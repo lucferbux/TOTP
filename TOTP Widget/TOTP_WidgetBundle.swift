@@ -13,6 +13,8 @@ struct TOTP_WidgetBundle: WidgetBundle {
     var body: some Widget {
         TOTP_Widget()
         TOTP_MultiWidget()
+        #if !os(visionOS)
         CopyCodeControl()
+        #endif
     }
 }

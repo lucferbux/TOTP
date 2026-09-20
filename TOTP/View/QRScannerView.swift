@@ -49,7 +49,7 @@ struct QRScannerView: View {
                         .font(.subheadline.weight(.medium))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .glassEffect(.regular, in: .capsule)
+                        .floatingGlass(in: .capsule)
                         .padding(.bottom, 32)
                 }
                 .toolbar {

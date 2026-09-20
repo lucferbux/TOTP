@@ -148,7 +148,7 @@ struct MenuBarView: View {
             } label: {
                 Label("Unlock with \(lock.methodName)", systemImage: lock.methodSymbol)
             }
-            .buttonStyle(.glassProminent)
+            .prominentActionStyle()
             .keyboardShortcut(.defaultAction)
             .padding(.bottom, 16)
         }
