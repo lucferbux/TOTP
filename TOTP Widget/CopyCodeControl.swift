@@ -55,6 +55,7 @@ struct CopyControlCodeIntent: AppIntent {
     static let title: LocalizedStringResource = "Copy Code"
     static let isDiscoverable = false
 
+
     @Parameter(title: "Account ID")
     var accountID: String?
 
@@ -65,6 +66,8 @@ struct CopyControlCodeIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
+        // The Control is reachable from the Lock Screen; honour the app lock there too.
+        try await IntentAuthentication.requireIfLocked()
         let models = AccountQuery.models()
         let model = models.first { $0.id.uuidString == accountID } ?? models.first
         guard let model else { throw AccountIntentError.accountNotFound }

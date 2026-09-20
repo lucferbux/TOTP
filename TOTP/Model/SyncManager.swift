@@ -486,11 +486,16 @@ public class SyncManager: ObservableObject {
     @MainActor
     public func scheduleSpotlightIndexing() {
         guard !AppEnvironment.isUITesting else { return }
-        let entities = accounts.filter { !$0.entry.isHotp }.map(AccountEntity.init(model:))
+        // With the app lock on, issuer and account names must not stay searchable from the
+        // Lock Screen — clear the index instead of donating to it.
+        let locked = AppPreferences.appLockEnabled
+        let entities = locked ? [] : accounts.filter { !$0.entry.isHotp }.map(AccountEntity.init(model:))
         Task.detached(priority: .background) {
             do {
                 try await CSSearchableIndex.default().deleteAppEntities(ofType: AccountEntity.self)
-                try await CSSearchableIndex.default().indexAppEntities(entities)
+                if !entities.isEmpty {
+                    try await CSSearchableIndex.default().indexAppEntities(entities)
+                }
                 logger.info("Spotlight index updated")
             } catch {
                 logger.error("Spotlight indexing failed: \(error.localizedDescription, privacy: .public)")

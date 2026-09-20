@@ -133,15 +133,16 @@ struct StorageTests {
         // The new primary key can't open it on its own …
         #expect((try? AccountStore.decode(defaults.data(forKey: AccountStore.accountsKey)!, key: key))?.isEmpty == true)
 
-        // … but the manager knows both keys, so nothing is lost
+        // … but the manager knows both keys, so nothing is lost — and because every record was
+        // readable, loading re-seals them with the primary key straight away.
         let manager = SharedDataManager(userDefaults: defaults, encryptionKey: key, decryptionKeys: [key, legacyKey])
         #expect(manager.accounts == accounts)
-        #expect(manager.storedUsesLegacyKey)
-
-        // Saving re-seals everything with the primary key
-        manager.saveAccounts()
         #expect(!manager.storedUsesLegacyKey)
         #expect(try AccountStore.decode(defaults.data(forKey: AccountStore.accountsKey)!, key: key) == accounts)
+
+        // Saving again is a no-op for the key
+        manager.saveAccounts()
+        #expect(!manager.storedUsesLegacyKey)
     }
 
     @Test("Opening with several candidate keys picks the one that works")

@@ -100,7 +100,8 @@ public struct OtpAuthURL: Equatable, Sendable {
     }
 
     /// Serialises back to an otpauth:// URL (used for round-trip tests and future export).
-    public var url: URL {
+    /// `nil` only if the label can't be represented in a URL.
+    public var url: URL? {
         var components = URLComponents()
         components.scheme = "otpauth"
         components.host = entry.isHotp ? "hotp" : "totp"
@@ -117,7 +118,7 @@ public struct OtpAuthURL: Equatable, Sendable {
             items.append(URLQueryItem(name: "counter", value: String(counter)))
         }
         components.queryItems = items
-        return components.url!
+        return components.url
     }
 
     public func makeModel(prefix: String? = nil, associatedDomains: [String]? = nil) -> OtpModel {

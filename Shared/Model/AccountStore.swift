@@ -24,7 +24,8 @@ public enum AppGroup {
 
 // MARK: - Storage Model
 
-/// On-disk representation. Only `encryptedKey` holds secret material, always ChaChaPoly-sealed.
+/// On-disk representation. `encryptedKey` and `encryptedPrefix` hold secret material and are
+/// always ChaChaPoly-sealed; everything else (issuer, account name, digits…) is metadata.
 public struct StoredOtpAccount: Codable, Equatable, Sendable {
     public let id: String
     public let issuer: String?
@@ -40,8 +41,11 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
     public let associatedDomains: [String]?
     /// Added in 4.0 — absent in older payloads, meaning SHA-1.
     public let algorithm: String?
+    /// Added in 4.4: the fixed prefix (PIN) sealed with the same key as the secret.
+    /// Older payloads carry it in the plaintext `prefix` field instead; those are re-sealed on save.
+    public let encryptedPrefix: Data?
 
-    public init(id: String, issuer: String?, name: String?, prefix: String?, encryptedKey: Data, isHotp: Bool, digits: Int, interval: Double, counter: Int64, createdDate: Date, modifiedDate: Date, associatedDomains: [String]? = nil, algorithm: String? = nil) {
+    public init(id: String, issuer: String?, name: String?, prefix: String?, encryptedKey: Data, isHotp: Bool, digits: Int, interval: Double, counter: Int64, createdDate: Date, modifiedDate: Date, associatedDomains: [String]? = nil, algorithm: String? = nil, encryptedPrefix: Data? = nil) {
         self.id = id
         self.issuer = issuer
         self.name = name
@@ -55,6 +59,7 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
         self.modifiedDate = modifiedDate
         self.associatedDomains = associatedDomains
         self.algorithm = algorithm
+        self.encryptedPrefix = encryptedPrefix
     }
 
     // Codable conformance with backward compatibility
@@ -73,15 +78,19 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
         modifiedDate = try container.decodeIfPresent(Date.self, forKey: .modifiedDate) ?? .distantPast
         associatedDomains = try container.decodeIfPresent([String].self, forKey: .associatedDomains)
         algorithm = try container.decodeIfPresent(String.self, forKey: .algorithm)
+        encryptedPrefix = try container.decodeIfPresent(Data.self, forKey: .encryptedPrefix)
     }
 
     public init(model: OtpModel, key: SymmetricKey, createdDate: Date = .now, modifiedDate: Date = .now) throws {
         let entry = model.entry
+        let sealedPrefix = try model.prefix.flatMap { prefix -> Data? in
+            prefix.isEmpty ? nil : try AccountCrypto.seal(Data(prefix.utf8), using: key)
+        }
         self.init(
             id: model.id.uuidString,
             issuer: model.issuer,
             name: model.name,
-            prefix: model.prefix,
+            prefix: nil,   // never written in the clear from 4.4 on
             encryptedKey: try AccountCrypto.seal(entry.key, using: key),
             isHotp: entry.isHotp,
             digits: entry.digits,
@@ -90,7 +99,8 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
             createdDate: createdDate,
             modifiedDate: modifiedDate,
             associatedDomains: model.associatedDomains,
-            algorithm: entry.algorithm == .sha1 ? nil : entry.algorithm.rawValue
+            algorithm: entry.algorithm == .sha1 ? nil : entry.algorithm.rawValue,
+            encryptedPrefix: sealedPrefix
         )
     }
 
@@ -102,6 +112,13 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
     /// (or by another device before the shared key existed) is still readable.
     public func model(keys: [SymmetricKey]) throws -> OtpModel {
         let secret = try AccountCrypto.open(encryptedKey, usingAny: keys)
+        // 4.4+ seals the prefix; older payloads still carry it in the clear.
+        let resolvedPrefix: String?
+        if let encryptedPrefix {
+            resolvedPrefix = String(data: try AccountCrypto.open(encryptedPrefix, usingAny: keys), encoding: .utf8)
+        } else {
+            resolvedPrefix = prefix
+        }
         let algorithm = algorithm.flatMap(OtpAlgorithm.init(lenient:)) ?? .sha1
         let entry: OtpEntry = isHotp
             ? .hotp(key: secret, digits: digits, counter: UInt64(max(0, counter)), algorithm: algorithm)
@@ -110,10 +127,18 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
             id: UUID(uuidString: id) ?? UUID(),
             issuer: issuer,
             name: name,
-            prefix: prefix,
+            prefix: resolvedPrefix,
             entry: entry,
             associatedDomains: associatedDomains
         )
+    }
+
+    /// True when this record still needs re-sealing with the current primary key.
+    public func needsResealing(with key: SymmetricKey) -> Bool {
+        if prefix != nil { return true }                                  // plaintext prefix from ≤4.3
+        if (try? AccountCrypto.open(encryptedKey, using: key)) == nil { return true }
+        if let encryptedPrefix, (try? AccountCrypto.open(encryptedPrefix, using: key)) == nil { return true }
+        return false
     }
 }
 
@@ -148,23 +173,48 @@ public enum AccountCrypto {
 public enum AccountStore {
     public static let accountsKey = "stored_totp_accounts"
 
+    /// What a stored payload decoded to: the accounts we could open, and the raw records we could
+    /// not. The unreadable ones must be written back untouched — dropping them destroys secrets we
+    /// may be able to read again once the right key is available.
+    public struct Decoded {
+        public var accounts: [OtpModel]
+        public var unreadable: [StoredOtpAccount]
+
+        public var isComplete: Bool { unreadable.isEmpty }
+    }
+
     /// Decodes a stored payload; accounts that fail to decrypt are skipped.
     public static func decode(_ data: Data, key: SymmetricKey) throws -> [OtpModel] {
         try decode(data, keys: [key])
     }
 
     public static func decode(_ data: Data, keys: [SymmetricKey]) throws -> [OtpModel] {
+        try decodeAll(data, keys: keys).accounts
+    }
+
+    public static func decodeAll(_ data: Data, keys: [SymmetricKey]) throws -> Decoded {
         let stored = try JSONDecoder().decode([StoredOtpAccount].self, from: data)
-        return stored.compactMap { try? $0.model(keys: keys) }
+        var accounts: [OtpModel] = []
+        var unreadable: [StoredOtpAccount] = []
+        for record in stored {
+            if let model = try? record.model(keys: keys) {
+                accounts.append(model)
+            } else {
+                unreadable.append(record)
+            }
+        }
+        return Decoded(accounts: accounts, unreadable: unreadable)
     }
 
     /// Encodes accounts, keeping the original creation date of accounts already present in `previous`.
-    public static func encode(_ accounts: [OtpModel], key: SymmetricKey, previous: [StoredOtpAccount] = [], now: Date = .now) throws -> Data {
+    /// `preserving` records are written back byte-for-byte — use it for records that couldn't be
+    /// decrypted, so a save can never erase them.
+    public static func encode(_ accounts: [OtpModel], key: SymmetricKey, previous: [StoredOtpAccount] = [], preserving: [StoredOtpAccount] = [], now: Date = .now) throws -> Data {
         let created = Dictionary(previous.map { ($0.id, $0.createdDate) }, uniquingKeysWith: { first, _ in first })
         let stored = try accounts.map { account in
             try StoredOtpAccount(model: account, key: key, createdDate: created[account.id.uuidString] ?? now, modifiedDate: now)
         }
-        return try JSONEncoder().encode(stored)
+        return try JSONEncoder().encode(stored + preserving)
     }
 
     /// Raw stored records (no decryption).

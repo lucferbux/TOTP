@@ -14,7 +14,25 @@ import os
 /// Launch-time environment switches.
 public enum AppEnvironment {
     /// `-UITestMode`: in-memory seeded data, no CloudKit, no app lock, no AutoFill identity writes.
-    public static let isUITesting = ProcessInfo.processInfo.arguments.contains("-UITestMode")
+    /// Debug-only: a release build must never let a launch argument disable the lock or swap the store.
+    public static let isUITesting: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-UITestMode")
+            || ProcessInfo.processInfo.arguments.contains("-ScreenshotMode")
+        #else
+        return false
+        #endif
+    }()
+
+    /// `-ScreenshotMode`: like UI-test mode, but seeded with a fuller, better-looking set of
+    /// accounts for App Store screenshots.
+    public static let isTakingScreenshots: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-ScreenshotMode")
+        #else
+        return false
+        #endif
+    }()
 }
 
 public final class SharedDataManager: ObservableObject, @unchecked Sendable {
@@ -23,10 +41,12 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Storage")
 
     private let userDefaults: UserDefaults
-    /// Key used to seal data we write.
-    private let encryptionKey: SymmetricKey
-    /// Every key that may have sealed existing data (shared, local, legacy).
-    private let decryptionKeys: [SymmetricKey]
+    /// Supplies the key we seal with and every key we can open with.
+    private let keys: KeyProviding
+
+    /// Records we couldn't decrypt (wrong/unavailable key). Written back untouched on every save so
+    /// a save can never destroy secrets we might read again later.
+    private var unreadableRecords: [StoredOtpAccount] = []
 
     @Published public var accounts: [OtpModel] = []
     @Published public var isLoading = false
@@ -38,37 +58,45 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
             let defaults = UserDefaults(suiteName: suite) ?? .standard
             defaults.removePersistentDomain(forName: suite)
             self.userDefaults = defaults
-            let testKey = SymmetricKey(size: .bits256)
-            self.encryptionKey = testKey
-            self.decryptionKeys = [testKey]
-            self.accounts = Self.uiTestSeed
+            self.keys = FixedKeys(primaryKey: SymmetricKey(size: .bits256))
+            self.accounts = AppEnvironment.isTakingScreenshots ? Self.screenshotSeed : Self.uiTestSeed
             persist()
         } else {
             self.userDefaults = AppGroup.defaults
-            self.encryptionKey = EncryptionKeyManager.shared.encryptionKey
-            self.decryptionKeys = EncryptionKeyManager.shared.decryptionKeys
+            self.keys = EncryptionKeyManager.shared
             loadAccounts()
-            // Re-seal anything that was encrypted with an older key so every device converges
-            // on the shared key.
-            if !accounts.isEmpty && storedUsesLegacyKey {
-                persist()
-            }
+            resealIfNeeded()
         }
     }
 
-    /// Designated initialiser for unit tests.
-    init(userDefaults: UserDefaults, encryptionKey: SymmetricKey, decryptionKeys: [SymmetricKey]? = nil) {
+    /// Designated initialiser for unit tests. Mirrors the production path, including the
+    /// re-seal migration, so tests exercise what ships.
+    init(userDefaults: UserDefaults, encryptionKey: SymmetricKey?, decryptionKeys: [SymmetricKey]? = nil) {
         self.userDefaults = userDefaults
-        self.encryptionKey = encryptionKey
-        self.decryptionKeys = decryptionKeys ?? [encryptionKey]
+        self.keys = FixedKeys(primaryKey: encryptionKey, allKeys: decryptionKeys)
         loadAccounts()
+        resealIfNeeded()
     }
 
-    /// True when any stored record can't be opened with the primary key (so it needs re-sealing).
+    init(userDefaults: UserDefaults, keys: KeyProviding) {
+        self.userDefaults = userDefaults
+        self.keys = keys
+        loadAccounts()
+        resealIfNeeded()
+    }
+
+    /// True when any stored record still needs re-sealing with the current primary key
+    /// (older key, or a prefix left in the clear by ≤4.3).
     var storedUsesLegacyKey: Bool {
-        AccountStore.storedRecords(in: userDefaults).contains { record in
-            (try? AccountCrypto.open(record.encryptedKey, using: encryptionKey)) == nil
-        }
+        guard let key = keys.primaryKey else { return false }
+        return AccountStore.storedRecords(in: userDefaults).contains { $0.needsResealing(with: key) }
+    }
+
+    /// Re-seals stored records with the current primary key, but only when every record was readable
+    /// — re-writing a partially readable store would drop the records we couldn't open.
+    private func resealIfNeeded() {
+        guard !accounts.isEmpty, unreadableRecords.isEmpty, storedUsesLegacyKey else { return }
+        persist()
     }
 
     // MARK: - Data Operations
@@ -79,13 +107,31 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
 
         guard let data = userDefaults.data(forKey: AccountStore.accountsKey) else {
             accounts = []
+            unreadableRecords = []
+            return
+        }
+        let candidates = keys.allKeys
+        guard !candidates.isEmpty else {
+            // Key storage is temporarily unreadable (locked device). Keep the ciphertext and say so
+            // rather than showing an empty, writable list.
+            Self.logger.notice("Encryption key unavailable; leaving stored accounts untouched")
+            accounts = []
+            unreadableRecords = AccountStore.storedRecords(in: userDefaults)
+            error = .keyUnavailable
             return
         }
         do {
-            accounts = try AccountStore.decode(data, keys: decryptionKeys)
+            let decoded = try AccountStore.decodeAll(data, keys: candidates)
+            accounts = decoded.accounts
+            unreadableRecords = decoded.unreadable
+            if !decoded.isComplete {
+                Self.logger.error("\(decoded.unreadable.count, privacy: .public) stored record(s) could not be decrypted; keeping them untouched")
+                error = .someAccountsUnreadable(decoded.unreadable.count)
+            }
         } catch {
             Self.logger.error("Failed to load accounts: \(error.localizedDescription, privacy: .public)")
             self.error = .loadFailed(error)
+            unreadableRecords = AccountStore.storedRecords(in: userDefaults)
         }
     }
 
@@ -138,11 +184,20 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
     // MARK: - Encryption
 
     public func encryptData(_ data: Data) throws -> Data {
-        try AccountCrypto.seal(data, using: encryptionKey)
+        guard let key = keys.primaryKey else { throw EncryptionKeyError.keyUnavailable }
+        return try AccountCrypto.seal(data, using: key)
     }
 
     public func decryptData(_ encryptedData: Data) throws -> Data {
-        try AccountCrypto.open(encryptedData, using: encryptionKey)
+        try AccountCrypto.open(encryptedData, usingAny: keys.allKeys)
+    }
+
+    /// Re-reads key storage and the account list. Call when the device unlocks after a launch that
+    /// happened while protected data was unavailable.
+    public func reloadAfterUnlock() {
+        EncryptionKeyManager.shared.invalidateCache()
+        loadAccounts()
+        resealIfNeeded()
     }
 
     public static func getSharedEncryptionKey() -> SymmetricKey? {
@@ -153,9 +208,14 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
 
     @discardableResult
     private func persist() -> Bool {
+        guard let key = keys.primaryKey else {
+            Self.logger.error("Refusing to save: encryption key unavailable")
+            error = .keyUnavailable
+            return false
+        }
         do {
             let previous = AccountStore.storedRecords(in: userDefaults)
-            let data = try AccountStore.encode(accounts, key: encryptionKey, previous: previous)
+            let data = try AccountStore.encode(accounts, key: key, previous: previous, preserving: unreadableRecords)
             userDefaults.set(data, forKey: AccountStore.accountsKey)
             error = nil
             return true
@@ -164,6 +224,24 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
             self.error = .saveFailed(error)
             return false
         }
+    }
+
+    /// Accounts shown in App Store screenshots. Fictional names only: real service names and logos
+    /// belong to their owners and don't belong in our marketing images (App Review 5.2.2).
+    static var screenshotSeed: [OtpModel] {
+        // A distinct secret per account, so the screenshots don't show five identical codes.
+        func account(_ issuer: String, _ name: String, secret: String, prefix: String? = nil, domain: String? = nil) -> OtpModel {
+            OtpModel(issuer: issuer, name: name, prefix: prefix,
+                     entry: .totp(key: Data(secret.utf8), digits: 6, interval: 30),
+                     associatedDomains: domain.map { [$0] })
+        }
+        return [
+            account("Northwind Corp", "you@northwind.example", secret: "12345678901234567890", prefix: "1234", domain: "sso.northwind.example"),
+            account("Contoso Cloud", "admin@contoso.example", secret: "abcdefghij1234567890", domain: "login.contoso.example"),
+            account("Fabrikam Mail", "you@fabrikam.example", secret: "qrstuvwxyz0987654321"),
+            account("Acme Bank", "personal", secret: "0987654321zyxwvutsrq"),
+            account("Tailspin Dev", "deploy-bot", secret: "mnopqrstuv5647382910")
+        ]
     }
 
     /// Deterministic accounts for UI tests (RFC 6238 test secret; no real credentials).
@@ -180,10 +258,23 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
 
 // MARK: - Error Types
 
+/// Fixed keys, for tests and UI-test mode.
+struct FixedKeys: KeyProviding {
+    let primaryKey: SymmetricKey?
+    let allKeys: [SymmetricKey]
+
+    init(primaryKey: SymmetricKey?, allKeys: [SymmetricKey]? = nil) {
+        self.primaryKey = primaryKey
+        self.allKeys = allKeys ?? [primaryKey].compactMap { $0 }
+    }
+}
+
 public enum SharedDataError: LocalizedError, Identifiable {
     case loadFailed(Error)
     case saveFailed(Error)
     case accountNotFound
+    case keyUnavailable
+    case someAccountsUnreadable(Int)
     case encryptionFailed
     case decryptionFailed
     case unknown(Error)
@@ -193,6 +284,8 @@ public enum SharedDataError: LocalizedError, Identifiable {
         case .loadFailed: "loadFailed"
         case .saveFailed: "saveFailed"
         case .accountNotFound: "accountNotFound"
+        case .keyUnavailable: "keyUnavailable"
+        case .someAccountsUnreadable: "someAccountsUnreadable"
         case .encryptionFailed: "encryptionFailed"
         case .decryptionFailed: "decryptionFailed"
         case .unknown: "unknown"
@@ -207,6 +300,10 @@ public enum SharedDataError: LocalizedError, Identifiable {
             String(localized: "Failed to save accounts: \(error.localizedDescription)")
         case .accountNotFound:
             String(localized: "The account no longer exists.")
+        case .keyUnavailable:
+            String(localized: "Your encryption key isn't available yet. Unlock this device and try again — your accounts are safe.")
+        case .someAccountsUnreadable(let count):
+            String(localized: "\(count) account(s) couldn't be decrypted on this device. They're kept untouched; signing in to the same iCloud account should restore access.")
         case .encryptionFailed:
             String(localized: "Failed to encrypt account data")
         case .decryptionFailed:

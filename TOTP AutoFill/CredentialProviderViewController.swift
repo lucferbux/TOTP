@@ -7,6 +7,7 @@
 //
 
 import AuthenticationServices
+import LocalAuthentication
 import SwiftUI
 
 #if canImport(UIKit)
@@ -66,6 +67,12 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
     // MARK: - QuickType bar (identity already chosen)
 
     override func provideCredentialWithoutUserInteraction(for credentialRequest: any ASCredentialRequest) {
+        // With the app lock on, a credential must never be handed over silently: ask the system to
+        // show our UI, where we authenticate first.
+        guard !AppPreferences.appLockEnabled else {
+            extensionContext.cancelRequest(withError: ASExtensionError(.userInteractionRequired))
+            return
+        }
         guard let account = account(for: credentialRequest) else {
             extensionContext.cancelRequest(withError: ASExtensionError(.credentialIdentityNotFound))
             return
@@ -73,13 +80,32 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
         complete(credentialRequest, with: account)
     }
 
+    /// Passes when the app lock is off; otherwise requires Face ID / Touch ID / passcode.
+    private func authenticateIfNeeded() async -> Bool {
+        guard AppPreferences.appLockEnabled else { return true }
+        let context = LAContext()
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return false }
+        do {
+            return try await context.evaluatePolicy(.deviceOwnerAuthentication,
+                                                    localizedReason: String(localized: "Unlock to fill your code"))
+        } catch {
+            return false
+        }
+    }
+
     override func prepareInterfaceToProvideCredential(for credentialRequest: any ASCredentialRequest) {
         hasShownUI = true
-        if let account = account(for: credentialRequest) {
-            complete(credentialRequest, with: account)
-        } else {
-            let kind: RequestKind = credentialRequest is ASPasswordCredentialRequest ? .password : .oneTimeCode
-            showAccountSelectionUI(serviceIdentifiers: [credentialRequest.credentialIdentity.serviceIdentifier], kind: kind)
+        Task { @MainActor in
+            guard await authenticateIfNeeded() else {
+                extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))
+                return
+            }
+            if let account = account(for: credentialRequest) {
+                complete(credentialRequest, with: account)
+            } else {
+                let kind: RequestKind = credentialRequest is ASPasswordCredentialRequest ? .password : .oneTimeCode
+                showAccountSelectionUI(serviceIdentifiers: [credentialRequest.credentialIdentity.serviceIdentifier], kind: kind)
+            }
         }
     }
 
@@ -128,7 +154,11 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             accounts: accounts,
             suggested: suggested,
             onSelect: { [weak self] account in
-                self?.complete(kind, with: account)
+                guard let self else { return }
+                Task { @MainActor in
+                    guard await self.authenticateIfNeeded() else { return }
+                    self.complete(kind, with: account)
+                }
             },
             onCancel: { [weak self] in
                 self?.extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))

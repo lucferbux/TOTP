@@ -85,7 +85,11 @@ final class AppLockManager: ObservableObject {
     // MARK: - Actions
 
     func lock() {
-        if isEnabled { isLocked = true }
+        guard isEnabled, !isLocked else { return }
+        isLocked = true
+        // Views observe this to dismiss sheets: the lock is drawn as an overlay, and a presented
+        // sheet sits above it — including the Add/Edit sheet, which can show a revealed secret.
+        NotificationCenter.default.post(name: .totpDidLock, object: nil)
     }
 
     /// Prompts for Face ID / Touch ID / Optic ID with passcode fallback.
@@ -168,17 +172,17 @@ struct AppLockModifier: ViewModifier {
     @ObservedObject var lock: AppLockManager
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Cover shown in the app switcher so codes aren't in the snapshot.
+    @ViewBuilder
+    private var privacyCover: some View {
+        if lock.isEnabled && !lock.isLocked && scenePhase != .active {
+            Rectangle().fill(.regularMaterial).ignoresSafeArea()
+        }
+    }
+
     func body(content: Content) -> some View {
-        content
-            .overlay {
-                if lock.isLocked {
-                    LockedView(lock: lock)
-                        .transition(.opacity)
-                } else if lock.isEnabled && scenePhase != .active {
-                    // Privacy cover for the app-switcher snapshot
-                    Rectangle().fill(.regularMaterial).ignoresSafeArea()
-                }
-            }
+        lockedContent(content)
+            .overlay { privacyCover }
             .animation(.smooth(duration: 0.25), value: lock.isLocked)
             .onChange(of: scenePhase) { _, phase in
                 #if os(iOS)
@@ -192,6 +196,31 @@ struct AppLockModifier: ViewModifier {
                 if lock.isLocked { await lock.unlock() }
             }
     }
+
+    // On iOS the lock is presented, not overlaid: an overlay sits *below* a presented sheet, so an
+    // open Add/Edit sheet would stay visible (and readable) behind it.
+    @ViewBuilder
+    private func lockedContent(_ content: Content) -> some View {
+        #if os(iOS)
+        content
+            .fullScreenCover(isPresented: Binding(get: { lock.isLocked }, set: { _ in })) {
+                LockedView(lock: lock)
+            }
+        #else
+        content
+            .overlay {
+                if lock.isLocked {
+                    LockedView(lock: lock)
+                        .transition(.opacity)
+                }
+            }
+        #endif
+    }
+}
+
+extension Notification.Name {
+    /// Posted when the app locks, so presented sheets can be dismissed.
+    static let totpDidLock = Notification.Name("com.lucferbux.TOTP.didLock")
 }
 
 extension View {

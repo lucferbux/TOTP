@@ -21,6 +21,7 @@ public enum AppPreferences {
     public enum Keys {
         public static let clipboardClearSeconds = "clipboardClearSeconds"
         public static let appLockEnabled = "appLockEnabled"
+        public static let allowUniversalClipboard = "allowUniversalClipboard"
     }
 
     public static let clipboardClearOptions: [Int] = [0, 30, 60, 120]
@@ -41,18 +42,24 @@ public enum AppPreferences {
         get { defaults.bool(forKey: Keys.appLockEnabled) }
         set { defaults.set(newValue, forKey: Keys.appLockEnabled) }
     }
+
+    /// Off by default: a copied code shouldn't travel to every nearby device via Handoff.
+    public static var allowUniversalClipboard: Bool {
+        get { defaults.bool(forKey: Keys.allowUniversalClipboard) }
+        set { defaults.set(newValue, forKey: Keys.allowUniversalClipboard) }
+    }
 }
 
 public enum ClipboardManager {
     /// Copies `value`, scheduling removal after `clearAfter` seconds (defaults to the user preference).
     @MainActor
-    public static func copy(_ value: String, clearAfter: Int = AppPreferences.clipboardClearSeconds) {
+    public static func copy(_ value: String,
+                            clearAfter: Int = AppPreferences.clipboardClearSeconds,
+                            allowUniversalClipboard: Bool = AppPreferences.allowUniversalClipboard) {
         #if canImport(UIKit)
-        var options: [UIPasteboard.OptionsKey: Any] = [:]
-        if let expiry = expirationDate(clearAfter: clearAfter) {
-            options[.expirationDate] = expiry
-        }
-        UIPasteboard.general.setItems([[UTType.plainText.identifier: value]], options: options)
+        UIPasteboard.general.setItems([[UTType.plainText.identifier: value]],
+                                      options: pasteboardOptions(clearAfter: clearAfter,
+                                                                 allowUniversalClipboard: allowUniversalClipboard))
         #elseif canImport(AppKit)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -70,6 +77,17 @@ public enum ClipboardManager {
         }
         #endif
     }
+
+    /// Options for a copy: keep the code on this device unless the user opted in, and expire it.
+    #if canImport(UIKit)
+    static func pasteboardOptions(clearAfter: Int, allowUniversalClipboard: Bool, now: Date = .now) -> [UIPasteboard.OptionsKey: Any] {
+        var options: [UIPasteboard.OptionsKey: Any] = [.localOnly: !allowUniversalClipboard]
+        if let expiry = expirationDate(clearAfter: clearAfter, now: now) {
+            options[.expirationDate] = expiry
+        }
+        return options
+    }
+    #endif
 
     /// Expiry date for a copy made at `now`, or `nil` when auto-clear is off.
     public static func expirationDate(clearAfter: Int, now: Date = .now) -> Date? {

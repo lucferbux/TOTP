@@ -70,10 +70,14 @@ struct AccountQuery: EntityStringQuery {
 
 enum AccountIntentError: Error, CustomLocalizedStringResourceConvertible {
     case accountNotFound
+    case authenticationFailed
+    case authenticationUnavailable
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .accountNotFound: "That account is no longer available. Open TOTP to check your accounts."
+        case .authenticationFailed: "TOTP is locked. Authenticate to use your codes."
+        case .authenticationUnavailable: "TOTP is locked and this device can't authenticate right now."
         }
     }
 }

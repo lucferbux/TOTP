@@ -32,7 +32,12 @@ public class CloudKitOtpModel: ObservableObject {
     // CloudKit record reference
     public var record: CKRecord?
 
-    /// False when the record was decrypted with a legacy key and should be re-uploaded.
+    /// The prefix (PIN), sealed with the account key. From 4.4 on this replaces the plaintext
+    /// `prefix` field, which is still read so records written by ≤4.3 keep working.
+    @Published public var encryptedPrefix: Data?
+
+    /// False when the record was sealed with a legacy key, or still carries a plaintext prefix,
+    /// and should be re-uploaded.
     public private(set) var sealedWithPrimaryKey = true
     
     public init(
@@ -48,7 +53,8 @@ public class CloudKitOtpModel: ObservableObject {
         createdDate: Date = Date(),
         modifiedDate: Date = Date(),
         associatedDomains: [String]? = nil,
-        algorithm: String? = nil
+        algorithm: String? = nil,
+        encryptedPrefix: Data? = nil
     ) {
         self.id = id
         self.issuer = issuer
@@ -63,6 +69,7 @@ public class CloudKitOtpModel: ObservableObject {
         self.modifiedDate = modifiedDate
         self.associatedDomains = associatedDomains
         self.algorithm = algorithm
+        self.encryptedPrefix = encryptedPrefix
     }
     
     // Initialize from CloudKit record
@@ -90,7 +97,8 @@ public class CloudKitOtpModel: ObservableObject {
             createdDate: createdDate,
             modifiedDate: modifiedDate,
             associatedDomains: record["associatedDomains"] as? [String],
-            algorithm: record["algorithm"] as? String
+            algorithm: record["algorithm"] as? String,
+            encryptedPrefix: record["encryptedPrefix"] as? Data
         )
         self.record = record
     }
@@ -102,7 +110,10 @@ public class CloudKitOtpModel: ObservableObject {
         
         record["issuer"] = issuer
         record["name"] = name
-        record["prefix"] = prefix
+        // The PIN is sealed; never upload it in the clear (a ≤4.3 record may still have one,
+        // which we clear as soon as we rewrite the record).
+        record["prefix"] = nil
+        record["encryptedPrefix"] = encryptedPrefix
         record["encryptedKey"] = encryptedKey
         record["isHotp"] = isHotp
         record["digits"] = digits
@@ -123,9 +134,21 @@ public class CloudKitOtpModel: ObservableObject {
     
     // Convert to local OtpModel for UI
     public func toOtpModel() throws -> OtpModel {
-        let decryptedKey = try EncryptionKeyManager.shared.decryptData(encryptedKey)
-        // Records sealed with an older key are re-uploaded by SyncManager after they load.
-        sealedWithPrimaryKey = (try? AccountCrypto.open(encryptedKey, using: EncryptionKeyManager.shared.encryptionKey)) != nil
+        let manager = EncryptionKeyManager.shared
+        let decryptedKey = try manager.decryptData(encryptedKey)
+        let resolvedPrefix: String?
+        if let encryptedPrefix {
+            resolvedPrefix = String(data: try manager.decryptData(encryptedPrefix), encoding: .utf8)
+        } else {
+            resolvedPrefix = prefix   // written by ≤4.3
+        }
+        // Records sealed with an older key — or still carrying a plaintext prefix — get re-uploaded
+        // by SyncManager after they load.
+        if let primary = manager.primaryKey {
+            sealedWithPrimaryKey = (try? AccountCrypto.open(encryptedKey, using: primary)) != nil && prefix == nil
+        } else {
+            sealedWithPrimaryKey = true   // can't tell without a key; don't churn uploads
+        }
         
         let algorithm = algorithm.flatMap(OtpAlgorithm.init(lenient:)) ?? .sha1
         let entry: OtpEntry = isHotp
@@ -136,7 +159,7 @@ public class CloudKitOtpModel: ObservableObject {
             id: UUID(uuidString: id) ?? UUID(),
             issuer: issuer,
             name: name,
-            prefix: prefix,
+            prefix: resolvedPrefix,
             entry: entry,
             associatedDomains: associatedDomains
         )
@@ -157,9 +180,12 @@ public class CloudKitOtpModel: ObservableObject {
         let entry = otpModel.entry
         issuer = otpModel.issuer
         name = otpModel.name
-        prefix = otpModel.prefix
+        prefix = nil
         associatedDomains = otpModel.associatedDomains
         encryptedKey = try EncryptionKeyManager.shared.encryptData(entry.key)
+        encryptedPrefix = try otpModel.prefix.flatMap { value -> Data? in
+            value.isEmpty ? nil : try EncryptionKeyManager.shared.encryptData(Data(value.utf8))
+        }
         isHotp = entry.isHotp
         digits = entry.digits
         interval = entry.interval ?? 30

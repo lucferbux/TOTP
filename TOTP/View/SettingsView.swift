@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var cloudRecordCount: Int?
     @State private var isChecking = false
     @State private var clipboardClearSeconds = AppPreferences.clipboardClearSeconds
+    @State private var allowUniversalClipboard = AppPreferences.allowUniversalClipboard
     #if os(macOS)
     @ObservedObject private var macSettings = MacOSAppSettings.shared
     #endif
@@ -112,10 +113,20 @@ struct SettingsView: View {
                 Label("Clear Copied Codes", systemImage: "clipboard")
             }
             .accessibilityIdentifier("clipboardClearPicker")
+
+            Toggle(isOn: $allowUniversalClipboard) {
+                Label("Share Clipboard With Other Devices", systemImage: "rectangle.on.rectangle")
+            }
+            .accessibilityIdentifier("universalClipboardToggle")
         } header: {
             Text("Security")
         } footer: {
-            Text("The lock hides your codes until you authenticate. AutoFill and widgets keep working. Copied codes are removed from the clipboard after the chosen time.")
+            Text("""
+            With the lock on, TOTP asks for \(lock.methodName) before showing codes — and before AutoFill,             Shortcuts or the Control Center control hand one over. Copied codes are removed from the clipboard             after the chosen time, and stay on this device unless you allow sharing with your other Apple devices.
+            """)
+        }
+        .onChange(of: allowUniversalClipboard) { _, allow in
+            AppPreferences.allowUniversalClipboard = allow
         }
     }
 
@@ -158,9 +169,21 @@ struct SettingsView: View {
     }
 
     private var aboutSection: some View {
-        Section("About") {
+        Section {
             LabeledContent("Version", value: appVersion)
             LabeledContent("Build", value: appBuild)
+            // App Review 5.1.1(i): the privacy policy must be reachable from inside the app.
+            Link(destination: URL(string: "https://lucferbux.github.io/TOTP/privacy.html")!) {
+                Label("Privacy Policy", systemImage: "hand.raised")
+            }
+            .accessibilityIdentifier("privacyPolicyLink")
+            Link(destination: URL(string: "https://lucferbux.github.io/TOTP/support.html")!) {
+                Label("Support", systemImage: "questionmark.circle")
+            }
+        } header: {
+            Text("About")
+        } footer: {
+            Text("TOTP doesn't collect any data. Your accounts stay on your devices and in your own iCloud.")
         }
     }
 

@@ -181,10 +181,10 @@ struct OtpAuthURLTests {
     func roundTrip() throws {
         let original = OtpAuthURL(issuer: "Example Corp", name: "user@example.com",
                                   entry: .totp(key: Data("12345678901234567890".utf8), digits: 8, interval: 45, algorithm: .sha512))
-        #expect(try OtpAuthURL(url: original.url) == original)
+        #expect(try OtpAuthURL(url: #require(original.url)) == original)
 
         let hotp = OtpAuthURL(issuer: nil, name: "me", entry: .hotp(key: Data("abc".utf8), digits: 6, counter: 7, algorithm: .sha1))
-        #expect(try OtpAuthURL(url: hotp.url) == hotp)
+        #expect(try OtpAuthURL(url: #require(hotp.url)) == hotp)
     }
 
     @Test("makeModel carries prefix and domains")

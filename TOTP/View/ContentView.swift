@@ -129,6 +129,13 @@ public struct ContentView: View {
             sheet = .add(pending)
             router.pendingImport = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .totpDidLock)) { _ in
+            // Nothing sensitive may stay on screen behind the lock
+            sheet = nil
+            deleting = nil
+            selection.removeAll()
+            isSelecting = false
+        }
         .onAppear {
             if let pending = router.pendingImport {
                 sheet = .add(pending)

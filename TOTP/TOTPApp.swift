@@ -78,12 +78,8 @@ struct TOTPApp: App {
                 AppRouter.shared.importError = error.localizedDescription
             }
         case "totp":
-            // Legacy widget link (≤ 3.x): copy the value it carried, then refresh widgets.
-            if url.host == "copy",
-               let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "code" })?.value {
-                ClipboardManager.copy(code)
-            }
+            // The ≤3.x widget used totp://copy?code=… to put text on the clipboard. Any app or web
+            // page could call it, so it's gone; widgets copy through CopyCodeIntent now.
             WidgetCenter.shared.reloadAllTimelines()
         default:
             break
