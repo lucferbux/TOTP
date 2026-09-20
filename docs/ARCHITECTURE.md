@@ -1,4 +1,4 @@
-# TOTP Authenticator - Technical Documentation
+# TOTP Password - Technical Documentation
 
 > **4.0 update (OS 27):** OTP math, the account model, the encrypted store codec (`AccountStore`), the key manager,
 > Base32 and `otpauth://` parsing now live in `Shared/` and are compiled into the app, widget and AutoFill targets
@@ -22,7 +22,7 @@
 
 ## Overview
 
-The TOTP Authenticator is a native iOS/macOS application that generates time-based one-time passwords (TOTP) and HMAC-based one-time passwords (HOTP) for two-factor authentication.
+The TOTP Password is a native iOS/macOS application that generates time-based one-time passwords (TOTP) and HMAC-based one-time passwords (HOTP) for two-factor authentication.
 
 ### Key Principles
 

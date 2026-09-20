@@ -62,7 +62,7 @@ struct MenuBarView: View {
                 Image(systemName: "lock.shield.fill")
                     .font(.title3)
                     .foregroundStyle(.tint)
-                Text("TOTP Authenticator")
+                Text("TOTP Password")
                     .font(.headline)
                 Spacer()
             }

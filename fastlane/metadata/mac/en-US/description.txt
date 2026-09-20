@@ -1,4 +1,4 @@
-TOTP Authenticator puts your two-factor verification codes in the Mac menu bar — and on your iPhone and iPad too, from a single purchase.
+TOTP Password puts your two-factor verification codes in the Mac menu bar — and on your iPhone and iPad too, from a single purchase.
 
 Click the menu bar icon and every code is there, with search and a one-click copy. Or leave it in the Dock, or both. It is a real Mac app: keyboard shortcuts, a proper Settings window, and a window that resizes the way you expect.
 

@@ -1,6 +1,6 @@
-# Contributing to TOTP Authenticator
+# Contributing to TOTP Password
 
-Thank you for your interest in contributing to the TOTP Authenticator! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the TOTP Password! This document provides guidelines and information for contributors.
 
 ## Table of Contents
 

@@ -1,4 +1,4 @@
-TOTP Authenticator generates the six-digit verification codes you need to sign in to the services you already use — on your iPhone, your iPad and your Mac, from a single purchase.
+TOTP Password generates the six-digit verification codes you need to sign in to the services you already use — on your iPhone, your iPad and your Mac, from a single purchase.
 
 It is built for one thing: getting the right code into the right field, quickly, without handing your secrets to anyone.
 

@@ -1,6 +1,6 @@
 # TOTP App - Feature Roadmap & RFE (Request for Enhancement)
 
-This document tracks planned features, enhancements, and future improvements for the TOTP Authenticator app.
+This document tracks planned features, enhancements, and future improvements for the TOTP Password app.
 
 ---
 

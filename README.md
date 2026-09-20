@@ -1,4 +1,4 @@
-# TOTP Authenticator
+# TOTP Password
 
 A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS and macOS built entirely with SwiftUI and Apple frameworks.
 
