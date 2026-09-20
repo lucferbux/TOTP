@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-Guidance for Claude Code (and other AI agents) working in this repository. This is the single source of truth for working conventions in this project.
+Guidance for Claude Code working in this repository. This is the single source of truth for working
+conventions. [AGENTS.md](AGENTS.md) is the portable summary for other agents — **update both together.**
 
 ## Project Overview
 
@@ -108,6 +109,16 @@ NavigationStack + .searchable + .toolbar { ToolbarItem(placement: .primaryAction
 List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 .buttonStyle(.glassProminent)                  // prominent call-to-action buttons
 
+// Toolbars (iOS): Notes-style bottom bar — search on the left, add on the right:
+.toolbar {
+    DefaultToolbarItem(kind: .search, placement: .bottomBar)
+    ToolbarSpacer(.fixed, placement: .bottomBar)
+    ToolbarItem(placement: .bottomBar) { addButton }
+}
+// Select mode ("Select" top-right) swaps the bottom bar for a destructive "Delete (n)" button and
+// the leading item for "Select All". On compact widths selection is driven by List(selection:) with
+// editMode active; the grid uses its own checkmarks so iPad/Mac behave the same.
+
 // Layout adapts through size classes only — never idiom, orientation or screen size
 // (iPhone Duo: outer display compact, inner display regular×regular, ignores orientation locks):
 @Environment(\.horizontalSizeClass) var sizeClass  // compact → List, regular → adaptive LazyVGrid
@@ -158,6 +169,7 @@ PlatformColors.secondarySystemGroupedBackground
 
 - OTP secret keys are **always** `ChaChaPoly`-sealed before they touch any persistent store (UserDefaults, CloudKit). Plaintext keys live in memory only while generating a code.
 - The symmetric key is generated once by `EncryptionKeyManager` and stored as a file in the App Group container (protection `completeUntilFirstUserAuthentication`) so the widget and AutoFill can read it; older Keychain copies are migrated. Extensions only read it (`EncryptionKeyManager.existingKey()`), never create it. Never hard-code or derive keys from constants.
+- **Never** commit real credentials — no real issuers, usernames, PINs or secrets in code, previews, samples, tests, fixtures or docs. Use `Example Corp` / `user@example.com` / the RFC test secret.
 - **Never** log, `print`, or put OTP keys / prefixes / generated codes into analytics, error messages, or screenshots. Use `os.Logger` without account data.
 - The prefix (PIN) is never displayed; the UI shows a "PIN" badge only. App Intent entities expose issuer/name only.
 - Never write a secret to `UserDefaults` unencrypted. The widget and AutoFill extension decrypt independently using the shared Keychain key.
@@ -171,6 +183,7 @@ PlatformColors.secondarySystemGroupedBackground
 - **AutoFill** (`TOTP AutoFill/`, iOS + macOS): `ASOneTimeCodeCredentialIdentity` (+ `ASPasswordCredentialIdentity` when an account has a prefix). One-time-code requests complete with `ASOneTimeCodeCredential`; password requests with `ASPasswordCredential(password: prefix + code)`. Service identifiers come from associated domains, falling back to a normalized issuer.
 - **CloudKit schema**: the optional `algorithm` field is only written for non-SHA-1 accounts. New fields must be deployed to the Production schema in the CloudKit Console before release.
 - **macOS**: `MenuBarExtra` (`.window` style) menu bar mode with a **static** icon (macOS 27 hosts all status items in one window; don't animate it), ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
+- **Select mode** (`ContentView`): `isSelecting` + `selection: Set<UUID>` drive batch delete through `SyncManager.deleteAccounts(withIds:)`, which removes them locally in one write, deletes each from CloudKit, then refreshes widgets, AutoFill and Spotlight once. Always confirm before deleting.
 - **App lock** (`AppLockManager`): optional, off by default, stored in the App Group; locks on background (iOS) or screen lock/sleep (macOS).
 
 ## Testing
@@ -194,5 +207,21 @@ PlatformColors.secondarySystemGroupedBackground
 
 ## Harness in this repo
 
-- **Skills** (`.claude/skills/`): `build-run-totp` (build & launch on iOS Simulator or macOS), `test-totp` (run unit/UI tests). The built-in `/run` and `verify` skills will discover these.
-- **Settings** (`.claude/settings.json`): allowlists safe `xcodebuild`/`swift`/`git`/`simctl` commands so common build/test calls don't prompt. Personal overrides go in `.claude/settings.local.json` (git-ignored).
+- **Skills** (`.claude/skills/`):
+  - `build-run-totp` — build & launch on the iOS Simulator or macOS (the built-in `/run` and `verify` skills discover it).
+  - `test-totp` — run the unit / UI suites.
+  - `release-totp` — version bump, archive and App Store Connect upload (pre-flight checks included).
+- **Hooks** (`scripts/swift-guardrails.sh`, wired as a `PostToolUse` hook for `Write|Edit`):
+  warns after editing a Swift file that uses `.foregroundColor`, `.spring()`, `.shadow()`,
+  `PreviewProvider`, `Timer.publish`, device/screen checks, `print(`, or a hard-coded secret.
+  It only warns — fix the warning, don't ignore it. Keep it in sync with the rules above.
+- **Settings** (`.claude/settings.json`): allowlists safe `xcodebuild`/`swift`/`git`/`simctl` commands so common build/test calls don't prompt; `xcodebuild -exportArchive` and `git push` always ask. Personal overrides go in `.claude/settings.local.json` (git-ignored).
+
+## Agent checklist
+
+Before saying a change is done:
+1. `xcodebuild build` succeeds for **iOS and macOS**.
+2. `xcodebuild test -only-testing:TOTPTests` passes (RFC vectors included); UI tests pass when UI changed.
+3. New behaviour has a test; every bug fix has a regression test.
+4. No secrets, real account data or `print` of codes anywhere — including tests and previews.
+5. Docs updated: `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/RFE.md` as applicable.

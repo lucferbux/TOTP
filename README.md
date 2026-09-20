@@ -25,8 +25,10 @@ A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS a
 - Liquid Glass design for iOS / iPadOS / macOS 27
 - Adaptive layout driven by size classes: list on compact widths (iPhone, iPhone Duo folded), card grid on regular widths (iPad, iPhone Duo unfolded, Mac); all orientations
 - Native swipe actions, context menus, search, pull-to-refresh and drag to reorder
+- Select mode: batch-select accounts and delete them in one go
+- iOS bottom bar with search and Add, like Notes
 - Dynamic Type, VoiceOver labels and haptic feedback
-- Fixed prefix (PIN) per account, added on copy and AutoFill (e.g. Red Hat PIN + token)
+- Fixed prefix (PIN) per account, added on copy and AutoFill (services that expect PIN + code)
 
 ### ☁️ Sync & Backup
 - iCloud sync via CloudKit
@@ -92,7 +94,7 @@ Coming soon to the App Store.
 ### Managing Accounts
 
 - **Swipe** a row for Copy, Edit and Delete (iPhone), or **long press / right-click** for the context menu
-- **Edit** to reorder
+- **Select** (top right) to tick several accounts and delete them together
 - **Pull down** to refresh accounts
 
 ## Architecture

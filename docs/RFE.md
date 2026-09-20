@@ -81,6 +81,7 @@ This document tracks planned features, enhancements, and future improvements for
 
 #### Account Management
 - [x] **Account Reordering** - Drag to reorder accounts (4.0)
+- [x] **Batch Delete** - Select mode with multi-select delete (4.1)
 - [ ] **Account Groups/Folders** - Organize by category
 - [x] **Account Search** - Search by issuer or name (4.0)
 - [ ] **Account Icons** - Custom or auto-fetched icons
