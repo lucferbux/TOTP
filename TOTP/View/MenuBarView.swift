@@ -128,6 +128,7 @@ struct MenuBarView: View {
             if syncManager.accounts.isEmpty {
                 SharedDataManager.shared.loadAccounts()
             }
+            syncManager.startIfNeeded()
         }
     }
 

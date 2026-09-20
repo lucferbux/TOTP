@@ -23,7 +23,10 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Storage")
 
     private let userDefaults: UserDefaults
+    /// Key used to seal data we write.
     private let encryptionKey: SymmetricKey
+    /// Every key that may have sealed existing data (shared, local, legacy).
+    private let decryptionKeys: [SymmetricKey]
 
     @Published public var accounts: [OtpModel] = []
     @Published public var isLoading = false
@@ -35,21 +38,37 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
             let defaults = UserDefaults(suiteName: suite) ?? .standard
             defaults.removePersistentDomain(forName: suite)
             self.userDefaults = defaults
-            self.encryptionKey = SymmetricKey(size: .bits256)
+            let testKey = SymmetricKey(size: .bits256)
+            self.encryptionKey = testKey
+            self.decryptionKeys = [testKey]
             self.accounts = Self.uiTestSeed
             persist()
         } else {
             self.userDefaults = AppGroup.defaults
             self.encryptionKey = EncryptionKeyManager.shared.encryptionKey
+            self.decryptionKeys = EncryptionKeyManager.shared.decryptionKeys
             loadAccounts()
+            // Re-seal anything that was encrypted with an older key so every device converges
+            // on the shared key.
+            if !accounts.isEmpty && storedUsesLegacyKey {
+                persist()
+            }
         }
     }
 
     /// Designated initialiser for unit tests.
-    init(userDefaults: UserDefaults, encryptionKey: SymmetricKey) {
+    init(userDefaults: UserDefaults, encryptionKey: SymmetricKey, decryptionKeys: [SymmetricKey]? = nil) {
         self.userDefaults = userDefaults
         self.encryptionKey = encryptionKey
+        self.decryptionKeys = decryptionKeys ?? [encryptionKey]
         loadAccounts()
+    }
+
+    /// True when any stored record can't be opened with the primary key (so it needs re-sealing).
+    var storedUsesLegacyKey: Bool {
+        AccountStore.storedRecords(in: userDefaults).contains { record in
+            (try? AccountCrypto.open(record.encryptedKey, using: encryptionKey)) == nil
+        }
     }
 
     // MARK: - Data Operations
@@ -63,7 +82,7 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
             return
         }
         do {
-            accounts = try AccountStore.decode(data, key: encryptionKey)
+            accounts = try AccountStore.decode(data, keys: decryptionKeys)
         } catch {
             Self.logger.error("Failed to load accounts: \(error.localizedDescription, privacy: .public)")
             self.error = .loadFailed(error)

@@ -31,6 +31,9 @@ public class CloudKitOtpModel: ObservableObject {
     
     // CloudKit record reference
     public var record: CKRecord?
+
+    /// False when the record was decrypted with a legacy key and should be re-uploaded.
+    public private(set) var sealedWithPrimaryKey = true
     
     public init(
         id: String = UUID().uuidString,
@@ -93,8 +96,9 @@ public class CloudKitOtpModel: ObservableObject {
     }
     
     // Convert to CloudKit record
-    public func toCKRecord() -> CKRecord {
-        let record = self.record ?? CKRecord(recordType: CloudKitOtpModel.recordType, recordID: CKRecord.ID(recordName: id))
+    public func toCKRecord(in zoneID: CKRecordZone.ID? = nil) -> CKRecord {
+        let recordID = zoneID.map { CKRecord.ID(recordName: id, zoneID: $0) } ?? CKRecord.ID(recordName: id)
+        let record = self.record ?? CKRecord(recordType: CloudKitOtpModel.recordType, recordID: recordID)
         
         record["issuer"] = issuer
         record["name"] = name
@@ -120,6 +124,8 @@ public class CloudKitOtpModel: ObservableObject {
     // Convert to local OtpModel for UI
     public func toOtpModel() throws -> OtpModel {
         let decryptedKey = try EncryptionKeyManager.shared.decryptData(encryptedKey)
+        // Records sealed with an older key are re-uploaded by SyncManager after they load.
+        sealedWithPrimaryKey = (try? AccountCrypto.open(encryptedKey, using: EncryptionKeyManager.shared.encryptionKey)) != nil
         
         let algorithm = algorithm.flatMap(OtpAlgorithm.init(lenient:)) ?? .sha1
         let entry: OtpEntry = isHotp

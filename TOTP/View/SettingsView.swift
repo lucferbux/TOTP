@@ -7,13 +7,17 @@
 
 import SwiftUI
 import AuthenticationServices
+import CloudKit
 
 #if os(macOS)
 import ServiceManagement
 #endif
 
 struct SettingsView: View {
+    @EnvironmentObject private var syncManager: SyncManager
     @ObservedObject private var lock = AppLockManager.shared
+    @State private var cloudRecordCount: Int?
+    @State private var isChecking = false
     @State private var clipboardClearSeconds = AppPreferences.clipboardClearSeconds
     #if os(macOS)
     @ObservedObject private var macSettings = MacOSAppSettings.shared
@@ -21,6 +25,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            iCloudSection
             securitySection
             #if os(macOS)
             macGeneralSection
@@ -39,6 +44,53 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var iCloudSection: some View {
+        Section {
+            LabeledContent("Status") {
+                Label(syncManager.syncState.description, systemImage: syncManager.syncState.systemImage)
+                    .foregroundStyle(syncManager.syncState.isError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+            }
+            LabeledContent("Accounts on This Device", value: "\(syncManager.accounts.count)")
+            LabeledContent("Accounts in iCloud") {
+                if isChecking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text(cloudRecordCount.map(String.init) ?? "—")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            LabeledContent("Encryption Key", value: EncryptionKeyManager.shared.usesSharedKey ? "Shared via iCloud Keychain" : "This device only")
+            LabeledContent("Environment", value: CloudKitDataManager.shared.environmentName)
+            LabeledContent("Container", value: CloudKitDataManager.shared.containerIdentifier)
+                .font(.caption)
+            Button {
+                Task { await refreshDiagnostics() }
+            } label: {
+                Label("Sync Now", systemImage: "arrow.clockwise.icloud")
+            }
+            .accessibilityIdentifier("syncNowButton")
+        } header: {
+            Text("iCloud Sync")
+        } footer: {
+            if !EncryptionKeyManager.shared.usesSharedKey {
+                Text("Turn on iCloud Keychain so this device can share its encryption key — without it, codes synced from other devices can't be read.")
+            } else {
+                Text("Accounts sync through your private iCloud database. Secrets stay encrypted with a key shared only through your iCloud Keychain.")
+            }
+        }
+        .task {
+            await refreshDiagnostics()
+        }
+    }
+
+    @MainActor
+    private func refreshDiagnostics() async {
+        isChecking = true
+        defer { isChecking = false }
+        await syncManager.refresh()
+        cloudRecordCount = syncManager.iCloudAvailable ? CloudKitDataManager.shared.accounts.count : nil
+    }
 
     private var securitySection: some View {
         Section {

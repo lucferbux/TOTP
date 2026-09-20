@@ -411,6 +411,7 @@ public struct ContentView: View {
         case .settings:
             NavigationStack {
                 SettingsView()
+                    .environmentObject(syncManager)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { self.sheet = nil }

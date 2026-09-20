@@ -119,6 +119,41 @@ struct StorageTests {
         #expect(AccountStore.loadAccounts(from: defaults, key: nil).isEmpty)
     }
 
+    @Test("Data sealed with an older key still opens, and is re-sealed on the next save")
+    func legacyKeyIsReadableAndHealed() throws {
+        let suite = "TOTPTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        // Written by an older version / another device, with a different key
+        let legacyKey = SymmetricKey(size: .bits256)
+        let accounts = sample()
+        defaults.set(try AccountStore.encode(accounts, key: legacyKey), forKey: AccountStore.accountsKey)
+
+        // The new primary key can't open it on its own …
+        #expect((try? AccountStore.decode(defaults.data(forKey: AccountStore.accountsKey)!, key: key))?.isEmpty == true)
+
+        // … but the manager knows both keys, so nothing is lost
+        let manager = SharedDataManager(userDefaults: defaults, encryptionKey: key, decryptionKeys: [key, legacyKey])
+        #expect(manager.accounts == accounts)
+        #expect(manager.storedUsesLegacyKey)
+
+        // Saving re-seals everything with the primary key
+        manager.saveAccounts()
+        #expect(!manager.storedUsesLegacyKey)
+        #expect(try AccountStore.decode(defaults.data(forKey: AccountStore.accountsKey)!, key: key) == accounts)
+    }
+
+    @Test("Opening with several candidate keys picks the one that works")
+    func openUsingAnyKey() throws {
+        let a = SymmetricKey(size: .bits256)
+        let b = SymmetricKey(size: .bits256)
+        let sealed = try AccountCrypto.seal(secret, using: b)
+        #expect(try AccountCrypto.open(sealed, usingAny: [a, b]) == secret)
+        #expect(throws: (any Error).self) { try AccountCrypto.open(sealed, usingAny: [a]) }
+        #expect(throws: (any Error).self) { try AccountCrypto.open(sealed, usingAny: []) }
+    }
+
     @Test("Batch delete removes only the selected accounts")
     func batchDelete() throws {
         let suite = "TOTPTests.\(UUID().uuidString)"
@@ -190,6 +225,16 @@ struct CloudKitMappingTests {
         #expect(record.allKeys().contains("algorithm") == false)
     }
 
+    @Test("Records are written into the synced zone, keeping the account id as the record name")
+    func recordUsesZoneAndStableID() throws {
+        let model = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+        let zoneID = CKRecordZone.ID(zoneName: CloudKitDataManager.zoneName, ownerName: CKCurrentUserDefaultName)
+        let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord(in: zoneID)
+        #expect(record.recordID.zoneID.zoneName == CloudKitDataManager.zoneName)
+        #expect(record.recordID.recordName == model.id.uuidString)
+        #expect(record.recordType == "TOTPAccount")
+    }
+
     @Test("HOTP counter maps both ways")
     func hotpCounter() throws {
         let model = OtpModel(issuer: "Bank", entry: .hotp(key: secret, digits: 6, counter: 99))
@@ -213,6 +258,16 @@ struct SyncMergeTests {
         #expect(merged.count == 2)
         #expect(merged.first { $0.issuer == "Example Corp" }?.prefix == "LOCAL")
         #expect(merged.contains { $0.id == cloudOnly.id })
+    }
+
+    @Test("An account already matched by id isn't duplicated by an issuer+name match")
+    func mergeMatchesById() {
+        let local = OtpModel(issuer: "Example Corp", name: "me", prefix: "LOCAL", entry: .totp(key: secret, digits: 6, interval: 30))
+        // Same account as it comes back from iCloud (same id), plus an unrelated cloud-only one
+        let cloudSame = OtpModel(id: local.id, issuer: "Example Corp", name: "me", prefix: "CLOUD", entry: .totp(key: secret, digits: 6, interval: 30))
+        let merged = SyncManager.mergeAccounts(local: [local], cloud: [cloudSame])
+        #expect(merged.count == 1)
+        #expect(merged[0].prefix == "LOCAL")
     }
 
     @Test("Service identifier uses first domain, then issuer")

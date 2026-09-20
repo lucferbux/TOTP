@@ -95,7 +95,13 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
     }
 
     public func model(key: SymmetricKey) throws -> OtpModel {
-        let secret = try AccountCrypto.open(encryptedKey, using: key)
+        try model(keys: [key])
+    }
+
+    /// Opens the secret with the first key that works, so data sealed by an older key
+    /// (or by another device before the shared key existed) is still readable.
+    public func model(keys: [SymmetricKey]) throws -> OtpModel {
+        let secret = try AccountCrypto.open(encryptedKey, usingAny: keys)
         let algorithm = algorithm.flatMap(OtpAlgorithm.init(lenient:)) ?? .sha1
         let entry: OtpEntry = isHotp
             ? .hotp(key: secret, digits: digits, counter: UInt64(max(0, counter)), algorithm: algorithm)
@@ -121,6 +127,20 @@ public enum AccountCrypto {
     public static func open(_ data: Data, using key: SymmetricKey) throws -> Data {
         try ChaChaPoly.open(ChaChaPoly.SealedBox(combined: data), using: key)
     }
+
+    /// Tries every key in order; throws the last failure when none works.
+    public static func open(_ data: Data, usingAny keys: [SymmetricKey]) throws -> Data {
+        guard !keys.isEmpty else { throw CryptoKitError.authenticationFailure }
+        var lastError: Error = CryptoKitError.authenticationFailure
+        for key in keys {
+            do {
+                return try open(data, using: key)
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
 }
 
 // MARK: - Store
@@ -130,8 +150,12 @@ public enum AccountStore {
 
     /// Decodes a stored payload; accounts that fail to decrypt are skipped.
     public static func decode(_ data: Data, key: SymmetricKey) throws -> [OtpModel] {
+        try decode(data, keys: [key])
+    }
+
+    public static func decode(_ data: Data, keys: [SymmetricKey]) throws -> [OtpModel] {
         let stored = try JSONDecoder().decode([StoredOtpAccount].self, from: data)
-        return stored.compactMap { try? $0.model(key: key) }
+        return stored.compactMap { try? $0.model(keys: keys) }
     }
 
     /// Encodes accounts, keeping the original creation date of accounts already present in `previous`.
@@ -150,8 +174,9 @@ public enum AccountStore {
     }
 
     /// Read-only loader used by the widget, AutoFill and App Intents.
-    public static func loadAccounts(from defaults: UserDefaults = AppGroup.defaults, key: SymmetricKey? = EncryptionKeyManager.existingKey()) -> [OtpModel] {
-        guard let key, let data = defaults.data(forKey: accountsKey) else { return [] }
-        return (try? decode(data, key: key)) ?? []
+    public static func loadAccounts(from defaults: UserDefaults = AppGroup.defaults, key: SymmetricKey? = nil) -> [OtpModel] {
+        let keys = key.map { [$0] } ?? EncryptionKeyManager.existingKeys()
+        guard !keys.isEmpty, let data = defaults.data(forKey: accountsKey) else { return [] }
+        return (try? decode(data, keys: keys)) ?? []
     }
 }

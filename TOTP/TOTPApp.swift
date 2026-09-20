@@ -40,7 +40,7 @@ struct TOTPApp: App {
                     handleURL(url)
                 }
                 .task {
-                    await syncManager.initializeSync()
+                    syncManager.startIfNeeded()
                 }
         }
         #if os(macOS)
@@ -64,6 +64,7 @@ struct TOTPApp: App {
         // macOS Settings window (Cmd+,)
         Settings {
             SettingsView()
+                .environmentObject(syncManager)
         }
         #endif
     }
@@ -114,6 +115,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         if !AppEnvironment.isUITesting {
             application.registerForRemoteNotifications()
         }
+        Task { @MainActor in SyncManager.shared.startIfNeeded() }
         return true
     }
 
@@ -139,6 +141,8 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.registerForRemoteNotifications()
         }
         MacOSAppSettings.shared.applyDockIconPolicy()
+        // The main window is suppressed at launch, so start syncing here rather than from a view.
+        Task { @MainActor in SyncManager.shared.startIfNeeded() }
     }
 
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

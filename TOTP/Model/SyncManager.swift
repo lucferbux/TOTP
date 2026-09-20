@@ -90,8 +90,21 @@ public class SyncManager: ObservableObject {
     // Cancellables for Combine subscriptions
     private var cancellables = Set<AnyCancellable>()
     
+    /// Guards against running the initial sync more than once per launch.
+    private var hasStarted = false
+    
     private init() {
         setupObservers()
+    }
+    
+    /// Starts the initial sync exactly once, from whichever surface comes up first.
+    /// On macOS the main window is suppressed at launch, so the menu bar (or the app delegate)
+    /// has to kick this off — otherwise sync would never run for menu-bar-only users.
+    @MainActor
+    public func startIfNeeded() {
+        guard !hasStarted else { return }
+        hasStarted = true
+        Task { await initializeSync() }
     }
     
     // MARK: - Setup
@@ -169,19 +182,21 @@ public class SyncManager: ObservableObject {
     /// Initializes sync on app launch
     @MainActor
     public func initializeSync() async {
+        hasStarted = true
         if AppEnvironment.isUITesting {
             accounts = localManager.accounts
             syncState = .idle
             return
         }
         
+        logger.debug("Initial sync starting")
         isLoading = true
         syncState = .syncing
         
         // Load local accounts first (fast)
         localManager.loadAccounts()
         accounts = localManager.accounts
-        await indexForSpotlight()
+        scheduleSpotlightIndexing()
         
         // Check iCloud status
         await cloudManager.checkAccountStatus()
@@ -208,6 +223,7 @@ public class SyncManager: ObservableObject {
     @MainActor
     public func performSync() async {
         guard iCloudAvailable else {
+            logger.notice("Sync skipped: iCloud is not available")
             syncState = .iCloudDisabled
             return
         }
@@ -218,9 +234,19 @@ public class SyncManager: ObservableObject {
             // Load cloud accounts
             await cloudManager.loadAccounts()
             
+            // One-time move of records written by 3.x into the synced zone
+            await cloudManager.migrateDefaultZoneRecords(ids: localManager.accounts.map { $0.id.uuidString })
+            
+            // Apply deletions made on other devices
+            applyCloudDeletions()
+            
             // Get both account sets
             let localAccounts = localManager.accounts
             let cloudAccounts = try cloudManager.getOtpModels()
+            
+            // Re-upload anything the cloud still holds under an old encryption key, so other
+            // devices (which now share the key) can read it.
+            await reuploadLegacyEncryptedRecords()
             
             // Merge using last-write-wins strategy
             let mergedAccounts = Self.mergeAccounts(local: localAccounts, cloud: cloudAccounts)
@@ -233,6 +259,7 @@ public class SyncManager: ObservableObject {
             
             await afterMutation()
             
+            logger.info("Sync finished: \(self.accounts.count, privacy: .public) local, \(cloudAccounts.count, privacy: .public) in iCloud")
             syncState = .synced(Date())
             
         } catch {
@@ -241,8 +268,24 @@ public class SyncManager: ObservableObject {
         }
     }
     
-    /// Merges local and cloud accounts. Accounts are matched by issuer + name and the local copy wins;
-    /// cloud-only accounts are added.
+    /// Removes accounts that were deleted on another device.
+    @MainActor
+    private func applyCloudDeletions() {
+        let deleted = cloudManager.deletedAccountIDs
+        guard !deleted.isEmpty else { return }
+        let ids = Set(deleted.compactMap(UUID.init(uuidString:)))
+        let present = localManager.accounts.filter { ids.contains($0.id) }
+        if !present.isEmpty {
+            logger.info("Removing \(present.count, privacy: .public) account(s) deleted on another device")
+            localManager.deleteAccounts(withIds: Set(present.map(\.id)))
+            accounts = localManager.accounts
+        }
+        cloudManager.deletedAccountIDs.removeAll()
+    }
+    
+    /// Merges local and cloud accounts. The same account is matched by id (records keep their
+    /// UUID as the record name) and then by issuer + name; the local copy wins, and cloud-only
+    /// accounts are added.
     static func mergeAccounts(local: [OtpModel], cloud: [OtpModel]) -> [OtpModel] {
         var merged: [UUID: OtpModel] = [:]
         
@@ -254,8 +297,7 @@ public class SyncManager: ObservableObject {
         // Merge cloud accounts (cloud wins if it has the same ID - assuming cloud is newer)
         // In a real scenario, you'd compare modifiedDate timestamps
         for cloudAccount in cloud {
-            // Cloud accounts come from CloudKitOtpModel which doesn't preserve UUID
-            // so we need to match by issuer+name or create new
+            if merged[cloudAccount.id] != nil { continue }
             if let existingAccount = local.first(where: {
                 $0.issuer == cloudAccount.issuer && $0.name == cloudAccount.name
             }) {
@@ -291,12 +333,13 @@ public class SyncManager: ObservableObject {
         for localAccount in localAccounts {
             // Check if this account exists in cloud
             let existsInCloud = cloudAccounts.contains { cloudAccount in
-                cloudAccount.issuer == localAccount.issuer && 
-                cloudAccount.name == localAccount.name
+                cloudAccount.id == localAccount.id
+                || (cloudAccount.issuer == localAccount.issuer && cloudAccount.name == localAccount.name)
             }
             
             if !existsInCloud {
                 do {
+                    logger.info("Uploading a local-only account to iCloud")
                     try await cloudManager.addOtpModel(localAccount)
                 } catch {
                     logger.error("Failed to upload account: \(error.localizedDescription, privacy: .public)")
@@ -368,6 +411,22 @@ public class SyncManager: ObservableObject {
         await afterMutation()
     }
     
+    /// Re-uploads cloud records that were sealed with a previous device-local key.
+    @MainActor
+    private func reuploadLegacyEncryptedRecords() async {
+        let stale = cloudManager.accounts.filter { !$0.sealedWithPrimaryKey }
+        guard !stale.isEmpty else { return }
+        logger.info("Re-encrypting \(stale.count, privacy: .public) cloud record(s) with the shared key")
+        for record in stale {
+            guard let model = try? record.toOtpModel() else { continue }
+            do {
+                try await cloudManager.updateOtpModel(model)
+            } catch {
+                logger.error("Failed to re-encrypt cloud record: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+    
     /// Deletes several accounts at once, syncing each removal to CloudKit.
     @MainActor
     public func deleteAccounts(withIds ids: Set<UUID>) async {
@@ -416,21 +475,26 @@ public class SyncManager: ObservableObject {
     private func afterMutation() async {
         WidgetCenter.shared.reloadAllTimelines()
         await syncCredentialIdentities()
-        await indexForSpotlight()
+        scheduleSpotlightIndexing()
     }
     
     // MARK: - Spotlight
     
     /// Donates account names (never secrets) to Spotlight so "Copy code for …" is searchable.
+    /// Deliberately fire-and-forget: Spotlight can take a long time (or never return) and must
+    /// never hold up syncing or launch.
     @MainActor
-    public func indexForSpotlight() async {
+    public func scheduleSpotlightIndexing() {
         guard !AppEnvironment.isUITesting else { return }
         let entities = accounts.filter { !$0.entry.isHotp }.map(AccountEntity.init(model:))
-        do {
-            try await CSSearchableIndex.default().deleteAppEntities(ofType: AccountEntity.self)
-            try await CSSearchableIndex.default().indexAppEntities(entities)
-        } catch {
-            logger.error("Spotlight indexing failed: \(error.localizedDescription, privacy: .public)")
+        Task.detached(priority: .background) {
+            do {
+                try await CSSearchableIndex.default().deleteAppEntities(ofType: AccountEntity.self)
+                try await CSSearchableIndex.default().indexAppEntities(entities)
+                logger.info("Spotlight index updated")
+            } catch {
+                logger.error("Spotlight indexing failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
     
