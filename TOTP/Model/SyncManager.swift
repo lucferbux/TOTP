@@ -368,6 +368,27 @@ public class SyncManager: ObservableObject {
         await afterMutation()
     }
     
+    /// Deletes several accounts at once, syncing each removal to CloudKit.
+    @MainActor
+    public func deleteAccounts(withIds ids: Set<UUID>) async {
+        guard !ids.isEmpty else { return }
+        localManager.deleteAccounts(withIds: ids)
+        accounts = localManager.accounts
+
+        if iCloudAvailable {
+            for id in ids {
+                do {
+                    try await cloudManager.deleteOtpModel(withId: id.uuidString)
+                } catch {
+                    logger.error("Failed to sync account deletion to cloud: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            syncState = .synced(Date())
+        }
+
+        await afterMutation()
+    }
+
     /// Persists a new order (drag to reorder).
     @MainActor
     public func moveAccounts(fromOffsets source: IndexSet, toOffset destination: Int) {

@@ -14,9 +14,17 @@ struct AccountCodeView: View {
         case card
     }
 
+    /// Whether the list is in select mode, and if so whether this account is selected.
+    enum SelectionState {
+        case none
+        case unselected
+        case selected
+    }
+
     let account: OtpModel
     var style: Style = .row
     var isCopied = false
+    var selectionState: SelectionState = .none
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -28,6 +36,14 @@ struct AccountCodeView: View {
     private func content(at date: Date) -> some View {
         let code = account.code(at: date)
         HStack(spacing: 14) {
+            if selectionState != .none {
+                Image(systemName: selectionState == .selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selectionState == .selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+                    .contentTransition(.symbolEffect(.replace))
+                    .accessibilityHidden(true)
+            }
+
             CountdownIndicator(entry: account.entry, date: date)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -54,11 +70,13 @@ struct AccountCodeView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 6) {
-                Image(systemName: isCopied ? "checkmark.circle.fill" : "doc.on.doc")
-                    .font(.body)
-                    .foregroundStyle(isCopied ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
-                    .contentTransition(.symbolEffect(.replace))
-                    .accessibilityHidden(true)
+                if selectionState == .none {
+                    Image(systemName: isCopied ? "checkmark.circle.fill" : "doc.on.doc")
+                        .font(.body)
+                        .foregroundStyle(isCopied ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
+                        .contentTransition(.symbolEffect(.replace))
+                        .accessibilityHidden(true)
+                }
 
                 if account.hasPrefix {
                     Label("PIN", systemImage: "key.fill")
@@ -81,10 +99,16 @@ struct AccountCodeView: View {
                     .fill(PlatformColors.secondarySystemGroupedBackground)
             }
         }
+        .overlay {
+            if style == .card && selectionState == .selected {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.tint, lineWidth: 2)
+            }
+        }
         .contentShape(.rect(cornerRadius: style == .card ? 16 : 0))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(code: code, date: date))
-        .accessibilityHint("Copies the code")
+        .accessibilityHint(selectionState == .none ? "Copies the code" : "Selects the account")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -96,6 +120,7 @@ struct AccountCodeView: View {
             parts.append(String(localized: "\(account.entry.secondsRemaining(at: date)) seconds left"))
         }
         if isCopied { parts.append(String(localized: "Copied")) }
+        if selectionState == .selected { parts.append(String(localized: "Selected")) }
         return parts.joined(separator: ", ")
     }
 }
@@ -139,6 +164,13 @@ struct CountdownIndicator: View {
     List {
         AccountCodeView(account: .preview(issuer: "Example Corp", name: "user@example.com", prefix: "1234"))
         AccountCodeView(account: .preview(issuer: "GitHub", name: "octocat"), isCopied: true)
+    }
+}
+
+#Preview("Selecting") {
+    List {
+        AccountCodeView(account: .preview(issuer: "Example Corp", name: "user@example.com", prefix: "1234"), selectionState: .selected)
+        AccountCodeView(account: .preview(issuer: "GitHub", name: "octocat"), selectionState: .unselected)
     }
 }
 

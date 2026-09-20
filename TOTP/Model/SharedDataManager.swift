@@ -103,6 +103,13 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
         persist()
     }
 
+    /// Removes several accounts in one write (batch delete from select mode).
+    public func deleteAccounts(withIds ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        accounts.removeAll { ids.contains($0.id) }
+        persist()
+    }
+
     /// Reorders accounts (drag to reorder); the order is persisted locally.
     public func moveAccounts(fromOffsets source: IndexSet, toOffset destination: Int) {
         accounts.move(fromOffsets: source, toOffset: destination)

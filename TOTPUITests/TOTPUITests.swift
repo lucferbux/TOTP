@@ -22,6 +22,19 @@ final class TOTPUITests: XCTestCase {
         app.buttons["account-\(title)"].firstMatch
     }
 
+    /// The row/card for an account, whatever element type it currently is
+    /// (a button normally, a selectable cell in select mode).
+    private func accountElement(_ title: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "account-\(title)").firstMatch
+    }
+
+    private func attach(_ name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     private func openActions(for title: String) {
         let element = account(title)
         XCTAssertTrue(element.waitForExistence(timeout: 5))
@@ -110,6 +123,54 @@ final class TOTPUITests: XCTestCase {
         let gone = NSPredicate(format: "exists == false")
         expectation(for: gone, evaluatedWith: account("Counter Bank"))
         waitForExpectations(timeout: 5)
+    }
+
+    func testBatchDeleteInSelectMode() {
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
+        app.buttons["selectButton"].tap()
+
+        accountElement("GitHub").tap()
+        accountElement("Counter Bank").tap()
+        attach("select-mode")
+
+        let delete = app.buttons["deleteSelectionButton"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        XCTAssertTrue(delete.label.contains("2"), "Delete button should show the selected count, got \(delete.label)")
+        delete.tap()
+
+        app.buttons["confirmBatchDeleteButton"].firstMatch.tap()
+
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: accountElement("GitHub"))
+        expectation(for: gone, evaluatedWith: accountElement("Counter Bank"))
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 3))
+        // Select mode ends once the deletion completes
+        XCTAssertTrue(app.buttons["selectButton"].waitForExistence(timeout: 3))
+    }
+
+    func testSelectAllAndCancelSelection() {
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
+        app.buttons["selectButton"].tap()
+
+        app.buttons["selectAllButton"].tap()
+        let delete = app.buttons["deleteSelectionButton"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        XCTAssertTrue(delete.label.contains("3"), "Expected all 3 selected, got \(delete.label)")
+
+        // Leaving select mode must not delete anything
+        app.buttons["doneSelectingButton"].tap()
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 3))
+        XCTAssertTrue(account("Counter Bank").exists)
+        XCTAssertTrue(account("Example Corp").exists)
+    }
+
+    func testDeleteButtonDisabledWithoutSelection() {
+        XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
+        app.buttons["selectButton"].tap()
+        let delete = app.buttons["deleteSelectionButton"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        XCTAssertFalse(delete.isEnabled)
     }
 
     func testOtpAuthLinkPrefillsForm() {

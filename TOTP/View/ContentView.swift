@@ -56,6 +56,9 @@ public struct ContentView: View {
     @State private var deleting: OtpModel?
     @State private var copiedAccountID: UUID?
     @State private var copyCount = 0
+    @State private var isSelecting = false
+    @State private var selection: Set<UUID> = []
+    @State private var confirmBatchDelete = false
 
     public init() {}
 
@@ -98,6 +101,18 @@ public struct ContentView: View {
             .accessibilityIdentifier("confirmDeleteButton")
         } message: { _ in
             Text("You won't be able to generate codes for this account unless you add it again.")
+        }
+        .confirmationDialog(
+            selection.count == 1 ? "Delete 1 account?" : "Delete \(selection.count) accounts?",
+            isPresented: $confirmBatchDelete,
+            titleVisibility: .visible
+        ) {
+            Button(selection.count == 1 ? "Delete Account" : "Delete \(selection.count) Accounts", role: .destructive) {
+                deleteSelection()
+            }
+            .accessibilityIdentifier("confirmBatchDeleteButton")
+        } message: {
+            Text("You won't be able to generate their codes unless you add them again.")
         }
         .alert("Data Error", isPresented: Binding(get: { dataManager.error != nil }, set: { if !$0 { dataManager.error = nil } })) {
             Button("OK", role: .cancel) { dataManager.error = nil }
@@ -159,14 +174,9 @@ public struct ContentView: View {
 
     /// iPhone, iPhone Duo folded, iPad slide-over / narrow splits.
     private var compactList: some View {
-        List {
+        List(selection: $selection) {
             ForEach(filteredAccounts) { account in
-                Button {
-                    copy(account)
-                } label: {
-                    AccountCodeView(account: account, style: .row, isCopied: copiedAccountID == account.id)
-                }
-                .buttonStyle(.plain)
+                row(account, style: .row)
                 .accessibilityIdentifier("account-\(account.displayTitle)")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) { deleting = account } label: {
@@ -191,7 +201,53 @@ public struct ContentView: View {
         }
         #if os(iOS)
         .listStyle(.insetGrouped)
+        .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
         #endif
+    }
+
+    /// One account: a copy button normally, a selectable cell while selecting.
+    @ViewBuilder
+    private func row(_ account: OtpModel, style: AccountCodeView.Style) -> some View {
+        #if os(iOS)
+        // On compact widths List(selection:) draws its own checkmarks in edit mode,
+        // so the card must not draw a second one.
+        let drawsOwnCheckmark = style == .card
+        #else
+        let drawsOwnCheckmark = true
+        #endif
+        let state: AccountCodeView.SelectionState = isSelecting && drawsOwnCheckmark
+            ? (selection.contains(account.id) ? .selected : .unselected)
+            : .none
+        let card = AccountCodeView(
+            account: account,
+            style: style,
+            isCopied: copiedAccountID == account.id,
+            selectionState: state
+        )
+        if isSelecting {
+            if drawsOwnCheckmark {
+                selectableCard(account, card: card)
+            } else {
+                card
+            }
+        } else {
+            Button {
+                copy(account)
+            } label: {
+                card
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func selectableCard(_ account: OtpModel, card: AccountCodeView) -> some View {
+        Button {
+            toggleSelection(account)
+        } label: {
+            card
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selection.contains(account.id) ? .isSelected : [])
     }
 
     /// iPad, iPhone Duo unfolded, Mac: adaptive columns that reflow continuously with width.
@@ -199,14 +255,9 @@ public struct ContentView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 480), spacing: 16)], spacing: 16) {
                 ForEach(filteredAccounts) { account in
-                    Button {
-                        copy(account)
-                    } label: {
-                        AccountCodeView(account: account, style: .card, isCopied: copiedAccountID == account.id)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("account-\(account.displayTitle)")
-                    .contextMenu { accountMenu(account) }
+                    row(account, style: .card)
+                        .accessibilityIdentifier("account-\(account.displayTitle)")
+                        .contextMenu { accountMenu(account) }
                 }
             }
             .padding()
@@ -237,24 +288,85 @@ public struct ContentView: View {
     private var toolbarContent: some ToolbarContent {
         #if os(iOS)
         ToolbarItem(placement: .topBarLeading) {
-            Button { sheet = .settings } label: {
-                Label("Settings", systemImage: "gearshape")
+            if isSelecting {
+                Button(allSelected ? "Deselect All" : "Select All") {
+                    toggleSelectAll()
+                }
+                .accessibilityIdentifier("selectAllButton")
+            } else {
+                Button { sheet = .settings } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .accessibilityIdentifier("settingsButton")
             }
-            .accessibilityIdentifier("settingsButton")
         }
-        if usesCompactList && search.isEmpty && syncManager.accounts.count > 1 {
+        if !syncManager.accounts.isEmpty {
             ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
+                selectButton
             }
+        }
+        // Notes-style bottom bar: search on the left, add on the right
+        if isSelecting {
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                deleteSelectionButton
+            }
+        } else {
+            DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            ToolbarSpacer(.fixed, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                addButton
+            }
+        }
+        #else
+        if !syncManager.accounts.isEmpty {
+            ToolbarItem(placement: .automatic) {
+                selectButton
+            }
+        }
+        if isSelecting {
+            ToolbarItem(placement: .automatic) {
+                Button(allSelected ? "Deselect All" : "Select All") { toggleSelectAll() }
+                    .accessibilityIdentifier("selectAllButton")
+            }
+            ToolbarItem(placement: .automatic) {
+                deleteSelectionButton
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            addButton
         }
         #endif
-        ToolbarItem(placement: .primaryAction) {
-            Button { sheet = .add(nil) } label: {
-                Label("Add Account", systemImage: "plus")
-            }
-            .accessibilityIdentifier("addAccountButton")
-            .help("Add a new account")
+    }
+
+    private var addButton: some View {
+        Button { sheet = .add(nil) } label: {
+            Label("Add Account", systemImage: "plus")
         }
+        .accessibilityIdentifier("addAccountButton")
+        .help("Add a new account")
+    }
+
+    private var selectButton: some View {
+        Button(isSelecting ? "Done" : "Select") {
+            withAnimation(.smooth(duration: 0.25)) {
+                isSelecting.toggle()
+                selection.removeAll()
+            }
+        }
+        .accessibilityIdentifier(isSelecting ? "doneSelectingButton" : "selectButton")
+    }
+
+    private var deleteSelectionButton: some View {
+        Button(role: .destructive) {
+            confirmBatchDelete = true
+        } label: {
+            // Text, not a Label: the bottom bar renders labels icon-only, which hides the count
+            Text(selection.isEmpty ? "Delete" : "Delete (\(selection.count))")
+        }
+        .tint(.red)
+        .disabled(selection.isEmpty)
+        .accessibilityIdentifier("deleteSelectionButton")
     }
 
     @ViewBuilder
@@ -314,6 +426,37 @@ public struct ContentView: View {
     }
 
     // MARK: - Actions
+
+    private var allSelected: Bool {
+        !filteredAccounts.isEmpty && selection.count == filteredAccounts.count
+    }
+
+    private func toggleSelectAll() {
+        withAnimation(.smooth(duration: 0.2)) {
+            selection = allSelected ? [] : Set(filteredAccounts.map(\.id))
+        }
+    }
+
+    private func toggleSelection(_ account: OtpModel) {
+        withAnimation(.smooth(duration: 0.15)) {
+            if selection.contains(account.id) {
+                selection.remove(account.id)
+            } else {
+                selection.insert(account.id)
+            }
+        }
+    }
+
+    private func deleteSelection() {
+        let ids = selection
+        Task {
+            await syncManager.deleteAccounts(withIds: ids)
+            withAnimation(.smooth(duration: 0.25)) {
+                selection.removeAll()
+                isSelecting = false
+            }
+        }
+    }
 
     private func copy(_ account: OtpModel) {
         Task {

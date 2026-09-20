@@ -18,7 +18,7 @@ struct StorageTests {
 
     private func sample(_ algorithm: OtpAlgorithm = .sha1) -> [OtpModel] {
         [
-            OtpModel(issuer: "Red Hat", name: "me", prefix: "PIN", entry: .totp(key: secret, digits: 6, interval: 30, algorithm: algorithm), associatedDomains: ["sso.redhat.com"]),
+            OtpModel(issuer: "Example Corp", name: "me", prefix: "PIN", entry: .totp(key: secret, digits: 6, interval: 30, algorithm: algorithm), associatedDomains: ["sso.example.com"]),
             OtpModel(issuer: "Bank", entry: .hotp(key: Data("other".utf8), digits: 8, counter: 12))
         ]
     }
@@ -64,7 +64,7 @@ struct StorageTests {
         let encrypted = try AccountCrypto.seal(secret, using: key)
         let legacy: [[String: Any]] = [[
             "id": "6F9619FF-8B86-D011-B42D-00CF4FC964FF",
-            "issuer": "Red Hat",
+            "issuer": "Example Corp",
             "name": "me",
             "prefix": "PIN",
             "encryptedKey": encrypted.base64EncodedString(),
@@ -90,7 +90,7 @@ struct StorageTests {
         let bad = try StoredOtpAccount(model: sample()[1], key: SymmetricKey(size: .bits256))
         let data = try JSONEncoder().encode([good, bad])
         let accounts = try AccountStore.decode(data, key: key)
-        #expect(accounts.map(\.issuer) == ["Red Hat"])
+        #expect(accounts.map(\.issuer) == ["Example Corp"])
     }
 
     @Test("Creation date is preserved across saves")
@@ -119,6 +119,27 @@ struct StorageTests {
         #expect(AccountStore.loadAccounts(from: defaults, key: nil).isEmpty)
     }
 
+    @Test("Batch delete removes only the selected accounts")
+    func batchDelete() throws {
+        let suite = "TOTPTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let manager = SharedDataManager(userDefaults: defaults, encryptionKey: key)
+        let extra = OtpModel(issuer: "GitHub", name: "octocat", entry: .totp(key: secret, digits: 6, interval: 30))
+        let accounts = sample() + [extra]
+        accounts.forEach(manager.addAccount)
+
+        manager.deleteAccounts(withIds: [accounts[0].id, accounts[2].id])
+        #expect(manager.accounts.map(\.issuer) == ["Bank"])
+        #expect(SharedDataManager(userDefaults: defaults, encryptionKey: key).accounts.map(\.issuer) == ["Bank"])
+
+        // Unknown ids and an empty set are no-ops
+        manager.deleteAccounts(withIds: [UUID()])
+        manager.deleteAccounts(withIds: [])
+        #expect(manager.accounts.count == 1)
+    }
+
     @Test("SharedDataManager update, move and delete persist")
     func managerMutations() async throws {
         let suite = "TOTPTests.\(UUID().uuidString)"
@@ -135,11 +156,11 @@ struct StorageTests {
         manager.moveAccounts(fromOffsets: IndexSet(integer: 1), toOffset: 0)
 
         let reloaded = SharedDataManager(userDefaults: defaults, encryptionKey: key)
-        #expect(reloaded.accounts.map(\.issuer) == ["Bank", "Red Hat"])
+        #expect(reloaded.accounts.map(\.issuer) == ["Bank", "Example Corp"])
         #expect(reloaded.accounts[1].prefix == "NEWPIN")
 
         manager.deleteAccount(withId: accounts[1].id)
-        #expect(SharedDataManager(userDefaults: defaults, encryptionKey: key).accounts.map(\.issuer) == ["Red Hat"])
+        #expect(SharedDataManager(userDefaults: defaults, encryptionKey: key).accounts.map(\.issuer) == ["Example Corp"])
 
         let missing = OtpModel(issuer: "Ghost", entry: .totp(key: secret, digits: 6, interval: 30))
         await #expect(throws: SharedDataError.self) { try await manager.updateAccount(missing) }
@@ -152,9 +173,9 @@ struct CloudKitMappingTests {
 
     @Test("OtpModel → CKRecord → OtpModel", arguments: OtpAlgorithm.allCases)
     func roundTrip(algorithm: OtpAlgorithm) throws {
-        let model = OtpModel(issuer: "Red Hat", name: "me", prefix: "PIN",
+        let model = OtpModel(issuer: "Example Corp", name: "me", prefix: "PIN",
                              entry: .totp(key: secret, digits: 8, interval: 60, algorithm: algorithm),
-                             associatedDomains: ["sso.redhat.com"])
+                             associatedDomains: ["sso.example.com"])
         let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord()
         #expect((record["encryptedKey"] as? Data) != secret)
         let restored = try #require(CloudKitOtpModel(from: record)).toOtpModel()
@@ -184,22 +205,22 @@ struct SyncMergeTests {
 
     @Test("Local wins on issuer+name match; cloud-only accounts are added")
     func merge() {
-        let local = OtpModel(issuer: "Red Hat", name: "me", prefix: "LOCAL", entry: .totp(key: secret, digits: 6, interval: 30))
-        let cloudCopy = OtpModel(issuer: "Red Hat", name: "me", prefix: "CLOUD", entry: .totp(key: secret, digits: 6, interval: 30))
+        let local = OtpModel(issuer: "Example Corp", name: "me", prefix: "LOCAL", entry: .totp(key: secret, digits: 6, interval: 30))
+        let cloudCopy = OtpModel(issuer: "Example Corp", name: "me", prefix: "CLOUD", entry: .totp(key: secret, digits: 6, interval: 30))
         let cloudOnly = OtpModel(issuer: "GitHub", name: "octo", entry: .totp(key: secret, digits: 6, interval: 30))
 
         let merged = SyncManager.mergeAccounts(local: [local], cloud: [cloudCopy, cloudOnly])
         #expect(merged.count == 2)
-        #expect(merged.first { $0.issuer == "Red Hat" }?.prefix == "LOCAL")
+        #expect(merged.first { $0.issuer == "Example Corp" }?.prefix == "LOCAL")
         #expect(merged.contains { $0.id == cloudOnly.id })
     }
 
     @Test("Service identifier uses first domain, then issuer")
     func serviceIdentifier() {
-        let withDomain = OtpModel(issuer: "Red Hat", entry: .totp(key: secret, digits: 6, interval: 30), associatedDomains: ["sso.redhat.com", "redhat.com"])
-        #expect(SyncManager.serviceIdentifier(for: withDomain).identifier == "sso.redhat.com")
-        let issuerOnly = OtpModel(issuer: "Red Hat", entry: .totp(key: secret, digits: 6, interval: 30))
-        #expect(SyncManager.serviceIdentifier(for: issuerOnly).identifier == "redhat")
+        let withDomain = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30), associatedDomains: ["sso.example.com", "example.com"])
+        #expect(SyncManager.serviceIdentifier(for: withDomain).identifier == "sso.example.com")
+        let issuerOnly = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+        #expect(SyncManager.serviceIdentifier(for: issuerOnly).identifier == "examplecorp")
     }
 }
 
@@ -266,11 +287,11 @@ struct TimelineAndClipboardTests {
 struct AppIntentTests {
     @Test("Account entities expose no secret material")
     func entityHasNoSecret() {
-        let model = OtpModel(issuer: "Red Hat", name: "me", prefix: "SECRETPIN",
+        let model = OtpModel(issuer: "Example Corp", name: "me", prefix: "SECRETPIN",
                              entry: .totp(key: Data("12345678901234567890".utf8), digits: 6, interval: 30))
         let entity = AccountEntity(model: model)
         #expect(entity.id == model.id)
-        #expect(entity.issuer == "Red Hat")
+        #expect(entity.issuer == "Example Corp")
         #expect(entity.accountName == "me")
         #expect(entity.hasPrefix)
         let mirror = Mirror(reflecting: entity).children.map { String(describing: $0.value) }.joined()
