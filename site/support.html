@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — TOTP Authenticator</title>
+<meta name="description" content="Help for TOTP Authenticator: adding accounts, the PIN prefix, AutoFill setup, iCloud sync, widgets and the app lock.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="site">
+    <div class="mark">T</div>
+    <a href="./">TOTP Authenticator</a>
+</header>
+<nav class="site">
+    <a href="./">Home</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="support.html">Support</a>
+    <a href="https://github.com/lucferbux/TOTP">GitHub</a>
+</nav>
+
+<h1>Support</h1>
+<p class="lead">Answers to the usual questions. If yours isn't here, open an issue on GitHub and
+I'll help.</p>
+
+<div class="card">
+    <p><strong>Get in touch:</strong>
+    <a href="https://github.com/lucferbux/TOTP/issues/new">Open an issue</a> ·
+    <a href="https://github.com/lucferbux/TOTP/discussions">Discussions</a></p>
+    <p class="muted">Please don't include a secret key, a QR code or a PIN in a bug report.</p>
+</div>
+
+<h2>Adding an account</h2>
+<p>Tap <code>+</code> and choose how to add it:</p>
+<ul>
+    <li><strong>Scan QR Code</strong> — point the camera at the code your service shows.</li>
+    <li><strong>Choose QR Code Image</strong> — pick a screenshot of the code.</li>
+    <li><strong>Paste</strong> — paste an <code>otpauth://</code> link.</li>
+    <li>Or type the secret key in by hand. Spaces and dashes don't matter.</li>
+</ul>
+<p>Most services use the defaults (time-based, 6 digits, 30 seconds, SHA-1). If yours differs, the
+form lets you change the algorithm, digit count and period.</p>
+
+<h2>The PIN prefix</h2>
+<p>Some workplace logins want a fixed PIN typed immediately before the generated code. Put that PIN
+in the <strong>Fixed Prefix</strong> field and TOTP will prepend it whenever it copies the code or
+fills it with AutoFill. The PIN is never shown on screen — accounts that have one show a small
+<em>PIN</em> badge instead — and it is stored encrypted, exactly like the secret.</p>
+
+<h2>Setting up AutoFill</h2>
+<table>
+<tr><th>iPhone / iPad</th><td>Settings ▸ General ▸ AutoFill &amp; Passwords ▸ turn on <strong>TOTP</strong>.</td></tr>
+<tr><th>Mac</th><td>System Settings ▸ General ▸ AutoFill &amp; Passwords ▸ turn on <strong>TOTP</strong>.</td></tr>
+</table>
+<p>Add the website to the account's <strong>AutoFill Domains</strong> field (for example
+<code>sso.example.com</code>) so it's suggested on the right page. Accounts with a PIN can also fill
+password fields with PIN + code together.</p>
+
+<h2>iCloud sync</h2>
+<p>Sync is automatic when you're signed in to iCloud, and uses your own private iCloud database.
+Open <strong>Settings ▸ iCloud</strong> in the app to see sync status, how many accounts are on the
+device and in iCloud, and to run a sync straight away.</p>
+<h3>Codes aren't appearing on another device</h3>
+<ul>
+    <li>Check both devices are signed in to the same Apple Account with iCloud Drive on.</li>
+    <li>Turn on <strong>iCloud Keychain</strong>. Devices share their encryption key through it; if
+    it's off, another device can't read what this one uploaded. The Settings screen tells you which
+    key is in use.</li>
+    <li>A TestFlight build and a build you compiled yourself use separate iCloud environments, so
+    they won't see each other's accounts.</li>
+</ul>
+
+<h2>Widgets and Control Centre</h2>
+<p>Add a widget from the Home Screen or Lock Screen, then choose which account it shows. Tapping it
+copies the code, including the PIN. The Control Centre control does the same in one tap and can be
+assigned to the Action button.</p>
+
+<h2>The app lock</h2>
+<p>Turn on <strong>Require Face ID</strong> (or Touch ID) in Settings to hide codes until you
+authenticate. With it on, AutoFill, Shortcuts and the Control Centre control also ask before handing
+over a code, and account names are removed from Spotlight.</p>
+
+<h2>Counter-based (HOTP) accounts</h2>
+<p>HOTP codes advance each time you use them, so they're only available in the app itself — not in
+widgets, Shortcuts or the Control, where a counter could drift out of step with the server.</p>
+
+<h2>Moving to a new device</h2>
+<p>Sign in to the same Apple Account with iCloud Keychain on, and your accounts arrive by
+themselves. There is no export file to move, and no account to recover — which also means that if
+you lose every device and have iCloud off, the secrets are gone. Keep the recovery codes your
+services give you.</p>
+
+<footer class="site">
+    <p><a href="./">Home</a> · <a href="privacy.html">Privacy</a> ·
+    <a href="https://github.com/lucferbux/TOTP">GitHub</a></p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — TOTP Authenticator</title>
+<meta name="description" content="TOTP Authenticator collects no data. Accounts stay on your device and in your own private iCloud database, encrypted before they leave the device.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="site">
+    <div class="mark">T</div>
+    <a href="./">TOTP Authenticator</a>
+</header>
+<nav class="site">
+    <a href="./">Home</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="support.html">Support</a>
+    <a href="https://github.com/lucferbux/TOTP">GitHub</a>
+</nav>
+
+<h1>Privacy Policy</h1>
+<p class="lead">TOTP Authenticator collects nothing. There is no account to create, no server of
+ours to talk to, and no analytics.</p>
+<p><small>Effective 20 September 2026 · Last updated 20 September 2026 · Applies to TOTP
+Authenticator for iPhone, iPad and Mac.</small></p>
+
+<div class="card">
+<h2 style="margin-top:0">In short</h2>
+<ul>
+    <li>The developer receives <strong>no data whatsoever</strong> from this app.</li>
+    <li>Your two-factor secrets are encrypted on your device before they are written anywhere.</li>
+    <li>Sync is optional and goes only to <strong>your own</strong> private iCloud database.</li>
+    <li>The camera is used only to read QR codes. Nothing is stored or uploaded.</li>
+    <li>Face ID / Touch ID results never leave your device.</li>
+    <li>No analytics, no advertising, no tracking, no third-party code.</li>
+</ul>
+</div>
+
+<h2>Who this is from</h2>
+<p>TOTP Authenticator is made by Lucas Fernández Aragón. Contact:
+<a href="https://github.com/lucferbux/TOTP/issues">GitHub Issues</a>.</p>
+
+<h2>What is collected</h2>
+<p>Nothing. The app has no sign-up, no user identifier, no device identifier, no crash reporting of
+its own, and no usage analytics. No data is sold or shared, because none is received.</p>
+
+<h2>What the app stores on your device</h2>
+<p>Accounts you add — the service name, the account label, the shared secret, and any fixed prefix
+(PIN) — are stored on the device. The secret and the prefix are sealed with ChaChaPoly authenticated
+encryption before being written to storage; the plaintext exists in memory only for the moment a
+code is generated. The encryption key is held in your Keychain and mirrored, readable only by you,
+inside the app's shared container so the widget and the AutoFill extension can generate codes too.</p>
+
+<h2>iCloud sync</h2>
+<p>If you are signed in to iCloud, accounts sync through the <strong>private database</strong> of
+your own iCloud account (container <code>iCloud.com.lucferbux.TOTP</code>). This is the one case
+where data leaves your device, and it goes only to Apple, on your behalf.</p>
+<p>The developer has no access to that database: Apple does not give developers access to users'
+private CloudKit data, and the secrets and PINs are additionally encrypted with a key that exists
+only on your devices — shared between them through your iCloud Keychain — so what is stored is
+ciphertext the developer could not read even if it were accessible. Service names and account
+labels are stored alongside it so sync is usable. Apple's handling of iCloud data is covered by
+<a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a>.</p>
+
+<h2>Camera</h2>
+<p>The camera is used for one purpose: reading a setup QR code. Frames are processed on the device
+as you scan, are never written to disk and are never transmitted. You can decline camera access and
+add accounts by pasting a link or typing the secret instead.</p>
+
+<h2>Face ID, Touch ID and the app lock</h2>
+<p>The optional app lock uses the system authentication prompt. The app receives only a yes-or-no
+answer; your biometric data stays in the Secure Enclave and is never available to the app or the
+developer.</p>
+
+<h2>Clipboard</h2>
+<p>Copying a code puts it on the clipboard so you can paste it. Copies are removed automatically
+after the delay you choose in Settings, and stay on the device you copied them on unless you turn on
+sharing with your other Apple devices.</p>
+
+<h2>Widgets, Shortcuts and AutoFill</h2>
+<p>The widget, the Control Centre control, Shortcuts actions and the AutoFill extension read the
+same encrypted store on your device. Shortcuts and Spotlight see only service and account names —
+never secrets, PINs or codes. Nothing in these features transmits anything.</p>
+
+<h2>Network</h2>
+<p>The app makes no network requests of its own. It has no backend, no telemetry endpoint and no
+remote configuration. The only network activity is Apple's iCloud sync, performed by the operating
+system.</p>
+
+<h2>Third parties</h2>
+<p>None. The app contains no third-party libraries, SDKs, analytics tools, advertising networks or
+crash reporters. It is built entirely with Apple frameworks.</p>
+
+<h2>Data Apple collects</h2>
+<p>Apple independently collects App Store download and purchase data, and — only if you opted in on
+your device — aggregate analytics and crash reports. Any such information the developer can see is
+anonymised and aggregated, and cannot be tied to a person. That collection is governed by Apple's
+privacy policy, not this one.</p>
+
+<h2>Children</h2>
+<p>The app is not directed at children and collects no personal information from anyone, including
+children under 13 (or 16 in the EEA).</p>
+
+<h2>Your rights (GDPR, UK GDPR, CCPA/CPRA)</h2>
+<p>Because no personal data is transmitted to or processed by the developer, there is no controller
+or processor relationship over your app data, and no copy of it to give you, correct or erase — the
+data is in your hands, on your devices and in your own iCloud account. Rights of access,
+rectification, erasure, restriction, portability and objection are exercised directly there; see
+<a href="#deletion">Deleting your data</a>.</p>
+<p>No categories of personal information have been collected, sold or shared, and there is no
+cross-context behavioural advertising, so no "Do Not Sell or Share My Personal Information" link is
+required. If you email the developer or open an issue, whatever you choose to put in that message is
+processed only to answer you, on the basis of legitimate interest, and kept no longer than needed.
+You may complain to your local supervisory authority.</p>
+
+<h2 id="deletion">Deleting your data</h2>
+<ul>
+    <li><strong>In the app:</strong> swipe a code away, or use Select to remove several at once.
+    Deletions sync to your other devices.</li>
+    <li><strong>Everything on a device:</strong> delete the app. That removes its local storage.</li>
+    <li><strong>Synced copies:</strong> deleting the app does <em>not</em> clear iCloud. Remove the
+    accounts in the app first, or delete the app's iCloud data under Settings ▸ your name ▸ iCloud ▸
+    Manage Account Storage.</li>
+</ul>
+<p>The developer cannot delete your data for you, because the developer has no copy of it.</p>
+
+<h2>Security and reporting a problem</h2>
+<p>Secrets are encrypted at rest and never logged. As with any authenticator, a device compromised
+at the system level — or an iCloud account someone else controls — can expose the data on it, so
+keep a device passcode set and two-factor authentication on for your Apple Account.</p>
+<p>If you find a vulnerability, please report it privately through
+<a href="https://github.com/lucferbux/TOTP/security/advisories/new">GitHub Security Advisories</a>.
+You can expect an acknowledgement within five working days. Good-faith research is welcome and will
+never be met with legal action.</p>
+
+<h2>Open source</h2>
+<p>The app is open source under the MIT licence at
+<a href="https://github.com/lucferbux/TOTP">github.com/lucferbux/TOTP</a>. Every claim here — no
+network calls, encryption before storage, what is and is not synced — can be verified in the code.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes materially, the date above changes and the update is noted in the app's
+release notes. Previous versions remain in the repository's history.</p>
+
+<footer class="site">
+    <p><a href="./">Home</a> · <a href="support.html">Support</a> ·
+    <a href="https://github.com/lucferbux/TOTP">GitHub</a></p>
+</footer>
+
+</div>
+</body>
+</html>

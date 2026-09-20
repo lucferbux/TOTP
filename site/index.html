@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TOTP Authenticator — two-factor codes for iPhone, iPad and Mac</title>
+<meta name="description" content="A native, local-first authenticator for iPhone, iPad and Mac. Two-factor codes with optional iCloud sync, AutoFill, widgets and a fixed PIN prefix. No accounts, no tracking.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="site">
+    <div class="mark">T</div>
+    <a href="./">TOTP Authenticator</a>
+</header>
+<nav class="site">
+    <a href="./">Home</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="support.html">Support</a>
+    <a href="https://github.com/lucferbux/TOTP">GitHub</a>
+</nav>
+
+<h1>Two-factor codes that stay yours</h1>
+<p class="lead">A native authenticator for iPhone, iPad and Mac. Your codes are generated on your
+device, encrypted at rest, and synced only through your own iCloud — if you want them synced at all.</p>
+
+<div class="grid">
+    <div class="card">
+        <h3>PIN&nbsp;+&nbsp;code in one step</h3>
+        <p>Some workplace logins expect a fixed PIN typed straight before the six-digit code. Give an
+        account a prefix and TOTP copies and fills the whole value for you. The PIN is never shown on
+        screen.</p>
+    </div>
+    <div class="card">
+        <h3>Everywhere you sign in</h3>
+        <p>AutoFill on iPhone, iPad and Mac fills one-time-code fields — and password fields, when
+        your account uses a PIN. A menu bar app on the Mac keeps codes one click away.</p>
+    </div>
+    <div class="card">
+        <h3>Widgets, Control&nbsp;Centre, Siri</h3>
+        <p>Home Screen and Lock Screen widgets, a Control Centre button that copies a code in one tap,
+        and Shortcuts actions for anything else.</p>
+    </div>
+    <div class="card">
+        <h3>Private by construction</h3>
+        <p>No account to create, no analytics, no third-party code. Secrets are sealed with ChaChaPoly
+        before they touch storage, using a key shared only through your iCloud Keychain.</p>
+    </div>
+</div>
+
+<h2>Screenshots</h2>
+<div class="shots">
+    <img src="screenshots/iphone-codes.png" alt="The list of codes on iPhone" loading="lazy">
+    <img src="screenshots/iphone-select.png" alt="Selecting several accounts on iPhone" loading="lazy">
+    <img src="screenshots/ipad-grid.png" alt="The code grid on iPad" loading="lazy">
+</div>
+
+<h2>Getting started</h2>
+<div class="card">
+    <p><strong>Add an account.</strong> Tap <code>+</code>, then scan the QR code your service shows
+    when you turn on two-factor authentication. You can also choose a saved QR image, paste an
+    <code>otpauth://</code> link, or type the secret in by hand.</p>
+    <p><strong>Turn on AutoFill.</strong> iPhone and iPad: Settings ▸ General ▸ AutoFill &amp;
+    Passwords, then enable TOTP. Mac: System Settings ▸ General ▸ AutoFill &amp; Passwords.</p>
+    <p><strong>Sync, optionally.</strong> Sign in to iCloud and your accounts follow you to your other
+    devices. Everything is encrypted before it leaves the device.</p>
+</div>
+
+<h2>Requirements</h2>
+<p>iOS&nbsp;27, iPadOS&nbsp;27 or macOS&nbsp;27. One purchase covers all your devices.</p>
+
+<footer class="site">
+    <p>TOTP Authenticator is <a href="https://github.com/lucferbux/TOTP">open source</a> under the MIT
+    licence — the claims on this page can be checked in the code.</p>
+    <p><a href="privacy.html">Privacy Policy</a> · <a href="support.html">Support</a></p>
+</footer>
+
+</div>
+</body>
+</html>

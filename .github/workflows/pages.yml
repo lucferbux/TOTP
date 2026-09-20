@@ -1,0 +1,40 @@
+# Publishes the marketing site, privacy policy and support page from site/.
+#
+# site/ is deployed rather than docs/ on purpose: a docs/ Pages source runs Jekyll over the
+# repository's internal documentation and would publish ARCHITECTURE.md, CLOUDKIT.md and RFE.md as
+# indexable pages describing this app's CloudKit zone, App Group and encryption design. Those files
+# stay where they are, readable in the repo, and only site/ is served.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a half-finished deploy; queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5
