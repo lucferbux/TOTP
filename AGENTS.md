@@ -77,30 +77,34 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 9. Don't duplicate models in extensions — put shared code in `Shared/`.
 10. New CloudKit fields must be deployed to the Production schema before release; write optional
     fields only when they differ from the default.
+11. Read CloudKit through zone change tokens, never `CKQuery` — queries need indexes that an
+    auto-created schema lacks, and they can't report deletions.
+12. Never block syncing or launch on another subsystem (Spotlight, push registration); make those
+    fire-and-forget. Log failures with `os.Logger` instead of swallowing them.
 
 **UI**
-11. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:
+13. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:
     outer display compact, inner display regular and it ignores orientation locks).
-12. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
+14. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
     `ContentUnavailableView`, `Form`); they get Liquid Glass for free.
-13. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
+15. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
     shared helpers `floatingGlass(in:)` / `prominentActionStyle()`, which fall back on visionOS.
-14. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
+16. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
     Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider` or `Timer.publish`.
-15. Every interactive element needs an accessibility label; list rows and controls that tests drive
+17. Every interactive element needs an accessibility label; list rows and controls that tests drive
     need a stable `accessibilityIdentifier`.
-16. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
+18. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
     visionOS build keeps compiling.
-17. Keep iOS and macOS at parity; route platform differences through the existing shims
+19. Keep iOS and macOS at parity; route platform differences through the existing shims
     (`PlatformColors`, `ClipboardManager`, `SystemSettings`).
 
 **Workflow**
-18. Conventional Commits: `type(scope): subject` with
+20. Conventional Commits: `type(scope): subject` with
     types `feat|fix|docs|style|refactor|test|chore` and
     scopes `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`.
-19. Don't commit or push unless asked. Branch before committing on `main`.
-20. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
-21. Don't add third-party dependencies, and don't change an identifier in only one place.
+21. Don't commit or push unless asked. Branch before committing on `main`.
+22. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
+23. Don't add third-party dependencies, and don't change an identifier in only one place.
 
 ## Release
 
