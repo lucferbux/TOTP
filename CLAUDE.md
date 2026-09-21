@@ -116,11 +116,12 @@ List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 //        ToolbarSpacer(.fixed, placement: .bottomBar)
 //        ToolbarItem(placement: .bottomBar) { addButton }
 //    }
-//  • regular (iPad, Mac) — every action lives in the navigation bar next to Select; search keeps
-//    its default toolbar position.
-// Select mode ("Select" top-right) replaces add with a destructive trash button and the leading
-// item with "Select All"; the trash carries an accessibilityLabel with the count, since the glyph
-// alone can't show it. On compact widths selection is driven by List(selection:) with editMode
+//  • regular (iPad, Mac) — every action lives in the navigation bar: add, then an ellipsis menu
+//    ("moreMenu") holding "Select Accounts", each in its own glass group (ToolbarSpacer(.fixed)
+//    between them — without it they merge into one capsule). Search keeps its default position.
+// Select mode ("Select" on iPhone, ⋯ ▸ Select Accounts on iPad/Mac) replaces add with a destructive
+// trash button + "Done", and the leading item with "Select All"; the trash carries an
+// accessibilityLabel with the count, since the glyph alone can't show it. On compact widths selection is driven by List(selection:) with editMode
 // active; the grid uses its own checkmarks so iPad/Mac behave the same.
 
 // Layout adapts through size classes only — never idiom, orientation or screen size
@@ -196,7 +197,7 @@ PlatformColors.secondarySystemGroupedBackground
 - **Widget** (`TOTP Widget/`): `AppIntentTimelineProvider` emits entries aligned to period boundaries (`CodeTimeline`) for 10 periods (`policy: .atEnd`); codes are computed from `entry.date`. Tap-to-copy is `Button(intent: CopyCodeIntent)`. Widgets/intents/controls only list TOTP accounts (HOTP counters must be advanced by the app). Codes use `.privacySensitive()`.
 - **AutoFill** (`TOTP AutoFill/`, iOS + macOS): `ASOneTimeCodeCredentialIdentity` (+ `ASPasswordCredentialIdentity` when an account has a prefix). One-time-code requests complete with `ASOneTimeCodeCredential`; password requests with `ASPasswordCredential(password: prefix + code)`. Service identifiers come from associated domains, falling back to a normalized issuer.
 - **CloudKit schema**: the optional `algorithm` field is only written for non-SHA-1 accounts. New fields must be deployed to the Production schema in the CloudKit Console before release. Setup, deployment and troubleshooting live in [docs/CLOUDKIT.md](docs/CLOUDKIT.md) — including why the Console's record browser needs a `recordName` QUERYABLE index that the app must never depend on.
-- **macOS**: `MenuBarExtra` (`.window` style) menu bar mode with a **static** icon (macOS 27 hosts all status items in one window; don't animate it), ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
+- **macOS**: `MenuBarExtra` (`.window` style) menu bar mode with a **static** icon (macOS 27 hosts all status items in one window; don't animate it), ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, the main window opens on launch unless launch at login is on (`MacOSAppSettings.presentsWindowAtLaunch` — a launch that showed only a menu bar icon, possibly hidden by the notch, left App Review with nothing to look at), Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
 - **Select mode** (`ContentView`): `isSelecting` + `selection: Set<UUID>` drive batch delete through `SyncManager.deleteAccounts(withIds:)`, which removes them locally in one write, deletes each from CloudKit, then refreshes widgets, AutoFill and Spotlight once. Always confirm before deleting.
 - **App lock** (`AppLockManager`): optional, off by default, stored in the App Group; locks on background (iOS) or screen lock/sleep (macOS).
 

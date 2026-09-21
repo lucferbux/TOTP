@@ -88,37 +88,40 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 **UI**
 13. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:
     outer display compact, inner display regular and it ignores orientation locks).
-14. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
+14. Regular width (iPad, Mac): add and an ellipsis menu (holding Select) are separate toolbar
+    items with a `ToolbarSpacer(.fixed)` between them. The Mac main window opens at launch unless
+    launch at login is on — never ship a launch that shows only a menu bar icon.
+15. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
     `ContentUnavailableView`, `Form`); they get Liquid Glass for free.
-15. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
+16. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
     shared helpers `floatingGlass(in:)` / `prominentActionStyle()`, which fall back on visionOS.
-16. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
+17. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
     Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider` or `Timer.publish`.
-17. Every interactive element needs an accessibility label; list rows and controls that tests drive
+18. Every interactive element needs an accessibility label; list rows and controls that tests drive
     need a stable `accessibilityIdentifier`. Icon-only toolbar buttons must spell out any state the
     glyph can't show (e.g. the trash button's selected count).
-18. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
+19. Widgets: Lock Screen accessory families and Controls are iOS/macOS only — guard them so the
     visionOS build keeps compiling.
-19. Keep iOS and macOS at parity; route platform differences through the existing shims
+20. Keep iOS and macOS at parity; route platform differences through the existing shims
     (`PlatformColors`, `ClipboardManager`, `SystemSettings`).
 
 **Release**
-20. Listing copy lives in `fastlane/metadata/`; app-level fields (name, subtitle, privacy URL,
+21. Listing copy lives in `fastlane/metadata/`; app-level fields (name, subtitle, privacy URL,
     categories) only in the iOS tree, since App Store Connect shares them across platforms.
-21. No automation submits for review — lanes leave drafts for a human. Attaching the build is a
+22. No automation submits for review — lanes leave drafts for a human. Attaching the build is a
     separate step from pushing metadata, and `whatsNew` can't be set on a first version.
-22. The website is `site/`, published by GitHub Actions. Never point Pages at `docs/`.
-23. Screenshots come from `scripts/export-screenshots.sh`. The Mac shots are driven by
+23. The website is `site/`, published by GitHub Actions. Never point Pages at `docs/`.
+24. Screenshots come from `scripts/export-screenshots.sh`. The Mac shots are driven by
     `-ScreenshotMode -ScreenshotScene <name>` (debug-only launch arguments) rather than UI
     automation, which would need Accessibility permission.
 
 **Workflow**
-24. Conventional Commits: `type(scope): subject` with
+25. Conventional Commits: `type(scope): subject` with
     types `feat|fix|docs|style|refactor|test|chore` and
     scopes `app|widget|autofill|otp|storage|sync|ui|security|macos|intents`.
-25. Don't commit or push unless asked. Branch before committing on `main`.
-26. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
-27. Don't add third-party dependencies, and don't change an identifier in only one place.
+26. Don't commit or push unless asked. Branch before committing on `main`.
+27. Update `CLAUDE.md`, `AGENTS.md`, `README.md` and `docs/RFE.md` when behaviour or structure changes.
+28. Don't add third-party dependencies, and don't change an identifier in only one place.
 
 ## Release
 

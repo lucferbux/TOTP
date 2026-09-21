@@ -19,7 +19,7 @@ f) Widgets: add "TOTP" from the widget gallery.
 (The app is listed on the App Store as "TOTP Password"; on the device its short name is "TOTP".)
 
 MAC APP
-The Mac app lives in the menu bar: click the shield icon at the top right of the screen to see codes, and "Open TOTP" (Cmd+O) there for the full window. The Dock icon is off by default and can be turned on in Settings (Cmd+,).
+Opening the Mac app shows its main window. It also lives in the menu bar: the shield icon at the top right of the screen lists every code, and "Open TOTP" (Cmd+O) there brings the window back after it is closed. Closing the window keeps the app running in the menu bar; the Dock icon shows while the window is open and can be kept permanently in Settings (Cmd+,). The window stays hidden at launch only if the user turns on "Launch at login".
 
 4. EXTERNAL SERVICES
 Only Apple's iCloud: a private CloudKit database in the user's own iCloud account for sync, and iCloud Keychain for the encryption key. No servers of ours, no third-party SDKs, analytics, advertising, payment processors or AI services. Codes are computed on device with CryptoKit.
