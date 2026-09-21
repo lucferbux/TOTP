@@ -28,6 +28,20 @@ final class TOTPUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "account-\(title)").firstMatch
     }
 
+    /// What starts select mode: "Select" in the navigation bar on iPhone, the ⋯ menu on iPad and Mac.
+    private var selectEntryPoint: XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["moreMenu", "selectButton"])).firstMatch
+    }
+
+    private func enterSelectMode() {
+        let entry = selectEntryPoint
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        if entry.identifier == "moreMenu" { entry.tap() }
+        let select = app.buttons["selectButton"]
+        XCTAssertTrue(select.waitForExistence(timeout: 3))
+        select.tap()
+    }
+
     private func attach(_ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name
@@ -127,7 +141,7 @@ final class TOTPUITests: XCTestCase {
 
     func testBatchDeleteInSelectMode() {
         XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
-        app.buttons["selectButton"].tap()
+        enterSelectMode()
 
         accountElement("GitHub").tap()
         accountElement("Counter Bank").tap()
@@ -146,12 +160,12 @@ final class TOTPUITests: XCTestCase {
         waitForExpectations(timeout: 5)
         XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 3))
         // Select mode ends once the deletion completes
-        XCTAssertTrue(app.buttons["selectButton"].waitForExistence(timeout: 3))
+        XCTAssertTrue(selectEntryPoint.waitForExistence(timeout: 3))
     }
 
     func testSelectAllAndCancelSelection() {
         XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
-        app.buttons["selectButton"].tap()
+        enterSelectMode()
 
         app.buttons["selectAllButton"].tap()
         let delete = app.buttons["deleteSelectionButton"]
@@ -167,7 +181,7 @@ final class TOTPUITests: XCTestCase {
 
     func testDeleteButtonDisabledWithoutSelection() {
         XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
-        app.buttons["selectButton"].tap()
+        enterSelectMode()
         let delete = app.buttons["deleteSelectionButton"]
         XCTAssertTrue(delete.waitForExistence(timeout: 3))
         XCTAssertFalse(delete.isEnabled)
@@ -175,11 +189,11 @@ final class TOTPUITests: XCTestCase {
         XCTAssertFalse(app.buttons["addAccountButton"].exists)
     }
 
-    /// Add and Select must both be reachable without leaving the navigation bar.
+    /// Add and Select must both be reachable without leaving the navigation bar, as separate controls.
     func testAddAndSelectAreBothAvailable() {
         let add = app.buttons["addAccountButton"]
-        let select = app.buttons["selectButton"]
         XCTAssertTrue(add.waitForExistence(timeout: 5))
+        let select = selectEntryPoint
         XCTAssertTrue(select.exists)
         XCTAssertTrue(add.isHittable)
         XCTAssertTrue(select.isHittable)

@@ -326,12 +326,12 @@ public struct ContentView: View {
                 .accessibilityIdentifier("settingsButton")
             }
         }
-        if !syncManager.accounts.isEmpty {
-            ToolbarItem(placement: .topBarTrailing) {
-                selectButton
-            }
-        }
         if usesCompactList {
+            if !syncManager.accounts.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    selectButton
+                }
+            }
             // iPhone (and narrow splits): Notes-style bottom bar — search on the left, add on the right
             if isSelecting {
                 ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -346,21 +346,29 @@ public struct ContentView: View {
                 }
             }
         } else {
-            // iPad / regular width: every action sits in the navigation bar next to Select
-            ToolbarItem(placement: .topBarTrailing) {
-                if isSelecting {
+            // iPad / regular width: every action sits in the navigation bar, each in its own glass
+            // group — add, then a "more" menu that holds Select; while selecting, trash then Done.
+            if isSelecting {
+                ToolbarItem(placement: .topBarTrailing) {
                     deleteSelectionButton
-                } else {
+                }
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                ToolbarItem(placement: .topBarTrailing) {
+                    selectButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
                     addButton
+                }
+                if !syncManager.accounts.isEmpty {
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        moreMenu
+                    }
                 }
             }
         }
         #else
-        if !syncManager.accounts.isEmpty {
-            ToolbarItem(placement: .automatic) {
-                selectButton
-            }
-        }
         if isSelecting {
             ToolbarItem(placement: .automatic) {
                 Button(allSelected ? "Deselect All" : "Select All") { toggleSelectAll() }
@@ -369,9 +377,20 @@ public struct ContentView: View {
             ToolbarItem(placement: .automatic) {
                 deleteSelectionButton
             }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            addButton
+            ToolbarSpacer(.fixed)
+            ToolbarItem(placement: .automatic) {
+                selectButton
+            }
+        } else {
+            ToolbarItem(placement: .primaryAction) {
+                addButton
+            }
+            if !syncManager.accounts.isEmpty {
+                ToolbarSpacer(.fixed)
+                ToolbarItem(placement: .automatic) {
+                    moreMenu
+                }
+            }
         }
         #endif
     }
@@ -386,12 +405,35 @@ public struct ContentView: View {
 
     private var selectButton: some View {
         Button(isSelecting ? "Done" : "Select") {
-            withAnimation(.smooth(duration: 0.25)) {
-                isSelecting.toggle()
-                selection.removeAll()
-            }
+            toggleSelecting()
         }
         .accessibilityIdentifier(isSelecting ? "doneSelectingButton" : "selectButton")
+    }
+
+    /// Regular width: secondary actions behind an ellipsis, so add keeps its own button.
+    private var moreMenu: some View {
+        Menu {
+            Button {
+                toggleSelecting()
+            } label: {
+                Label("Select Accounts", systemImage: "checkmark.circle")
+            }
+            .accessibilityIdentifier("selectButton")
+        } label: {
+            Label("More", systemImage: "ellipsis")
+        }
+        #if os(macOS)
+        .menuIndicator(.hidden)
+        #endif
+        .accessibilityIdentifier("moreMenu")
+        .help("More actions")
+    }
+
+    private func toggleSelecting() {
+        withAnimation(.smooth(duration: 0.25)) {
+            isSelecting.toggle()
+            selection.removeAll()
+        }
     }
 
     private var deleteSelectionButton: some View {

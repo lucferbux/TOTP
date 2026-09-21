@@ -43,7 +43,11 @@ final class ScreenshotTests: XCTestCase {
         capture("02-copied")
 
         // Select mode with a couple of accounts ticked
-        if app.buttons["selectButton"].exists {
+        // iPhone shows "Select" in the navigation bar; iPad keeps it in the ⋯ menu
+        if app.buttons["moreMenu"].exists {
+            app.buttons["moreMenu"].tap()
+        }
+        if app.buttons["selectButton"].waitForExistence(timeout: 3) {
             app.buttons["selectButton"].tap()
             account("Fabrikam Mail").tap()
             account("Acme Bank").tap()
