@@ -1,24 +1,31 @@
-No account, sign-in or demo credentials are needed — the app works offline as soon as it opens.
+NO ACCOUNT, NO SIGN-IN
+There is no registration, login, user-generated content or paid content. The app works offline the moment it opens; no demo credentials are needed.
 
-ADDING A TEST ACCOUNT
-Tap + and paste this link (it is the RFC 6238 test vector, not a real account):
+1. SCREEN RECORDING
+Attached to our reply in App Review (iPhone and Mac, latest OS, physical devices).
+
+2. PURPOSE AND AUDIENCE
+TOTP Password is a general-purpose two-factor authenticator for anyone who has turned on 2FA for their online accounts. It generates the standard six-digit codes (RFC 6238 TOTP and RFC 4226 HOTP) that services such as email, cloud and developer sites ask for at sign-in, on iPhone, iPad and Mac from one purchase. What it adds over typing codes by hand: AutoFill of codes into sign-in fields, widgets, a Mac menu bar item, private iCloud sync between the user's own devices, and an optional fixed prefix (PIN) for services that require a PIN typed directly before the code. It is not built for, or restricted to, any specific company or organisation.
+
+3. HOW TO TRY IT
+a) Copy this link, then tap + (Mac: + in the window toolbar) and choose Paste. It is the public RFC 6238 test secret, not a real account:
 otpauth://totp/Example%20Corp:reviewer@example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Example%20Corp
-A six-digit code appears immediately and refreshes every 30 seconds. Tap the row to copy it.
-
-THE PIN PREFIX
-Editing an account shows a "Fixed Prefix (PIN)" field. Some workplace logins require a fixed PIN typed directly before the generated code; when one is set, the app copies and fills PIN + code together. It is deliberately never displayed — accounts that have one show a small "PIN" badge.
-
-AUTOFILL MUST BE ENABLED MANUALLY
-The credential provider only appears after it is turned on:
-iOS/iPadOS: Settings > General > AutoFill & Passwords > enable "TOTP"
-macOS: System Settings > General > AutoFill & Passwords > enable "TOTP"
-Without that step the extension is inactive, which can look like it is not working.
-
-ICLOUD SYNC
-Accounts sync through the user's own private CloudKit database. It cannot be demonstrated end-to-end on a single device, and the developer has no access to that data.
+Alternatively type Issuer "Example Corp" and Secret Key GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ.
+b) Tap Add. A code appears and refreshes every 30 seconds. Tap the row (Mac: click) to copy it.
+c) PIN prefix: open the account, fill "Fixed Prefix (PIN)", save. The row shows a "PIN" badge (the PIN itself is never displayed) and copying now yields PIN + code.
+d) Select (top right) enters multi-select for batch deletion.
+e) AutoFill must be enabled once by the user: iOS Settings > General > AutoFill & Passwords > enable "TOTP"; macOS System Settings > General > AutoFill & Passwords > enable "TOTP".
+f) Widgets: add "TOTP" from the widget gallery.
+(The app is listed on the App Store as "TOTP Password"; on the device its short name is "TOTP".)
 
 MAC APP
-The Mac app runs in the menu bar and its main window is hidden at launch by design. Click the menu bar icon (a shield) to see the codes, or use "Open TOTP" in that menu.
+The Mac app lives in the menu bar: click the shield icon at the top right of the screen to see codes, and "Open TOTP" (Cmd+O) there for the full window. The Dock icon is off by default and can be turned on in Settings (Cmd+,).
 
-ENCRYPTION
-Only Apple-provided cryptography is used (CryptoKit HMAC for RFC 4226/6238 codes and ChaChaPoly to encrypt data at rest), so the app qualifies for the export-compliance exemption. ITSAppUsesNonExemptEncryption is set to NO in the bundle.
+4. EXTERNAL SERVICES
+Only Apple's iCloud: a private CloudKit database in the user's own iCloud account for sync, and iCloud Keychain for the encryption key. No servers of ours, no third-party SDKs, analytics, advertising, payment processors or AI services. Codes are computed on device with CryptoKit.
+
+5. REGIONS
+The app functions identically in all regions; there is no regional content or feature difference.
+
+6. REGULATION / THIRD-PARTY MATERIAL
+Not a regulated service and contains no protected third-party material. It implements open IETF standards (RFC 4226/6238); users add secrets issued to them by their own services. Only Apple-provided cryptography is used (export-compliance exemption, ITSAppUsesNonExemptEncryption = NO).
