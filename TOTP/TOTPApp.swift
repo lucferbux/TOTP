@@ -46,7 +46,9 @@ struct TOTPApp: App {
         #if os(macOS)
         .windowToolbarStyle(.unified)
         .defaultSize(width: 820, height: 600)
-        .defaultLaunchBehavior(AppEnvironment.isUITesting ? .presented : .suppressed)
+        .defaultLaunchBehavior(
+            AppEnvironment.isUITesting || MacOSAppSettings.shared.presentsWindowAtLaunch ? .presented : .suppressed
+        )
         #endif
         .commands {
             AccountCommands()
@@ -136,8 +138,15 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
         if !AppEnvironment.isUITesting {
             NSApplication.shared.registerForRemoteNotifications()
         }
-        MacOSAppSettings.shared.applyDockIconPolicy()
-        // The main window is suppressed at launch, so start syncing here rather than from a view.
+        if MacOSAppSettings.shared.presentsWindowAtLaunch {
+            // The window opens at launch: show the Dock icon while it's up, like "Open TOTP" does.
+            // Closing the last window re-applies the Dock preference.
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate()
+        } else {
+            MacOSAppSettings.shared.applyDockIconPolicy()
+        }
+        // At login the main window is suppressed, so start syncing here rather than from a view.
         Task { @MainActor in SyncManager.shared.startIfNeeded() }
         #if DEBUG
         positionWindowForScreenshotsIfNeeded()
@@ -158,18 +167,10 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
         let size = CGSize(width: 1440, height: 900)
         let insetFromTop: CGFloat = 100
 
-        // A scene can end up with a second, empty main window on top of the real one. The window
-        // we want is the one carrying the toolbar; the rest are ordered out so they can't be shot.
         func mainWindows() -> [NSWindow] {
-            let titled = NSApp.windows.filter {
+            NSApp.windows.filter {
                 $0.isVisible && $0.canBecomeMain && $0.styleMask.contains(.titled) && !($0 is NSPanel)
             }
-            let withToolbar = titled.filter { $0.toolbar != nil }
-            guard !withToolbar.isEmpty else { return titled }
-            for extra in titled where extra.toolbar == nil {
-                extra.orderOut(nil)
-            }
-            return withToolbar
         }
 
         // Applied several times because presenting a sheet or entering select mode rebuilds the

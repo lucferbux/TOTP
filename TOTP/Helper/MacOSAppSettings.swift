@@ -84,6 +84,13 @@ final class MacOSAppSettings: ObservableObject {
     var loginItemStatus: SMAppService.Status {
         return SMAppService.mainApp.status
     }
+
+    /// Whether the main window opens when the app launches. It stays hidden only once the user has
+    /// turned on launch at login and so knows the app lives in the menu bar; otherwise opening the
+    /// app would show nothing but a menu bar icon, which a notch can even hide.
+    var presentsWindowAtLaunch: Bool {
+        !(launchAtLogin && SMAppService.mainApp.status == .enabled)
+    }
     
     // MARK: - Window Management
     

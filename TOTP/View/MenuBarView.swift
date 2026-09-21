@@ -121,7 +121,7 @@ struct MenuBarView: View {
         }
         .frame(width: 320)
         .task {
-            // The main window is suppressed at launch (`.defaultLaunchBehavior(.suppressed)`),
+            // The main window is suppressed when the app starts at login,
             // so `initializeSync()` may not have run yet when the app starts straight into the
             // menu bar. Load locally-stored accounts so the list is populated without first
             // having to open the main window.
