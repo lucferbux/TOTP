@@ -51,6 +51,7 @@ struct KeyLifecycleTests {
 }
 
 @Suite("Ciphertext is never dropped")
+@MainActor
 struct CiphertextPreservationTests {
     let key = SymmetricKey(size: .bits256)
     let secret = Data("12345678901234567890".utf8)
@@ -121,6 +122,7 @@ struct CiphertextPreservationTests {
 }
 
 @Suite("Prefix is secret")
+@MainActor
 struct PrefixSecrecyTests {
     let key = SymmetricKey(size: .bits256)
     let secret = Data("12345678901234567890".utf8)

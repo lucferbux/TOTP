@@ -12,6 +12,7 @@ import CloudKit
 @testable import TOTP
 
 @Suite("Encrypted storage")
+@MainActor
 struct StorageTests {
     let key = SymmetricKey(size: .bits256)
     let secret = Data("12345678901234567890".utf8)
@@ -93,15 +94,21 @@ struct StorageTests {
         #expect(accounts.map(\.issuer) == ["Example Corp"])
     }
 
-    @Test("Creation date is preserved across saves")
+    @Test("Creation date is preserved across saves, and saving doesn't count as editing")
     func createdDatePreserved() throws {
-        let accounts = sample()
+        let edited = Date(timeIntervalSince1970: 500)
+        let accounts = sample().map { account in
+            var account = account
+            account.modifiedDate = edited
+            return account
+        }
         let first = try AccountStore.encode(accounts, key: key, now: Date(timeIntervalSince1970: 1000))
         let previous = try JSONDecoder().decode([StoredOtpAccount].self, from: first)
         let second = try AccountStore.encode(accounts, key: key, previous: previous, now: Date(timeIntervalSince1970: 2000))
         let records = try JSONDecoder().decode([StoredOtpAccount].self, from: second)
         #expect(records.allSatisfy { $0.createdDate == Date(timeIntervalSince1970: 1000) })
-        #expect(records.allSatisfy { $0.modifiedDate == Date(timeIntervalSince1970: 2000) })
+        #expect(records.allSatisfy { $0.modifiedDate == edited })
+        #expect(try AccountStore.decode(second, key: key).allSatisfy { $0.modifiedDate == edited })
     }
 
     @Test("AccountStore.loadAccounts reads what SharedDataManager writes")
@@ -188,7 +195,7 @@ struct StorageTests {
 
         var edited = accounts[0]
         edited.prefix = "NEWPIN"
-        try await manager.updateAccount(edited)
+        try manager.updateAccount(edited)
         manager.moveAccounts(fromOffsets: IndexSet(integer: 1), toOffset: 0)
 
         let reloaded = SharedDataManager(userDefaults: defaults, encryptionKey: key)
@@ -199,7 +206,7 @@ struct StorageTests {
         #expect(SharedDataManager(userDefaults: defaults, encryptionKey: key).accounts.map(\.issuer) == ["Example Corp"])
 
         let missing = OtpModel(issuer: "Ghost", entry: .totp(key: secret, digits: 6, interval: 30))
-        await #expect(throws: SharedDataError.self) { try await manager.updateAccount(missing) }
+        #expect(throws: SharedDataError.self) { try manager.updateAccount(missing) }
     }
 }
 
@@ -236,12 +243,37 @@ struct CloudKitMappingTests {
         #expect(record.recordType == "TOTPAccount")
     }
 
+    @Test("The edit date travels with the record, untouched by the upload")
+    func modifiedDateRoundTrip() throws {
+        let edited = Date(timeIntervalSince1970: 1_700_000_000)
+        let model = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30), modifiedDate: edited)
+        let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord()
+        #expect(record["modifiedDate"] as? Date == edited)
+        #expect(try CloudKitOtpModel(from: record)?.toOtpModel().modifiedDate == edited)
+    }
+
     @Test("HOTP counter maps both ways")
     func hotpCounter() throws {
         let model = OtpModel(issuer: "Bank", entry: .hotp(key: secret, digits: 6, counter: 99))
         let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord()
         #expect(record["counter"] as? Int64 == 99)
         #expect(try CloudKitOtpModel(from: record)?.toOtpModel().entry.counter == 99)
+    }
+
+    @Test("Records with a period code generation can't use are skipped", arguments: [Double.nan, .infinity, 0])
+    func malformedIntervalIsRejected(interval: Double) throws {
+        let model = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+        let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord()
+        record["interval"] = interval
+        #expect(CloudKitOtpModel(from: record) == nil)
+    }
+
+    @Test("Records with an impossible number of digits are skipped", arguments: [0, 64])
+    func malformedDigitsAreRejected(digits: Int) throws {
+        let model = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+        let record = try CloudKitOtpModel.from(otpModel: model).toCKRecord()
+        record["digits"] = digits
+        #expect(CloudKitOtpModel(from: record) == nil)
     }
 }
 
@@ -277,6 +309,67 @@ struct SyncMergeTests {
         #expect(SyncManager.serviceIdentifier(for: withDomain).identifier == "sso.example.com")
         let issuerOnly = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
         #expect(SyncManager.serviceIdentifier(for: issuerOnly).identifier == "examplecorp")
+    }
+
+    @Test("The later edit wins, in whichever direction it lies")
+    func lastWriteWins() {
+        let old = Date(timeIntervalSince1970: 1_000)
+        let new = Date(timeIntervalSince1970: 2_000)
+        let renamedHere = OtpModel(issuer: "Example Corp", name: "renamed here", entry: .totp(key: secret, digits: 6, interval: 30), modifiedDate: new)
+        var stale = renamedHere
+        stale.name = "old name"
+        stale.modifiedDate = old
+
+        let renamedThere = OtpModel(issuer: "GitHub", name: "renamed there", prefix: "4321", entry: .totp(key: secret, digits: 6, interval: 30), modifiedDate: new)
+        var outdated = renamedThere
+        outdated.name = "old name"
+        outdated.prefix = nil
+        outdated.modifiedDate = old
+
+        // Same content, different dates (e.g. a millisecond lost on the round trip): nothing to do
+        var unchanged = OtpModel(issuer: "Bank", entry: .totp(key: secret, digits: 6, interval: 30), modifiedDate: new)
+        let unchangedCloud = unchanged
+        unchanged.modifiedDate = old
+
+        let result = SyncManager.reconcile(local: [renamedHere, outdated, unchanged], cloud: [stale, renamedThere, unchangedCloud])
+        #expect(result.cloud.map(\.name) == ["renamed here"])
+        #expect(result.local.map(\.name) == ["renamed there"])
+        #expect(result.local.first?.prefix == "4321")
+        #expect(result.local.first?.modifiedDate == new)   // an applied edit keeps its date
+    }
+
+    @Test("A re-keyed HOTP secret keeps its own counter instead of the old secret's")
+    func rekeyedHotpStartsOver() {
+        let old = OtpModel(issuer: "Bank", entry: .hotp(key: secret, digits: 6, counter: 40), modifiedDate: Date(timeIntervalSince1970: 1_000))
+        var rekeyed = old
+        rekeyed.entry = .hotp(key: Data("abcdefghijabcdefghij".utf8), digits: 6, counter: 0)
+        rekeyed.modifiedDate = Date(timeIntervalSince1970: 2_000)
+        #expect(OtpModel.resolved(old, rekeyed).entry.counter == 0)
+        #expect(OtpModel.resolved(rekeyed, old).entry.counter == 0)
+    }
+
+    @Test("HOTP counters converge on the higher one, in whichever direction it lies")
+    func hotpCountersTakeTheHigher() {
+        let ahead = OtpModel(issuer: "Bank", entry: .hotp(key: secret, digits: 6, counter: 12))
+        let behind = OtpModel(issuer: "Brokerage", entry: .hotp(key: secret, digits: 6, counter: 3))
+        let same = OtpModel(issuer: "Credit Union", entry: .hotp(key: secret, digits: 6, counter: 7))
+        let totp = OtpModel(issuer: "Example Corp", entry: .totp(key: secret, digits: 6, interval: 30))
+
+        func withCounter(_ account: OtpModel, _ counter: UInt64) -> OtpModel {
+            var copy = account
+            copy.entry = .hotp(key: secret, digits: 6, counter: counter)
+            return copy
+        }
+        let cloud = [withCounter(ahead, 5), withCounter(behind, 9), same, totp]
+
+        let result = SyncManager.reconcile(local: [ahead, behind, same, totp], cloud: cloud)
+        // This device used more Bank codes: iCloud must move forward
+        #expect(result.cloud.map(\.id) == [ahead.id])
+        #expect(result.cloud.first?.entry.counter == 12)
+        // Another device used more Brokerage codes: this device must move forward, keeping its secret
+        #expect(result.local.map(\.id) == [behind.id])
+        #expect(result.local.first?.entry.counter == 9)
+        #expect(result.local.first?.entry.key == secret)
     }
 }
 

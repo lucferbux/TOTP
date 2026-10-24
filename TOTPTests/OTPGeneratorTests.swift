@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import TOTP
 
 @Suite("OTP generation")
@@ -116,6 +117,29 @@ struct OTPGeneratorTests {
     ])
     func grouping(raw: String, grouped: String) {
         #expect(raw.groupedOTP == grouped)
+    }
+
+    @Test("A damaged period never traps; it falls back to 30 s", arguments: [Double.nan, .infinity, -.infinity])
+    func unusablePeriod(interval: Double) {
+        let damaged = OtpEntry.totp(key: Self.sha1Seed, digits: 6, interval: interval)
+        let standard = OtpEntry.totp(key: Self.sha1Seed, digits: 6, interval: 30)
+        let date = Date(timeIntervalSince1970: 1_700_000_010)
+        #expect(damaged.code(at: date) == standard.code(at: date))
+        #expect(damaged.secondsRemaining(at: date) == standard.secondsRemaining(at: date))
+        #expect(CodeTimeline.refreshDates(for: [damaged], now: date, count: 3).count == 3)
+    }
+
+    @Test("Live codes tick on whole wall-clock seconds, so every row changes in the same frame")
+    func codeTicksAlignToSeconds() {
+        let start = Date(timeIntervalSince1970: 1_700_000_010.37)
+        let dates = Array(CodeTickSchedule().entries(from: start, mode: .normal).prefix(4))
+        #expect(dates == [start] + [11, 12, 13].map { Date(timeIntervalSince1970: 1_700_000_000 + $0) })
+    }
+
+    @Test("Paused live codes draw once and then stop")
+    func pausedCodeTicksStop() {
+        let start = Date(timeIntervalSince1970: 1_700_000_010.37)
+        #expect(Array(CodeTickSchedule(isPaused: true).entries(from: start, mode: .normal)) == [start])
     }
 
     @Test("Algorithm parsing is lenient")

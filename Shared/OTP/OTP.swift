@@ -36,8 +36,15 @@ public enum OtpEntry: Hashable, Sendable {
 
     /// TOTP period in seconds (`nil` for HOTP).
     public var interval: Double? {
-        if case let .totp(_, _, interval, _) = self { return interval }
+        if case let .totp(_, _, interval, _) = self { return Self.usableInterval(interval) }
         return nil
+    }
+
+    /// A period the math can't trap on. Every entry point limits periods to 1…300 s, but a damaged
+    /// record could still carry NaN, infinity or 0, and `UInt64(nan)` crashes the app, the widget
+    /// and AutoFill alike. Valid values pass through unchanged, so no existing code moves.
+    static func usableInterval(_ interval: Double) -> Double {
+        interval.isFinite ? max(interval, 1) : 30
     }
 
     /// HOTP counter (`nil` for TOTP).
@@ -72,7 +79,7 @@ public enum OtpEntry: Hashable, Sendable {
     /// RFC 6238 time step `T = floor(unixTime / X)`.
     public static func timeStep(at date: Date, interval: Double) -> UInt64 {
         let seconds = max(0, date.timeIntervalSince1970)
-        return UInt64(floor(seconds / max(interval, 1)))
+        return UInt64(floor(seconds / usableInterval(interval)))
     }
 
     /// Start of the period that contains `date` (TOTP only).

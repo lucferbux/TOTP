@@ -50,7 +50,10 @@ public enum AppEnvironment {
     }()
 }
 
-public final class SharedDataManager: ObservableObject, @unchecked Sendable {
+/// Main-actor isolated: views observe `accounts`, and every mutation re-seals and rewrites the
+/// whole store, so two threads must never interleave here.
+@MainActor
+public final class SharedDataManager: ObservableObject {
     public static let shared = SharedDataManager()
 
     private static let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Storage")
@@ -109,7 +112,7 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
 
     /// Re-seals stored records with the current primary key, but only when every record was readable
     /// — re-writing a partially readable store would drop the records we couldn't open.
-    private func resealIfNeeded() {
+    func resealIfNeeded() {
         guard !accounts.isEmpty, unreadableRecords.isEmpty, storedUsesLegacyKey else { return }
         persist()
     }
@@ -161,12 +164,12 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
         persist()
     }
 
-    public func saveAccount(_ account: OtpModel) async throws {
+    public func saveAccount(_ account: OtpModel) throws {
         accounts.append(account)
         if !persist(), let error { throw error }
     }
 
-    public func updateAccount(_ account: OtpModel) async throws {
+    public func updateAccount(_ account: OtpModel) throws {
         guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
             throw SharedDataError.accountNotFound
         }
@@ -215,7 +218,7 @@ public final class SharedDataManager: ObservableObject, @unchecked Sendable {
         resealIfNeeded()
     }
 
-    public static func getSharedEncryptionKey() -> SymmetricKey? {
+    public nonisolated static func getSharedEncryptionKey() -> SymmetricKey? {
         EncryptionKeyManager.existingKey()
     }
 

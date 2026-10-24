@@ -544,15 +544,12 @@ public struct ContentView: View {
     }
 
     private func copy(_ account: OtpModel) {
-        Task {
-            let value = await syncManager.useCode(for: account)
-            ClipboardManager.copy(value)
-            withAnimation(.smooth(duration: 0.25)) {
-                copiedAccountID = account.id
-            }
-            copyCount += 1
-            AccessibilityNotification.Announcement("Code copied").post()
+        ClipboardManager.copy(syncManager.useCode(for: account))
+        withAnimation(.smooth(duration: 0.25)) {
+            copiedAccountID = account.id
         }
+        copyCount += 1
+        AccessibilityNotification.Announcement("Code copied").post()
     }
 }
 

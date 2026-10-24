@@ -205,9 +205,8 @@ struct MenuBarView: View {
     // MARK: - Actions
 
     private func copyCode(for account: OtpModel) {
+        ClipboardManager.copy(syncManager.useCode(for: account))
         Task {
-            let value = await syncManager.useCode(for: account)
-            ClipboardManager.copy(value)
             withAnimation(.smooth(duration: 0.2)) {
                 copiedAccountId = account.id
             }

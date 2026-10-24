@@ -19,14 +19,17 @@ import os
 
 private let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "CloudKit")
 
-public class CloudKitDataManager: ObservableObject {
+/// Main-actor isolated, like everything that observes it. CloudKit's async APIs suspend without
+/// blocking the main thread.
+@MainActor
+public final class CloudKitDataManager: ObservableObject {
     public static let shared = CloudKitDataManager()
 
     private let container: CKContainer
     private let privateDatabase: CKDatabase
 
     /// Dedicated zone: the default zone doesn't support change tokens.
-    static let zoneName = "TOTPAccounts"
+    nonisolated static let zoneName = "TOTPAccounts"
     private let zoneID = CKRecordZone.ID(zoneName: CloudKitDataManager.zoneName, ownerName: CKCurrentUserDefaultName)
 
     @Published public var accounts: [CloudKitOtpModel] = []
@@ -55,7 +58,6 @@ public class CloudKitDataManager: ObservableObject {
 
     // MARK: - Account Status
 
-    @MainActor
     public func checkAccountStatus() async {
         do {
             let status = try await container.accountStatus()
@@ -82,7 +84,6 @@ public class CloudKitDataManager: ObservableObject {
     }
 
     /// Subscribes to zone changes so other devices' edits arrive as silent pushes.
-    @MainActor
     public func registerForRemoteNotifications() async {
         guard !hasRegisteredSubscription, accountStatus == .available else { return }
         do {
@@ -105,15 +106,10 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
-    public func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> Bool {
-        guard let info = userInfo as? [String: NSObject],
-              CKNotification(fromRemoteNotificationDictionary: info) != nil else {
-            return false
-        }
-        logger.info("Received CloudKit push; fetching changes")
-        await loadAccounts()
-        return true
+    /// Whether a remote notification comes from CloudKit (our zone subscription).
+    public nonisolated func isZoneNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard let info = userInfo as? [String: NSObject] else { return false }
+        return CKNotification(fromRemoteNotificationDictionary: info) != nil
     }
 
     // MARK: - Change token
@@ -135,7 +131,6 @@ public class CloudKitDataManager: ObservableObject {
     // MARK: - Data Operations
 
     /// Pulls everything that changed in the zone since the last fetch.
-    @MainActor
     public func loadAccounts() async {
         guard accountStatus == .available else {
             self.error = CloudKitError.accountNotAvailable
@@ -179,7 +174,6 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
     private func fetchChanges(since token: CKServerChangeToken?) async throws {
         var token = token
         var more = true
@@ -223,7 +217,6 @@ public class CloudKitDataManager: ObservableObject {
 
     /// Moves records written by 3.x into the zone (they were saved in the default zone, where
     /// they can't be fetched incrementally). Records are looked up by ID, so no index is needed.
-    @MainActor
     public func migrateDefaultZoneRecords(ids: [String]) async {
         guard accountStatus == .available, !ids.isEmpty else { return }
         let migratedKey = "cloudkit_default_zone_migrated"
@@ -241,7 +234,7 @@ public class CloudKitDataManager: ObservableObject {
                     copy[key] = legacy[key]
                 }
                 _ = try await privateDatabase.save(copy)
-                try? await privateDatabase.deleteRecord(withID: legacyID)
+                _ = try? await privateDatabase.deleteRecord(withID: legacyID)
                 migrated += 1
             }
             AppGroup.defaults.set(true, forKey: migratedKey)
@@ -255,12 +248,10 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
     public func saveAccount(_ account: CloudKitOtpModel) async throws {
         try await saveAccount(account, retryOnConflict: true)
     }
 
-    @MainActor
     private func saveAccount(_ account: CloudKitOtpModel, retryOnConflict: Bool) async throws {
         guard accountStatus == .available else {
             throw CloudKitError.accountNotAvailable
@@ -271,30 +262,21 @@ public class CloudKitDataManager: ObservableObject {
 
         do {
             try await ensureZone()
-            account.modifiedDate = Date()
             let record = account.toCKRecord(in: zoneID)
 
             let savedRecord = try await privateDatabase.save(record)
             account.record = savedRecord
             logger.info("Saved a record to iCloud")
-
-            if let index = accounts.firstIndex(where: { $0.id == account.id }) {
-                accounts[index] = account
-            } else {
-                accounts.append(account)
-            }
+            cache(account)
 
             self.lastSyncDate = Date()
             self.error = nil
 
         } catch let error as CKError {
-            if error.code == .serverRecordChanged && retryOnConflict {
-                // Last-write-wins: take the server record and overwrite it
-                if let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
-                    account.record = serverRecord
-                    try await saveAccount(account, retryOnConflict: false)
-                    return
-                }
+            if error.code == .serverRecordChanged && retryOnConflict,
+               let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
+                try await resolveConflict(saving: account, against: serverRecord)
+                return
             }
             handle(error)
             throw CloudKitError.saveFailed(error)
@@ -304,7 +286,34 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
+    /// Another device saved this record first. Keep whichever edit is later — and the higher HOTP
+    /// counter either way — instead of blindly overwriting the server's copy.
+    private func resolveConflict(saving account: CloudKitOtpModel, against serverRecord: CKRecord) async throws {
+        let server = CloudKitOtpModel(from: serverRecord)
+        guard let server, let theirs = try? server.toOtpModel(), let mine = try? account.toOtpModel() else {
+            // Can't read one side: the server's copy may be newer, so don't write over it blindly
+            logger.error("Conflicting iCloud record could not be compared; keeping the server copy")
+            if let server { cache(server) }
+            return
+        }
+        let resolved = OtpModel.resolved(mine, theirs)
+        if resolved.hasSameContent(as: theirs) {
+            cache(server)
+            return
+        }
+        account.record = serverRecord
+        try account.apply(resolved)
+        try await saveAccount(account, retryOnConflict: false)
+    }
+
+    private func cache(_ account: CloudKitOtpModel) {
+        if let index = accounts.firstIndex(where: { $0.id == account.id }) {
+            accounts[index] = account
+        } else {
+            accounts.append(account)
+        }
+    }
+
     public func deleteAccount(_ account: CloudKitOtpModel) async throws {
         guard accountStatus == .available else {
             throw CloudKitError.accountNotAvailable
@@ -332,7 +341,6 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
     public func syncAccounts() async {
         await loadAccounts()
     }
@@ -362,7 +370,6 @@ public class CloudKitDataManager: ObservableObject {
 
     // MARK: - Error Handling
 
-    @MainActor
     private func handle(_ error: Error) {
         if let ckError = error as? CKError {
             logger.error("CloudKit error \(ckError.errorCode, privacy: .public): \(ckError.localizedDescription, privacy: .public)")
@@ -400,13 +407,11 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
     public func addOtpModel(_ otpModel: OtpModel) async throws {
         let cloudKitModel = try CloudKitOtpModel.from(otpModel: otpModel)
         try await saveAccount(cloudKitModel)
     }
 
-    @MainActor
     public func updateOtpModel(_ otpModel: OtpModel) async throws {
         if let existingIndex = accounts.firstIndex(where: { $0.id == otpModel.id.uuidString }) {
             let cloudKitModel = accounts[existingIndex]
@@ -417,13 +422,21 @@ public class CloudKitDataManager: ObservableObject {
         }
     }
 
-    @MainActor
     public func deleteOtpModel(withId id: String) async throws {
         if let account = accounts.first(where: { $0.id == id }) {
             try await deleteAccount(account)
         } else {
-            // Not in our cached list (e.g. never fetched): delete by ID anyway
-            try? await privateDatabase.deleteRecord(withID: CKRecord.ID(recordName: id, zoneID: zoneID))
+            // Not in our cached list (e.g. never fetched): delete by ID anyway. Only "it isn't
+            // there" counts as done — any other failure must be retried, or the account comes back.
+            guard accountStatus == .available else { throw CloudKitError.accountNotAvailable }
+            do {
+                _ = try await privateDatabase.deleteRecord(withID: CKRecord.ID(recordName: id, zoneID: zoneID))
+            } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+                return
+            } catch let error as CKError {
+                handle(error)
+                throw CloudKitError.deleteFailed(error)
+            }
         }
     }
 }

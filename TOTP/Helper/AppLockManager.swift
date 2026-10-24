@@ -111,6 +111,8 @@ final class AppLockManager: ObservableObject {
         isEnabled = enabled
         AppPreferences.appLockEnabled = enabled
         isLocked = false
+        // Spotlight drops (or regains) account names with the lock; widgets re-read the preference
+        SyncManager.shared.appLockDidChange()
     }
 
     private func authenticate(reason: String) async -> Bool {

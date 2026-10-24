@@ -80,7 +80,9 @@ public class CloudKitOtpModel: ObservableObject {
               let interval = record["interval"] as? Double,
               let counter = record["counter"] as? Int64,
               let createdDate = record["createdDate"] as? Date,
-              let modifiedDate = record["modifiedDate"] as? Date else {
+              let modifiedDate = record["modifiedDate"] as? Date,
+              // Records come off the network: skip anything code generation can't handle
+              (1...10).contains(digits), interval.isFinite, interval >= 1 else {
             return nil
         }
         
@@ -120,7 +122,7 @@ public class CloudKitOtpModel: ObservableObject {
         record["interval"] = interval
         record["counter"] = counter
         record["createdDate"] = createdDate
-        record["modifiedDate"] = Date() // Always update modified date when saving
+        record["modifiedDate"] = modifiedDate   // when the account was edited, not when it was uploaded
         record["associatedDomains"] = associatedDomains
         if let algorithm {
             record["algorithm"] = algorithm
@@ -161,7 +163,8 @@ public class CloudKitOtpModel: ObservableObject {
             name: name,
             prefix: resolvedPrefix,
             entry: entry,
-            associatedDomains: associatedDomains
+            associatedDomains: associatedDomains,
+            modifiedDate: modifiedDate
         )
     }
     
@@ -191,6 +194,7 @@ public class CloudKitOtpModel: ObservableObject {
         interval = entry.interval ?? 30
         counter = Int64(clamping: entry.counter ?? 0)
         algorithm = entry.algorithm == .sha1 ? nil : entry.algorithm.rawValue
+        modifiedDate = otpModel.modifiedDate
     }
 }
 

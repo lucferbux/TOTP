@@ -81,7 +81,7 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
         encryptedPrefix = try container.decodeIfPresent(Data.self, forKey: .encryptedPrefix)
     }
 
-    public init(model: OtpModel, key: SymmetricKey, createdDate: Date = .now, modifiedDate: Date = .now) throws {
+    public init(model: OtpModel, key: SymmetricKey, createdDate: Date = .now) throws {
         let entry = model.entry
         let sealedPrefix = try model.prefix.flatMap { prefix -> Data? in
             prefix.isEmpty ? nil : try AccountCrypto.seal(Data(prefix.utf8), using: key)
@@ -97,7 +97,7 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
             interval: entry.interval ?? 30,
             counter: Int64(clamping: entry.counter ?? 0),
             createdDate: createdDate,
-            modifiedDate: modifiedDate,
+            modifiedDate: model.modifiedDate,
             associatedDomains: model.associatedDomains,
             algorithm: entry.algorithm == .sha1 ? nil : entry.algorithm.rawValue,
             encryptedPrefix: sealedPrefix
@@ -129,7 +129,8 @@ public struct StoredOtpAccount: Codable, Equatable, Sendable {
             name: name,
             prefix: resolvedPrefix,
             entry: entry,
-            associatedDomains: associatedDomains
+            associatedDomains: associatedDomains,
+            modifiedDate: modifiedDate
         )
     }
 
@@ -207,12 +208,13 @@ public enum AccountStore {
     }
 
     /// Encodes accounts, keeping the original creation date of accounts already present in `previous`.
+    /// Each record keeps its account's own `modifiedDate`: saving is not editing.
     /// `preserving` records are written back byte-for-byte — use it for records that couldn't be
     /// decrypted, so a save can never erase them.
     public static func encode(_ accounts: [OtpModel], key: SymmetricKey, previous: [StoredOtpAccount] = [], preserving: [StoredOtpAccount] = [], now: Date = .now) throws -> Data {
         let created = Dictionary(previous.map { ($0.id, $0.createdDate) }, uniquingKeysWith: { first, _ in first })
         let stored = try accounts.map { account in
-            try StoredOtpAccount(model: account, key: key, createdDate: created[account.id.uuidString] ?? now, modifiedDate: now)
+            try StoredOtpAccount(model: account, key: key, createdDate: created[account.id.uuidString] ?? now)
         }
         return try JSONEncoder().encode(stored + preserving)
     }
