@@ -68,8 +68,13 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 4. The prefix is never rendered on screen; show the "PIN" badge instead. It is secret material:
    sealed before storage or upload, never logged.
 5. Extensions only read the encryption key (`EncryptionKeyManager.existingKey()`), never create it.
-   A key is minted only when every source is positively absent — an unreadable source is not absent.
-   Never drop records you can't decrypt; write them back untouched.
+   A key is minted only when every source is positively absent — an unreadable source is not absent —
+   and only to seal something (`primaryKey`); reading (`allKeys`) never mints. Never discard a key
+   (replaced ones go to the retired-keys file) and never drop records you can't decrypt.
+   Each iCloud Keychain key is its own item (added, never updated or deleted); the oldest by name
+   is primary everywhere. AutoFill authenticates before drawing its list; widgets show a locked
+   state while the app lock is on; HOTP never leaves the app (no widget, intent, control or AutoFill).
+   Sync is last-write-wins per account on `modifiedDate`, which only an edit or an HOTP use changes.
 
 **Correctness**
 6. Codes are zero-padded `String`s. Never format a code from an integer — leading zeros matter,
@@ -95,8 +100,12 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
     `ContentUnavailableView`, `Form`); they get Liquid Glass for free.
 16. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
     shared helpers `floatingGlass(in:)` / `prominentActionStyle()`, which fall back on visionOS.
-17. Use `.foregroundStyle`, `.smooth` animations, `TimelineView`, `#Preview`, `@ScaledMetric`.
-    Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider` or `Timer.publish`.
+17. Use `.foregroundStyle`, `.smooth` animations, `TimelineView(.codeTicks(paused:))`, `#Preview`,
+    `@ScaledMetric`. Don't use `.foregroundColor`, `.spring()`, `.shadow()`, `PreviewProvider`,
+    `Timer.publish` or `.periodic(from: .now, …)`, and don't animate anything every second — live
+    codes pause while the window is hidden or locked (`pausesLiveCodesWhenHidden()`).
+    `SyncManager`, `SharedDataManager` and `CloudKitDataManager` are `@MainActor`; never carry a
+    snapshot of the account list across an `await`.
 18. Every interactive element needs an accessibility label; list rows and controls that tests drive
     need a stable `accessibilityIdentifier`. Icon-only toolbar buttons must spell out any state the
     glyph can't show (e.g. the trash button's selected count).

@@ -148,9 +148,14 @@ This document tracks planned features, enhancements, and future improvements for
 ### Current
 1. Widget may show stale data if app hasn't been launched recently
 2. CloudKit sync may fail silently on network errors
-3. HOTP counter not synced between devices
 
 ### Resolved (Last 3 Releases)
+- ~~Mac app at 15–40% CPU while idle in the menu bar~~ (live codes stop when hidden; no per-second animation)
+- ~~HOTP counter not synced between devices~~ (the higher counter wins on every sync)
+- ~~Deleted accounts could come back after an offline delete~~ (pending deletions are retried)
+- ~~Edits made on another device (rename, PIN, re-keyed secret) never arrived~~ (last write wins per account)
+- ~~Widgets showed codes with the app lock on~~ (locked state)
+- ~~Two devices creating a key before iCloud Keychain synced could overwrite each other's~~ (one item per key)
 - ~~Swipe gesture conflict with ScrollView~~ (Fixed)
 - ~~Dark mode contrast issues~~ (Fixed)
 - ~~Widget timeline not updating~~ (Fixed)
