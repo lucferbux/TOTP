@@ -36,6 +36,7 @@ struct TOTPApp: App {
             ContentView()
                 .environmentObject(syncManager)
                 .appLock(lock)
+                .pausesLiveCodesWhenHidden()
                 .onOpenURL { url in
                     handleURL(url)
                 }

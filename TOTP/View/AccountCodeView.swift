@@ -26,10 +26,14 @@ struct AccountCodeView: View {
     var isCopied = false
     var selectionState: SelectionState = .none
 
+    @Environment(\.liveCodesEnabled) private var liveCodesEnabled
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.codeTicks(paused: !liveCodesEnabled)) { context in
             content(at: context.date)
         }
+        // Start the timeline afresh when it resumes, so it never keeps a paused schedule
+        .id(liveCodesEnabled)
     }
 
     @ViewBuilder
@@ -126,27 +130,35 @@ struct AccountCodeView: View {
 }
 
 /// Circular countdown for TOTP; counter badge for HOTP.
+///
+/// The ring steps once a second instead of animating. Measured on a Mac with three accounts, the
+/// 0.3 s animation each second cost ~30% CPU — every frame re-lays out the whole window — against
+/// ~1.5% for the step. Plain shapes rather than a `Gauge`, whose styles draw through Core
+/// Graphics on the CPU.
 struct CountdownIndicator: View {
     let entry: OtpEntry
     let date: Date
 
     @ScaledMetric(relativeTo: .title2) private var size: CGFloat = 44
+    @ScaledMetric(relativeTo: .title2) private var lineWidth: CGFloat = 4.5
 
     var body: some View {
         Group {
             if let interval = entry.interval {
                 let remaining = entry.secondsRemaining(at: date)
-                Gauge(value: Double(remaining), in: 0...interval) {
-                    EmptyView()
-                } currentValueLabel: {
+                let tint: Color = remaining <= 5 ? .red : .accentColor
+                ZStack {
+                    Circle()
+                        .stroke(tint.opacity(0.2), lineWidth: lineWidth)
+                    Circle()
+                        .trim(from: 0, to: min(Double(remaining) / interval, 1))
+                        .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
                     Text("\(remaining)")
                         .font(.system(.caption, design: .rounded, weight: .semibold))
                         .monospacedDigit()
-                        .contentTransition(.numericText(countsDown: true))
                 }
-                .gaugeStyle(.accessoryCircularCapacity)
-                .tint(remaining <= 5 ? .red : .accentColor)
-                .animation(.smooth(duration: 0.3), value: remaining)
+                .padding(lineWidth / 2)
             } else {
                 Image(systemName: "arrow.trianglehead.clockwise")
                     .font(.headline)

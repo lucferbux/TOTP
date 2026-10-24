@@ -15,6 +15,9 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var searchText = ""
     @State private var copiedAccountId: UUID?
+    /// The panel outlives its window: closing it only orders it out, so without this the rows
+    /// would keep redrawing every second for as long as the app runs.
+    @State private var isPanelVisible = true
 
     /// Height per account row, so the overall list height is deterministic.
     private let rowHeight: CGFloat = 52
@@ -38,7 +41,7 @@ struct MenuBarView: View {
     /// unlike a `ScrollView`, whose ideal height along its scroll axis is ~0, which
     /// makes it collapse to nothing when the popover sizes itself to fit its content.
     private var accountRows: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.codeTicks(paused: !isPanelVisible)) { context in
             VStack(spacing: rowSpacing) {
                 ForEach(filteredAccounts) { account in
                     MenuBarAccountRow(
@@ -53,6 +56,8 @@ struct MenuBarView: View {
             }
             .padding(.vertical, 4)
         }
+        // Start the timeline afresh when the panel reopens, so it never keeps a paused schedule
+        .id(isPanelVisible)
     }
 
     var body: some View {
@@ -120,6 +125,7 @@ struct MenuBarView: View {
             .padding(.vertical, 4)
         }
         .frame(width: 320)
+        .background { WindowVisibilityReader(isVisible: $isPanelVisible) }
         .task {
             // The main window is suppressed when the app starts at login,
             // so `initializeSync()` may not have run yet when the app starts straight into the
@@ -226,6 +232,7 @@ struct MenuBarAccountRow: View {
     @State private var isHovered = false
 
     var body: some View {
+        let code = account.code(at: date)
         Button(action: onTap) {
             HStack(spacing: 10) {
                 CountdownIndicator(entry: account.entry, date: date)
@@ -262,7 +269,7 @@ struct MenuBarAccountRow: View {
                         .foregroundStyle(.green)
                         .transition(.scale.combined(with: .opacity))
                 } else {
-                    Text(account.code(at: date).groupedOTP)
+                    Text(code.groupedOTP)
                         .font(.system(.subheadline, design: .monospaced, weight: .semibold))
                         .contentTransition(.numericText())
                 }
@@ -282,7 +289,7 @@ struct MenuBarAccountRow: View {
                 isHovered = hovering
             }
         }
-        .accessibilityLabel("\(account.displayTitle), \(account.code(at: date))")
+        .accessibilityLabel("\(account.displayTitle), \(code)")
         .accessibilityHint("Copies the code")
     }
 }

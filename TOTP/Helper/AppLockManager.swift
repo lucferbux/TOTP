@@ -207,7 +207,11 @@ struct AppLockModifier: ViewModifier {
                 LockedView(lock: lock)
             }
         #else
+        // The overlay only covers the codes visually: keep them out of VoiceOver and keyboard
+        // navigation too, or Tab + Space would still copy one while locked.
         content
+            .disabled(lock.isLocked)
+            .accessibilityHidden(lock.isLocked)
             .overlay {
                 if lock.isLocked {
                     LockedView(lock: lock)

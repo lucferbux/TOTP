@@ -218,13 +218,7 @@ public struct ContentView: View {
     /// One account: a copy button normally, a selectable cell while selecting.
     @ViewBuilder
     private func row(_ account: OtpModel, style: AccountCodeView.Style) -> some View {
-        #if os(iOS)
-        // On compact widths List(selection:) draws its own checkmarks in edit mode,
-        // so the card must not draw a second one.
-        let drawsOwnCheckmark = style == .card
-        #else
-        let drawsOwnCheckmark = true
-        #endif
+        let drawsOwnCheckmark = drawsOwnCheckmark(for: style)
         let state: AccountCodeView.SelectionState = isSelecting && drawsOwnCheckmark
             ? (selection.contains(account.id) ? .selected : .unselected)
             : .none
@@ -248,6 +242,16 @@ public struct ContentView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// On compact widths List(selection:) draws its own checkmarks in edit mode,
+    /// so the card must not draw a second one.
+    private func drawsOwnCheckmark(for style: AccountCodeView.Style) -> Bool {
+        #if os(iOS)
+        style == .card
+        #else
+        true
+        #endif
     }
 
     private func selectableCard(_ account: OtpModel, card: AccountCodeView) -> some View {

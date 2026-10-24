@@ -37,7 +37,7 @@ struct OTPSelectionView: View {
                 } else if filteredSuggested.isEmpty && others.isEmpty {
                     ContentUnavailableView.search(text: searchText)
                 } else {
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                    TimelineView(.codeTicks()) { context in
                         List {
                             if !filteredSuggested.isEmpty {
                                 Section("Suggested") {
