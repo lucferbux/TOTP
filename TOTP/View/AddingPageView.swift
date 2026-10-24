@@ -86,11 +86,11 @@ public struct AddingPageView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) { dismiss() }
+                    Button("Cancel", systemImage: "xmark", role: .cancel) { dismiss() }
                         .accessibilityIdentifier("cancelButton")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "Save" : "Add") {
+                    Button(isEditing ? "Save" : "Add", systemImage: "checkmark", role: .confirm) {
                         Task { await save() }
                     }
                     .disabled(!canSave)

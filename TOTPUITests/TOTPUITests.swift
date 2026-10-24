@@ -28,16 +28,21 @@ final class TOTPUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "account-\(title)").firstMatch
     }
 
-    /// What starts select mode: "Select" in the navigation bar on iPhone, the ⋯ menu on iPad and Mac.
+    /// The menus that hold "Select Accounts" at regular width: the system overflow menu on iPad
+    /// (and iPhone Duo open), our own ⋯ menu on Mac.
+    static let overflowMenus = ["OverflowBarButtonItem", "moreMenu"]
+
+    /// What starts select mode: "Select" in the toolbar on iPhone, an overflow menu otherwise.
     private var selectEntryPoint: XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["moreMenu", "selectButton"])).firstMatch
+        app.buttons.matching(NSPredicate(format: "identifier IN %@", Self.overflowMenus + ["selectButton"])).firstMatch
     }
 
     private func enterSelectMode() {
         let entry = selectEntryPoint
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
-        if entry.identifier == "moreMenu" { entry.tap() }
-        let select = app.buttons["selectButton"]
+        if Self.overflowMenus.contains(entry.identifier) { entry.tap() }
+        // The system overflow menu drops our identifier, so match the title there
+        let select = app.buttons.matching(NSPredicate(format: "identifier == 'selectButton' OR label == 'Select Accounts'")).firstMatch
         XCTAssertTrue(select.waitForExistence(timeout: 3))
         select.tap()
     }
@@ -77,6 +82,10 @@ final class TOTPUITests: XCTestCase {
     func testSearchFiltersAccounts() {
         XCTAssertTrue(account("GitHub").waitForExistence(timeout: 5))
         let search = app.searchFields.firstMatch
+        // In a side bar (iPhone Duo) search is collapsed to a button until tapped
+        if !search.waitForExistence(timeout: 2) {
+            app.buttons["Search"].firstMatch.tap()
+        }
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         search.typeText("git")
@@ -93,8 +102,13 @@ final class TOTPUITests: XCTestCase {
         issuer.typeText("Acme")
 
         // Reveal the field: typing into secure fields is unreliable in the simulator
-        app.buttons["Show Secret Key"].tap()
+        let reveal = app.buttons["Show Secret Key"]
+        reveal.tap()
         let secret = app.textFields["secretField"]
+        // On a freshly created iPad simulator the first tap while the keyboard is up sometimes
+        // doesn't land (seen on unchanged code too); tap again rather than fail on the simulator.
+        if !secret.waitForExistence(timeout: 2) { reveal.tap() }
+        XCTAssertTrue(secret.waitForExistence(timeout: 3))
         secret.tap()
         secret.typeText("JBSWY3DPEHPK3PXP")
 
@@ -217,7 +231,7 @@ final class TOTPUITests: XCTestCase {
         let lockToggle = app.descendants(matching: .any).matching(identifier: "appLockToggle").firstMatch
         XCTAssertTrue(lockToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Settings"].exists || app.navigationBars["Settings"].exists)
-        app.buttons["Done"].tap()
+        app.buttons["settingsDoneButton"].tap()
         XCTAssertTrue(account("Example Corp").waitForExistence(timeout: 3))
     }
 

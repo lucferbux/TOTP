@@ -43,12 +43,15 @@ final class ScreenshotTests: XCTestCase {
         capture("02-copied")
 
         // Select mode with a couple of accounts ticked
-        // iPhone shows "Select" in the navigation bar; iPad keeps it in the ⋯ menu
-        if app.buttons["moreMenu"].exists {
-            app.buttons["moreMenu"].tap()
+        // iPhone shows "Select" in the toolbar; iPad keeps it in the system overflow menu
+        let overflow = app.buttons["OverflowBarButtonItem"]
+        if overflow.exists {
+            overflow.tap()
         }
-        if app.buttons["selectButton"].waitForExistence(timeout: 3) {
-            app.buttons["selectButton"].tap()
+        // The system overflow menu drops our identifier, so match the title there
+        let select = app.buttons.matching(NSPredicate(format: "identifier == 'selectButton' OR label == 'Select Accounts'")).firstMatch
+        if select.waitForExistence(timeout: 3) {
+            select.tap()
             account("Fabrikam Mail").tap()
             account("Acme Bank").tap()
             capture("03-select")
@@ -66,7 +69,7 @@ final class ScreenshotTests: XCTestCase {
             app.buttons["settingsButton"].tap()
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "appLockToggle").firstMatch.waitForExistence(timeout: 5))
             capture("05-settings")
-            app.buttons["Done"].tap()
+            app.buttons["settingsDoneButton"].tap()
         }
     }
 }

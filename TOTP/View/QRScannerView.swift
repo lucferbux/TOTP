@@ -54,7 +54,7 @@ struct QRScannerView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", role: .cancel, action: onCancel)
+                        Button("Cancel", systemImage: "xmark", role: .cancel, action: onCancel)
                     }
                 }
                 .navigationTitle("Scan QR Code")

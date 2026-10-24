@@ -64,7 +64,7 @@ struct OTPSelectionView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel, action: onCancel)
+                    Button("Cancel", systemImage: "xmark", role: .cancel, action: onCancel)
                 }
             }
             .searchable(text: $searchText, prompt: "Search accounts")

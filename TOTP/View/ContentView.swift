@@ -59,6 +59,11 @@ public struct ContentView: View {
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var confirmBatchDelete = false
+    /// Where the grid's display can fold (iPhone Duo inner display).
+    @State private var fold = FoldGeometry()
+    /// The account at the top of the list or grid, so folding or unfolding iPhone Duo — which
+    /// swaps one for the other — keeps the same accounts in view.
+    @State private var scrolledAccountID: UUID?
 
     public init() {}
 
@@ -209,6 +214,7 @@ public struct ContentView: View {
                 syncManager.moveAccounts(fromOffsets: source, toOffset: destination)
             } : nil)
         }
+        .scrollPosition(id: $scrolledAccountID, anchor: .top)
         #if os(iOS)
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
@@ -264,18 +270,23 @@ public struct ContentView: View {
         .accessibilityAddTraits(selection.contains(account.id) ? .isSelected : [])
     }
 
-    /// iPad, iPhone Duo unfolded, Mac: adaptive columns that reflow continuously with width.
+    /// iPad, iPhone Duo unfolded, Mac: columns that reflow continuously with width. On a display
+    /// that folds, the count stays even and no card sits on the fold (see `AccountGridLayout`).
     private var regularGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 480), spacing: 16)], spacing: 16) {
+        let padding = AccountGridLayout.spacing
+        return ScrollView {
+            LazyVGrid(columns: AccountGridLayout.columns(for: fold.inset(by: padding)), spacing: AccountGridLayout.spacing) {
                 ForEach(filteredAccounts) { account in
                     row(account, style: .card)
                         .accessibilityIdentifier("account-\(account.displayTitle)")
                         .contextMenu { accountMenu(account) }
                 }
             }
-            .padding()
+            .scrollTargetLayout()
+            .padding(padding)
         }
+        .scrollPosition(id: $scrolledAccountID, anchor: .top)
+        .onGeometryChange(for: FoldGeometry.self) { FoldGeometry($0) } action: { fold = $0 }
         .background(PlatformColors.systemGroupedBackground)
     }
 
@@ -319,10 +330,7 @@ public struct ContentView: View {
         #if os(iOS)
         ToolbarItem(placement: .topBarLeading) {
             if isSelecting {
-                Button(allSelected ? "Deselect All" : "Select All") {
-                    toggleSelectAll()
-                }
-                .accessibilityIdentifier("selectAllButton")
+                selectAllButton
             } else {
                 Button { sheet = .settings } label: {
                     Label("Settings", systemImage: "gearshape")
@@ -348,10 +356,12 @@ public struct ContentView: View {
                 ToolbarItem(placement: .bottomBar) {
                     addButton
                 }
+                .visibilityPriority(.high)
             }
         } else {
-            // iPad / regular width: every action sits in the navigation bar, each in its own glass
-            // group — add, then a "more" menu that holds Select; while selecting, trash then Done.
+            // iPad / regular width (and iPhone Duo open): add, then Select Accounts in the system
+            // overflow menu — the ellipsis belongs to it, and it follows the bar wherever the system
+            // puts it, side bars included. While selecting: trash, then Done.
             if isSelecting {
                 ToolbarItem(placement: .topBarTrailing) {
                     deleteSelectionButton
@@ -364,10 +374,10 @@ public struct ContentView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     addButton
                 }
+                .visibilityPriority(.high)
                 if !syncManager.accounts.isEmpty {
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                    ToolbarItem(placement: .topBarTrailing) {
-                        moreMenu
+                    ToolbarOverflowMenu {
+                        selectAccountsButton
                     }
                 }
             }
@@ -375,8 +385,7 @@ public struct ContentView: View {
         #else
         if isSelecting {
             ToolbarItem(placement: .automatic) {
-                Button(allSelected ? "Deselect All" : "Select All") { toggleSelectAll() }
-                    .accessibilityIdentifier("selectAllButton")
+                selectAllButton
             }
             ToolbarItem(placement: .automatic) {
                 deleteSelectionButton
@@ -407,31 +416,50 @@ public struct ContentView: View {
         .help("Add a new account")
     }
 
+    // Every toolbar item has a title *and* a symbol: on iPhone Duo the system moves bars to the
+    // side, and an item with only a title can't go there (it shows the symbol vertically, either
+    // one horizontally, both in the overflow menu).
+
     private var selectButton: some View {
-        Button(isSelecting ? "Done" : "Select") {
-            toggleSelecting()
+        Group {
+            if isSelecting {
+                Button("Done", systemImage: "checkmark", role: .confirm) { toggleSelecting() }
+            } else {
+                Button("Select", systemImage: "checkmark.circle") { toggleSelecting() }
+            }
         }
         .accessibilityIdentifier(isSelecting ? "doneSelectingButton" : "selectButton")
     }
 
-    /// Regular width: secondary actions behind an ellipsis, so add keeps its own button.
+    private var selectAllButton: some View {
+        Button(allSelected ? "Deselect All" : "Select All",
+               systemImage: allSelected ? "checklist.unchecked" : "checklist") {
+            toggleSelectAll()
+        }
+        .accessibilityIdentifier("selectAllButton")
+    }
+
+    private var selectAccountsButton: some View {
+        Button("Select Accounts", systemImage: "checkmark.circle") {
+            toggleSelecting()
+        }
+        .accessibilityIdentifier("selectButton")
+    }
+
+    #if os(macOS)
+    /// Mac: secondary actions behind an ellipsis, so add keeps its own button. (iOS uses the system
+    /// overflow menu instead, which doesn't exist on macOS.)
     private var moreMenu: some View {
         Menu {
-            Button {
-                toggleSelecting()
-            } label: {
-                Label("Select Accounts", systemImage: "checkmark.circle")
-            }
-            .accessibilityIdentifier("selectButton")
+            selectAccountsButton
         } label: {
             Label("More", systemImage: "ellipsis")
         }
-        #if os(macOS)
         .menuIndicator(.hidden)
-        #endif
         .accessibilityIdentifier("moreMenu")
         .help("More actions")
     }
+    #endif
 
     private func toggleSelecting() {
         withAnimation(.smooth(duration: 0.25)) {
@@ -473,6 +501,8 @@ public struct ContentView: View {
                 .padding(.vertical, 12)
                 .floatingGlass(in: .capsule)
                 .padding(.bottom, 12)
+                // While iPhone Duo is partly folded, centred means on the fold: use the trailing side
+                .offset(x: !usesCompactList ? (fold.keepClear.map { $0.upperBound / 2 } ?? 0) : 0)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("copiedToast")
@@ -498,7 +528,8 @@ public struct ContentView: View {
                     .environmentObject(syncManager)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { self.sheet = nil }
+                            Button("Done", systemImage: "checkmark", role: .confirm) { self.sheet = nil }
+                                .accessibilityIdentifier("settingsDoneButton")
                         }
                     }
             }
