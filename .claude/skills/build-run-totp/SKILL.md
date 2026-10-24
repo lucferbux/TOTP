@@ -12,7 +12,16 @@ Native SwiftUI app, `TOTP.xcodeproj` (no workspace, no SPM). Scheme `TOTP`, depl
 ```bash
 xcrun simctl list devices available        # choose a real device name
 ```
-Defaults that exist on this machine: `iPhone 18 Pro`, `iPhone 17`, `iPad Pro 11-inch (M5)`.
+Defaults that exist on this machine: `iPhone 18 Pro`, `iPad Pro 11-inch (M5)` (iOS 27.0) and `iPhone Duo` (iOS 27.1).
+
+**iPhone Duo.** Xcode 27 has no Simulator app: the window is **Device Hub**
+(`open /Applications/Xcode.app/Contents/Applications/DeviceHub.app`), and it's the only way to open,
+close or half-fold the device — `simctl` and XCTest can't. It boots closed. Capture either display:
+```bash
+xcrun simctl io "iPhone Duo" enumerate          # outer 1398×2034, inner 2007×2853 — note each port UUID
+xcrun simctl io "iPhone Duo" screenshot --display=<port UUID> /tmp/duo.png
+```
+Don't fake a pose with `simctl io … screenConfig power off`: it blanks both displays until a reboot.
 
 ## 2. Build
 

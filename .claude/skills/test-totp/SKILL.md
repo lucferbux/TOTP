@@ -30,7 +30,15 @@ xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
 
 # macOS
 xcodebuild test -project TOTP.xcodeproj -scheme TOTP -destination 'platform=macOS'
+
+# iPhone Duo (iOS 27.1 runtime — it supports only that device). Boots closed: the UI tests run on the
+# outer display. Open it in Device Hub to run them on the inner display.
+xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
+  -destination "platform=iOS Simulator,name=iPhone Duo" -parallel-testing-enabled NO
 ```
+
+Run UI tests with `-parallel-testing-enabled NO` on a simulator that was just created: the clones
+xcodebuild makes time out (watchdog) while it finishes its first boot.
 
 Pipe through `xcbeautify` when available for readable output.
 

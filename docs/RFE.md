@@ -41,6 +41,7 @@ This document tracks planned features, enhancements, and future improvements for
 - [x] **Swipe Actions** - Swipe-to-reveal edit/delete
 - [x] **Context Menu** - Long press for actions
 - [x] **Adaptive Layout (4.0)** - Size-class driven list/grid for iPhone, iPhone Duo, iPad and Mac; all orientations
+- [x] **iPhone Duo (4.5)** - Side bars (every toolbar item has a symbol), system overflow menu, even grid columns that stay off the fold, scroll position kept across fold/unfold, Duo screenshots
 - [x] **Haptic Feedback** - Tactile response on copy
 - [x] **Copy Toast** - Visual confirmation on copy
 

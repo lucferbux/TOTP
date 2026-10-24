@@ -48,7 +48,9 @@ xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
   -only-testing:TOTPTests
 ```
 
-- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M5)`.
+- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M5)`. Foldable: `name=iPhone Duo` (iOS 27.1 runtime, which supports only that device; iPhone and iPad simulators stay on 27.0).
+- **iPhone Duo poses** can only be changed in **Device Hub** (Xcode ▸ Open Developer Tool ▸ Device Hub — Xcode 27 has no separate Simulator app); neither `simctl` nor XCTest can fold it. It boots closed. `xcrun simctl io <udid> enumerate` lists both displays (outer 1398×2034, inner 2007×2853), and `simctl io screenshot --display=<port UUID>` captures either. Don't use `simctl io screenConfig … power off` to fake a pose: it blanks both displays until a reboot.
+- Run UI tests with `-parallel-testing-enabled NO` on a freshly created simulator: the clones xcodebuild makes otherwise time out while the simulator finishes its first boot.
 - Prefer the project's **`build-run-totp`** and **`test-totp`** skills — they wrap these commands, pick a live simulator, and pipe through `xcbeautify` when available.
 - CloudKit, AutoFill, App Groups, and Keychain sharing require a signing team and provisioned containers; they **do not work in unsigned simulator builds**. Don't treat sync/AutoFill failures in a bare simulator as regressions.
 
@@ -116,9 +118,14 @@ List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 //        ToolbarSpacer(.fixed, placement: .bottomBar)
 //        ToolbarItem(placement: .bottomBar) { addButton }
 //    }
-//  • regular (iPad, Mac) — every action lives in the navigation bar: add, then an ellipsis menu
-//    ("moreMenu") holding "Select Accounts", each in its own glass group (ToolbarSpacer(.fixed)
-//    between them — without it they merge into one capsule). Search keeps its default position.
+//  • regular (iPad, iPhone Duo open, Mac) — every action lives in the navigation bar: add
+//    (.visibilityPriority(.high)), then "Select Accounts" in the system ToolbarOverflowMenu on iOS
+//    (the ellipsis belongs to it; XCUITest sees it as "OverflowBarButtonItem") and in our own
+//    ellipsis Menu ("moreMenu") on macOS, where ToolbarOverflowMenu doesn't exist. Search keeps
+//    its default position.
+//  • iPhone Duo puts bars on the side (outer display, inner in landscape). An item with a title but
+//    no symbol never goes there, so every toolbar item has both: Button("Select", systemImage:),
+//    Button("Done", systemImage: "checkmark", role: .confirm), Cancel with "xmark", and so on.
 // Select mode ("Select" on iPhone, ⋯ ▸ Select Accounts on iPad/Mac) replaces add with a destructive
 // trash button + "Done", and the leading item with "Select All"; the trash carries an
 // accessibilityLabel with the count, since the glyph alone can't show it. On compact widths selection is driven by List(selection:) with editMode
@@ -126,8 +133,13 @@ List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 
 // Layout adapts through size classes only — never idiom, orientation or screen size
 // (iPhone Duo: outer display compact, inner display regular×regular, ignores orientation locks):
-@Environment(\.horizontalSizeClass) var sizeClass  // compact → List, regular → adaptive LazyVGrid
-GridItem(.adaptive(minimum: 300, maximum: 480))
+@Environment(\.horizontalSizeClass) var sizeClass  // compact → List, regular → LazyVGrid
+AccountGridLayout.columns(for: fold)               // 300–480 pt cards; on a display that folds
+                                                   // (iPhone Duo) an even count, and while it's
+                                                   // half open the cards on each side stop at the
+                                                   // fold (FoldGeometry reads reservedRegions, 27.1)
+// List and grid share .scrollPosition(id:), so folding or unfolding keeps the same accounts in view.
+// iOS 27.1 ships only on iPhone Duo: the deployment target stays 27.0 and 27.1 APIs need #available.
 
 // Cards (regular-width grid) — native surface, NOT glass:
 .background { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(PlatformColors.secondarySystemGroupedBackground) }

@@ -51,7 +51,9 @@ $EDITOR fastlane/metadata/ios/en-US/release_notes.txt
 cp fastlane/metadata/ios/en-US/release_notes.txt fastlane/metadata/mac/en-US/release_notes.txt
 
 # 4. Screenshots, if the UI changed
-scripts/export-screenshots.sh     # iPhone + iPad + Mac
+scripts/export-screenshots.sh     # iPhone + iPad + iPhone Duo outer + Mac
+# iPhone Duo inner display: open the "iPhone Duo" simulator in Device Hub first, then
+scripts/export-screenshots.sh --duo-inner
 
 # 5. Archive and upload the binaries (the release-totp skill has the full commands)
 

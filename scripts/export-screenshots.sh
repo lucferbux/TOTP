@@ -2,12 +2,19 @@
 # Runs the screenshot UI tests on the devices App Store Connect still requires, and writes the PNGs
 # where fastlane deliver and the website expect them.
 #
-#   scripts/export-screenshots.sh            # iPhone 6.9" + iPad 13"
-#   scripts/export-screenshots.sh --keep     # keep the .xcresult bundles for inspection
+#   scripts/export-screenshots.sh              # iPhone 6.9" + iPad 13" + iPhone Duo outer + Mac
+#   scripts/export-screenshots.sh --duo-inner  # only iPhone Duo's inner display (open it first, see below)
+#   scripts/export-screenshots.sh --keep       # keep the .xcresult bundles for inspection
 #
 # Apple's required classes (everything smaller is scaled automatically):
-#   iPhone 6.9"  1320×2868   → fastlane/screenshots/en-US  (deliver picks the display type by pixel size)
-#   iPad   13"   2064×2752
+#   iPhone 6.9"       1320×2868   → fastlane/screenshots/en-US  (deliver picks the display type by pixel size)
+#   iPad   13"        2064×2752
+#   iPhone Duo outer  1398×2034   (required from April 2027 for apps built with the iOS 27.1 SDK)
+#   iPhone Duo inner  2007×2853
+#
+# The UI tests capture whichever display is in use. The iPhone Duo simulator boots closed, so a normal
+# run shoots the outer display. Only Device Hub can open it (neither simctl nor XCTest can change the
+# pose): boot "iPhone Duo", open it in Xcode ▸ Open Developer Tool ▸ Device Hub, then run --duo-inner.
 #   Mac          2880×1800   → fastlane/screenshots_mac/en-US (needs Screen Recording permission)
 set -euo pipefail
 
@@ -17,14 +24,21 @@ SCHEME="TOTP"
 OUT="fastlane/screenshots/en-US"
 SITE="site/screenshots"
 TMP="${TMPDIR:-/tmp}/totp-screenshots"
-KEEP=${1:-}
+KEEP=""; DUO_INNER=""
+for arg in "$@"; do
+    case "$arg" in
+        --keep) KEEP=1 ;;
+        --duo-inner) DUO_INNER=1 ;;
+    esac
+done
 
 rm -rf "$TMP"; mkdir -p "$TMP" "$OUT" "$SITE"
 
 capture() {
     local device="$1"
     local prefix="$2"
-    local result="$TMP/$prefix.xcresult"
+    local expected="${3:-}"   # WIDTHxHEIGHT the shots must have, when one device has several displays
+local result="$TMP/$prefix.xcresult"
     echo "==> $device"
     # Apple's convention for marketing shots: full bars, full battery, 9:41.
     local udid
@@ -54,9 +68,9 @@ for runtime, devices in json.load(sys.stdin)['devices'].items():
     xcrun xcresulttool export attachments --path "$result" --output-path "$staging" >/dev/null
 
     # manifest.json maps the generated file names back to the names the test gave them
-    /usr/bin/python3 - "$staging" "$OUT" "$prefix" <<'PY'
-import json, pathlib, shutil, sys
-staging, out, prefix = (pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3])
+    /usr/bin/python3 - "$staging" "$OUT" "$prefix" "$expected" <<'PY'
+import json, pathlib, shutil, subprocess, sys
+staging, out, prefix, expected = (pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], sys.argv[4])
 manifest = json.loads((staging / "manifest.json").read_text())
 count = 0
 for test in manifest:
@@ -69,6 +83,12 @@ for test in manifest:
         stem = name.split("_0_")[0]
         if stem.endswith(".png"):
             stem = stem[:-4]
+        if expected:
+            info = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(staging / exported)],
+                                  capture_output=True, text=True).stdout.split()
+            size = f"{info[-3]}x{info[-1]}"
+            if size not in (expected, "x".join(reversed(expected.split("x")))):
+                sys.exit(f"   {name} is {size}, expected {expected}: is the iPhone Duo in the right pose?")
         target = out / f"{prefix}-{stem}.png"
         shutil.copyfile(staging / exported, target)
         count += 1
@@ -77,8 +97,14 @@ print(f"   {count} screenshot(s)")
 PY
 }
 
+if [ -n "$DUO_INNER" ]; then
+    capture "iPhone Duo" "duo-inner" "2007x2853"
+    exit 0
+fi
+
 capture "iPhone 18 Pro Max" "iphone-69"
 capture "iPad Pro 13-inch (M5)" "ipad-13"
+capture "iPhone Duo" "duo-outer" "1398x2034"
 
 # --- macOS -------------------------------------------------------------------------------------
 # No UI-test automation here (that needs Accessibility permission). Instead the app positions its
@@ -155,4 +181,4 @@ writes the window's real frame to the App Group container for the capture to use
 If it was skipped, take the shots by hand (⌘⇧4 then space, click the window) and pad them:
     sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-codes.png
 NOTE
-[ "$KEEP" = "--keep" ] || rm -rf "$TMP"
+[ -n "$KEEP" ] || rm -rf "$TMP"

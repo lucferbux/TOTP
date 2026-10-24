@@ -93,9 +93,13 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 **UI**
 13. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:
     outer display compact, inner display regular and it ignores orientation locks).
-14. Regular width (iPad, Mac): add and an ellipsis menu (holding Select) are separate toolbar
-    items with a `ToolbarSpacer(.fixed)` between them. The Mac main window opens at launch unless
-    launch at login is on — never ship a launch that shows only a menu bar icon.
+14. Regular width (iPad, iPhone Duo open, Mac): add, then Select Accounts in the system
+    `ToolbarOverflowMenu` on iOS (our own ellipsis `Menu` on macOS). Every toolbar item has a title
+    **and** a symbol — iPhone Duo moves bars to the side, and a title-only item can't go there.
+    The grid keeps an even column count on a display that folds and keeps cards off the fold
+    (`AccountGridLayout`). iOS 27.1 ships only on iPhone Duo, so the deployment target stays 27.0
+    and 27.1 APIs need `#available`. The Mac main window opens at launch unless launch at login
+    is on — never ship a launch that shows only a menu bar icon.
 15. Prefer system components (`List`, `.swipeActions`, `.searchable`, toolbars,
     `ContentUnavailableView`, `Form`); they get Liquid Glass for free.
 16. Liquid Glass only on floating, transient chrome — never on cards or list rows — and through the
