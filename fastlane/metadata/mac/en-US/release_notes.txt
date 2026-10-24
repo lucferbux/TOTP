@@ -1,8 +1,7 @@
-Security and reliability release.
+Lighter and more reliable.
 
-• Your PIN prefix is now encrypted everywhere it is stored and synced, just like the secret itself. Existing accounts are migrated automatically.
-• Copied codes stay on the device you copied them on. You can allow sharing with your other Apple devices in Settings.
-• With the app lock on, AutoFill, Shortcuts and the Control Centre control now ask for Face ID, Touch ID or your passcode before handing over a code, and account names are kept out of Spotlight.
-• The lock now covers sheets and the app switcher, so nothing sensitive can be left on screen.
-• Hardened how the encryption key is stored and recovered, so a locked device can never be mistaken for a first run.
-• Added a privacy policy and support site, reachable from Settings.
+• The menu bar app no longer uses CPU in the background: codes stop refreshing whenever their window is closed, minimised or covered, or the app is locked.
+• iCloud sync now keeps your latest change on every device, so renamed accounts, new PINs and updated secret keys show up everywhere. Accounts you delete stay deleted, even if you were offline.
+• Counter-based (HOTP) codes are never handed out twice, even across devices.
+• With the app lock on, widgets hide your codes, AutoFill asks for Touch ID before showing your accounts, and the locked window can't be used from the keyboard.
+• Copied codes stay on this Mac unless you allow sharing with your other devices in Settings.
