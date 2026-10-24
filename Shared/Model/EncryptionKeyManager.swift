@@ -6,7 +6,11 @@
 //
 //  The key lives in two places:
 //    1. iCloud Keychain (synchronizable) — shared by all of the user's devices, so a record
-//       uploaded by one device can be decrypted by another. This is the key we encrypt with.
+//       uploaded by one device can be decrypted by another. Every key ever created has its own
+//       item (`key-<milliseconds>-<uuid>`): two devices that each create one before iCloud Keychain
+//       has synced never overwrite each other. The oldest — by the name, which syncs, not by an
+//       attribute that might not — is the primary key on every device, so all of them converge on
+//       it, and the others stay readable.
 //    2. App Group container file — mirror of (1) so the widget and AutoFill extensions, which
 //       must never mint a key, can read it without Keychain round-trips.
 //  Keys written by older versions (plain Keychain items) are still read, and data sealed with them
@@ -16,7 +20,12 @@
 //  temporarily unreadable (device locked, Keychain busy): that orphans every existing record and,
 //  because the shared item syncs, can propagate to other devices. Every lookup therefore reports
 //  `absent` and `unavailable` separately, and a key is minted **only** when every source is
-//  positively absent.
+//  positively absent — and only to seal something (`primaryKey`). Reading (`allKeys`) never mints:
+//  on a new device the first sync reads iCloud records before iCloud Keychain has delivered the
+//  shared key, and minting there would race that key.
+//
+//  A key is never discarded either. When a different shared key replaces the mirror file, the old
+//  one moves to a "retired" file and stays in `allKeys`, so anything still sealed with it opens.
 //
 
 import Foundation
@@ -27,7 +36,7 @@ import os
 public protocol KeyProviding: Sendable {
     /// The key new data is sealed with; `nil` when key storage can't be read right now.
     var primaryKey: SymmetricKey? { get }
-    /// Every key that may have sealed existing data, newest first.
+    /// Every key that may have sealed existing data, primary first.
     var allKeys: [SymmetricKey] { get }
 }
 
@@ -35,9 +44,11 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
     public static let shared = EncryptionKeyManager()
 
     private static let keyFileName = ".totp-encryption-key"
+    private static let retiredKeysFileName = ".totp-encryption-keys-retired"
     private static let sharedService = "TOTP-Shared-Encryption"
-    private static let sharedAccount = "shared-key"
-    private static let legacyServices = ["TOTP-SharedData-Encryption", "TOTP-CloudKit-Encryption"]
+    /// The single item earlier builds wrote; always the oldest key when present.
+    private static let legacySharedAccount = "shared-key"
+private static let legacyServices = ["TOTP-SharedData-Encryption", "TOTP-CloudKit-Encryption"]
     private static let logger = Logger(subsystem: "com.lucferbux.TOTP", category: "Encryption")
 
     /// Result of looking for a key in one place.
@@ -58,19 +69,25 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
 
     private let lock = NSLock()
     private var cached: KeySet?
+    /// When a read last found no key. Reads within `missBackoff` of it don't query storage again:
+    /// a body that asks twice per render would otherwise run six Keychain queries each time.
+    private var lastMiss: Date?
+    private static let missBackoff: TimeInterval = 2
 
     private init() {}
 
     // MARK: - KeyProviding
 
-    public var primaryKey: SymmetricKey? { resolve()?.primary }
-    public var allKeys: [SymmetricKey] { resolve()?.all ?? [] }
+    /// The key to seal with. The only accessor that may create one, on a genuine first run.
+    public var primaryKey: SymmetricKey? { resolve(creatingIfAbsent: true)?.primary }
+    /// Every key that can open existing data. Never creates a key.
+    public var allKeys: [SymmetricKey] { resolve(creatingIfAbsent: false)?.all ?? [] }
 
     /// True when the primary key is shared through iCloud Keychain (so other devices can read our records).
-    public var usesSharedKey: Bool { resolve()?.isShared ?? false }
+    public var usesSharedKey: Bool { resolve(creatingIfAbsent: false)?.isShared ?? false }
 
     /// True when key storage couldn't be read; the UI can tell the user instead of showing "no accounts".
-    public var isKeyUnavailable: Bool { resolve() == nil }
+    public var isKeyUnavailable: Bool { resolve(creatingIfAbsent: false) == nil }
 
     // MARK: - Encryption
 
@@ -93,27 +110,29 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
         existingKeys().first
     }
 
-    /// Every key an extension can decrypt with, newest first.
+    /// Every key an extension can decrypt with, primary first.
     public static func existingKeys() -> [SymmetricKey] {
-        var keys: [SymmetricKey] = []
-        if case let .found(shared) = loadFromKeychain(service: sharedService, account: sharedAccount, synchronizable: true) {
-            keys.append(shared)
-        }
+        var keys = loadKeychainKeys(service: sharedService, synchronizable: true) ?? []
         if case let .found(file) = loadFromSharedFile() {
             keys.append(file)
         }
+        keys.append(contentsOf: loadRetiredKeys())
         return dedupe(keys)
     }
 
     // MARK: - Key resolution
 
-    /// Returns the key set, resolving (and only if provably necessary, creating) it once.
-    private func resolve() -> KeySet? {
+    /// Returns the key set, resolving it once — and creating one only when asked to and provably necessary.
+    private func resolve(creatingIfAbsent: Bool) -> KeySet? {
         lock.lock()
         defer { lock.unlock() }
         if let cached { return cached }
-        let resolved = Self.resolveKeys()
-        cached = resolved          // stays nil when unavailable, so the next call retries
+        if !creatingIfAbsent, let lastMiss, Date.now.timeIntervalSince(lastMiss) < Self.missBackoff {
+            return nil
+        }
+        let resolved = Self.resolveKeys(creatingIfAbsent: creatingIfAbsent)
+        cached = resolved          // stays nil when unavailable, so a later call retries
+        lastMiss = resolved == nil ? .now : nil
         return resolved
     }
 
@@ -122,30 +141,41 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
     public func invalidateCache() {
         lock.lock()
         cached = nil
+        lastMiss = nil
         lock.unlock()
     }
 
-    static func resolveKeys() -> KeySet? {
-        let shared = loadFromKeychain(service: sharedService, account: sharedAccount, synchronizable: true)
+    static func resolveKeys(creatingIfAbsent: Bool = true) -> KeySet? {
+        let shared = loadKeychainKeys(service: sharedService, synchronizable: true)
         let file = loadFromSharedFile()
         let legacy = legacyKeychainKeys()
+        let retired = loadRetiredKeys()
 
         // Any source that might hold a key but can't be read means we must not write anything.
-        let anyUnavailable = shared == .unavailable || file == .unavailable
+        let anyUnavailable = shared == nil || file == .unavailable
         var known: [SymmetricKey] = []
         if case let .found(key) = file { known.append(key) }
         known.append(contentsOf: legacy)
         known = dedupe(known)
 
-        // 1. A key synced from another device wins — that's what makes sync work.
-        if case let .found(sharedKey) = shared {
+        // 1. The oldest key in iCloud Keychain wins on every device — that's what makes sync work.
+        if let shared, let sharedKey = shared.first {
             if case let .found(fileKey) = file, data(of: fileKey) == data(of: sharedKey) {
                 // Mirror already matches
             } else {
-                // Mirror it so the widget and AutoFill can read it without the Keychain
-                saveToSharedFile(sharedKey, overwriteExisting: true)
+                // Mirror it so the widget and AutoFill can read it without the Keychain — but keep
+                // the key it replaces: records not yet re-sealed (offline, partly unreadable store)
+                // still need it, and this mirror may be its only copy.
+                var keptReplacedKey = true
+                if case let .found(fileKey) = file {
+                    keptReplacedKey = retire(fileKey)
+                }
+                // If it couldn't be kept, leave the mirror alone rather than lose the old key
+                if keptReplacedKey {
+                    saveToSharedFile(sharedKey, overwriteExisting: true)
+                }
             }
-            return KeySet(primary: sharedKey, all: dedupe([sharedKey] + known), isShared: true)
+            return KeySet(primary: sharedKey, all: dedupe(shared + known + retired), isShared: true)
         }
 
         if anyUnavailable {
@@ -155,20 +185,22 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
 
         // 2. This device has a key but it isn't shared yet — publish it, don't replace it.
         if let local = known.first {
-            let published = saveToKeychain(local, service: sharedService, account: sharedAccount, synchronizable: true)
+            let published = addToKeychain(local, service: sharedService)
             saveToSharedFile(local, overwriteExisting: false)
             if !published {
                 logger.notice("iCloud Keychain unavailable; using the device-local key")
             }
-            return KeySet(primary: local, all: known, isShared: published)
+            return KeySet(primary: local, all: dedupe(known + retired), isShared: published)
         }
 
-        // 3. Every source positively reported "absent" — this really is a first run.
+        // 3. Every source positively reported "absent" — this really is a first run. Only something
+        // that is about to seal data may create the key; a read just reports that there is none yet.
+        guard creatingIfAbsent else { return nil }
         let created = SymmetricKey(size: .bits256)
-        let published = saveToKeychain(created, service: sharedService, account: sharedAccount, synchronizable: true)
+        let published = addToKeychain(created, service: sharedService)
         saveToSharedFile(created, overwriteExisting: false)
         logger.info("Created a new encryption key")
-        return KeySet(primary: created, all: [created], isShared: published)
+        return KeySet(primary: created, all: dedupe([created] + retired), isShared: published)
     }
 
     private static func dedupe(_ keys: [SymmetricKey]) -> [SymmetricKey] {
@@ -205,8 +237,13 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
     private static func saveToSharedFile(_ key: SymmetricKey, overwriteExisting: Bool) {
         guard let url = keyFileURL else { return }
         if !overwriteExisting && FileManager.default.fileExists(atPath: url.path) { return }
+        writeKeyFile(data(of: key), to: url)
+    }
+
+    @discardableResult
+    private static func writeKeyFile(_ data: Data, to url: URL) -> Bool {
         do {
-            try data(of: key).write(to: url, options: [.atomic])
+            try data.write(to: url, options: [.atomic])
             var attributes: [FileAttributeKey: Any] = [.posixPermissions: 0o600]
             #if os(iOS)
             // Widget / AutoFill must still read it after first unlock
@@ -214,9 +251,42 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
             #endif
             try FileManager.default.setAttributes(attributes, ofItemAtPath: url.path)
             hardenKeyFile(at: url)
+            return true
         } catch {
             logger.error("Failed to persist encryption key: \(error.localizedDescription, privacy: .public)")
+            return false
         }
+    }
+
+    // MARK: - Retired keys
+
+    private static var retiredKeysURL: URL? {
+        AppGroup.containerURL?.appendingPathComponent(retiredKeysFileName)
+    }
+
+    /// Keys that used to be the primary key, oldest first: 32 bytes each, back to back.
+    static func loadRetiredKeys() -> [SymmetricKey] {
+        guard let url = retiredKeysURL, let data = try? Data(contentsOf: url), data.count % 32 == 0 else { return [] }
+        return stride(from: 0, to: data.count, by: 32).map { offset in
+            SymmetricKey(data: data.subdata(in: offset..<(offset + 32)))
+        }
+    }
+
+    /// Adds `key` to the retired keys; nothing is ever removed from that file. Returns whether the
+    /// key is now safely stored there.
+    private static func retire(_ key: SymmetricKey) -> Bool {
+        guard let url = retiredKeysURL else { return false }
+        let retired = loadRetiredKeys()
+        if retired.contains(where: { data(of: $0) == data(of: key) }) { return true }
+        if FileManager.default.fileExists(atPath: url.path), retired.isEmpty {
+            // Exists but unreadable (protected, or not a whole number of keys): don't clobber it
+            logger.error("Retired key file is unreadable; not retiring the replaced key")
+            return false
+        }
+        let combined = (retired + [key]).reduce(into: Data()) { $0.append(data(of: $1)) }
+        guard writeKeyFile(combined, to: url) else { return false }
+        logger.notice("Kept the replaced encryption key as a retired key")
+        return true
     }
 
     /// Owner-only, and out of backups — the key is recoverable from iCloud Keychain, so there's no
@@ -272,27 +342,74 @@ public final class EncryptionKeyManager: KeyProviding, @unchecked Sendable {
         }
     }
 
-    /// Updates the item in place, adding it only when it's positively missing.
-    /// Never deletes: deleting a synchronizable item removes it from every device.
-    @discardableResult
-    private static func saveToKeychain(_ key: SymmetricKey, service: String, account: String, synchronizable: Bool) -> Bool {
-        let query = baseQuery(service: service, account: account, synchronizable: synchronizable)
-        let updateStatus = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data(of: key)] as CFDictionary)
-        if updateStatus == errSecSuccess { return true }
+    /// Every key stored under `service`, primary (oldest) first; `[]` when there is none and `nil`
+    /// when the Keychain can't be read right now.
+    static func loadKeychainKeys(service: String, synchronizable: Bool) -> [SymmetricKey]? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        if synchronizable { query[kSecAttrSynchronizable as String] = kCFBooleanTrue }
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
 
-        guard updateStatus == errSecItemNotFound else {
-            logger.error("Keychain update failed with status \(updateStatus, privacy: .public)")
-            return false
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let items = result as? [[String: Any]] else { return nil }
+            return orderedKeys(items.compactMap { item in
+                guard let account = item[kSecAttrAccount as String] as? String,
+                      let data = item[kSecValueData as String] as? Data else { return nil }
+                return (account, data)
+            })
+        case errSecItemNotFound:
+            return []
+        default:
+            // errSecInteractionNotAllowed (locked device), errSecMissingEntitlement, daemon errors…
+            logger.notice("Keychain read failed with status \(status, privacy: .public)")
+            return nil
         }
+    }
 
-        var attributes = query
+    /// Orders stored keys so every device picks the same primary: the legacy single item first
+    /// (it predates the rest), then by name, which starts with the creation time in milliseconds.
+    /// Entries that aren't 32-byte keys are ignored.
+    static func orderedKeys(_ items: [(account: String, data: Data)]) -> [SymmetricKey] {
+        items
+            .filter { $0.data.count == 32 }
+            .sorted { lhs, rhs in
+                if (lhs.account == legacySharedAccount) != (rhs.account == legacySharedAccount) {
+                    return lhs.account == legacySharedAccount
+                }
+                return lhs.account < rhs.account
+            }
+            .map { SymmetricKey(data: $0.data) }
+    }
+
+    /// Name for a new key's item: creation time (fixed width, so names sort by it), then a UUID so
+    /// two devices can never pick the same one.
+    static func newKeyAccount(now: Date = .now) -> String {
+        let milliseconds = UInt64(max(0, now.timeIntervalSince1970) * 1000)
+        return "key-" + String(format: "%016llu", milliseconds) + "-" + UUID().uuidString
+    }
+
+    /// Adds `key` as a new synchronizable item. Never updates or deletes one: deleting a
+    /// synchronizable item removes it from every device, and overwriting one loses a key.
+    @discardableResult
+    private static func addToKeychain(_ key: SymmetricKey, service: String) -> Bool {
+        var attributes = baseQuery(service: service, account: newKeyAccount(), synchronizable: true)
         attributes[kSecValueData as String] = data(of: key)
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        let addStatus = SecItemAdd(attributes as CFDictionary, nil)
-        if addStatus != errSecSuccess {
-            logger.error("Keychain write failed with status \(addStatus, privacy: .public)")
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        if status != errSecSuccess {
+            logger.error("Keychain write failed with status \(status, privacy: .public)")
         }
-        return addStatus == errSecSuccess
+        return status == errSecSuccess
     }
 
     private static func legacyKeychainKeys() -> [SymmetricKey] {

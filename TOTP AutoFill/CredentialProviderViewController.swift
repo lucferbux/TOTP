@@ -28,13 +28,11 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     private var accounts: [OtpModel] = []
     private var hasShownUI = false
+    /// Set once the user passed the app lock in this presentation, so picking an account after
+    /// unlocking the list doesn't prompt a second time.
+    private var isAuthenticated = false
 
     // MARK: - Lifecycle
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        accounts = AccountStore.loadAccounts()
-    }
 
     #if canImport(UIKit)
     override func viewDidAppear(_ animated: Bool) {
@@ -82,15 +80,23 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     /// Passes when the app lock is off; otherwise requires Face ID / Touch ID / passcode.
     private func authenticateIfNeeded() async -> Bool {
-        guard AppPreferences.appLockEnabled else { return true }
+        guard AppPreferences.appLockEnabled, !isAuthenticated else { return true }
         let context = LAContext()
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return false }
         do {
-            return try await context.evaluatePolicy(.deviceOwnerAuthentication,
-                                                    localizedReason: String(localized: "Unlock to fill your code"))
+            isAuthenticated = try await context.evaluatePolicy(.deviceOwnerAuthentication,
+                                                               localizedReason: String(localized: "Unlock to fill your code"))
         } catch {
-            return false
+            isAuthenticated = false
         }
+        return isAuthenticated
+    }
+
+    /// Accounts AutoFill can offer. HOTP is left out, as everywhere outside the app: filling one
+    /// here would hand out a code without advancing — and saving — its counter, so the same code
+    /// would be filled again next time.
+    private static func loadAccounts() -> [OtpModel] {
+        AccountStore.loadAccounts().filter { !$0.entry.isHotp }
     }
 
     override func prepareInterfaceToProvideCredential(for credentialRequest: any ASCredentialRequest) {
@@ -120,7 +126,7 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     private func account(for request: any ASCredentialRequest) -> OtpModel? {
         let recordIdentifier = request.credentialIdentity.recordIdentifier ?? ""
-        if accounts.isEmpty { accounts = AccountStore.loadAccounts() }
+        if accounts.isEmpty { accounts = Self.loadAccounts() }
         return accounts.first { $0.recordIdentifier == recordIdentifier }
     }
 
@@ -145,7 +151,19 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
 
     private func showAccountSelectionUI(serviceIdentifiers: [ASCredentialServiceIdentifier], kind: RequestKind) {
         hasShownUI = true
-        accounts = AccountStore.loadAccounts()
+        Task { @MainActor in
+            // The list shows live codes for every account: with the app lock on, nothing is drawn
+            // until the user has authenticated.
+            guard await authenticateIfNeeded() else {
+                extensionContext.cancelRequest(withError: ASExtensionError(.userCanceled))
+                return
+            }
+            embedSelectionUI(serviceIdentifiers: serviceIdentifiers, kind: kind)
+        }
+    }
+
+    private func embedSelectionUI(serviceIdentifiers: [ASCredentialServiceIdentifier], kind: RequestKind) {
+        accounts = Self.loadAccounts()
 
         let identifiers = serviceIdentifiers.map(\.identifier)
         let suggested = identifiers.isEmpty ? [] : accounts.filter { $0.matchesAutoFill(serviceIdentifiers: identifiers) }

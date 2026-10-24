@@ -35,6 +35,8 @@ struct CodesEntry: TimelineEntry {
         case noAccounts
         /// Data is protected until the device is unlocked once after a restart.
         case unavailable
+        /// The app lock is on. A widget can't ask for Face ID, so it shows no codes at all.
+        case locked
     }
 
     let date: Date
@@ -69,9 +71,22 @@ enum CodesTimeline {
     }
 
     static func load() -> (accounts: [OtpModel], state: CodesEntry.State) {
+        // Checked first, so a locked app's secrets aren't even decrypted in the widget process
+        guard !AppPreferences.appLockEnabled else { return ([], .locked) }
         guard EncryptionKeyManager.existingKey() != nil else { return ([], .unavailable) }
         let accounts = AccountQuery.models()
         return (accounts, accounts.isEmpty ? .noAccounts : .ready)
+    }
+
+    /// When WidgetKit should ask again. Codes need a new timeline once the last period ends; a
+    /// locked or empty widget only changes when the app says so (it reloads timelines after every
+    /// change and when the lock is toggled); protected data is retried after a while.
+    static func policy(for state: CodesEntry.State, now: Date = .now) -> TimelineReloadPolicy {
+        switch state {
+        case .ready: .atEnd
+        case .unavailable: .after(now.addingTimeInterval(15 * 60))
+        case .noAccounts, .locked: .never
+        }
     }
 }
 
@@ -89,7 +104,7 @@ struct SingleAccountProvider: AppIntentTimelineProvider {
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<CodesEntry> {
         let (accounts, state) = CodesTimeline.load()
         let entries = CodesTimeline.entries(for: select(configuration, from: accounts), state: state)
-        return Timeline(entries: entries, policy: .atEnd)
+        return Timeline(entries: entries, policy: CodesTimeline.policy(for: state))
     }
 
     private func select(_ configuration: ConfigurationAppIntent, from accounts: [OtpModel]) -> [OtpModel] {
@@ -114,7 +129,7 @@ struct MultiAccountProvider: AppIntentTimelineProvider {
     func timeline(for configuration: MultiAccountConfigurationIntent, in context: Context) async -> Timeline<CodesEntry> {
         let (accounts, state) = CodesTimeline.load()
         let entries = CodesTimeline.entries(for: select(configuration, from: accounts, family: context.family), state: state)
-        return Timeline(entries: entries, policy: .atEnd)
+        return Timeline(entries: entries, policy: CodesTimeline.policy(for: state))
     }
 
     private func select(_ configuration: MultiAccountConfigurationIntent, from accounts: [OtpModel], family: WidgetFamily) -> [OtpModel] {
@@ -319,14 +334,29 @@ struct WidgetMessageView: View {
         #endif
         default:
             VStack(spacing: 6) {
-                Image(systemName: state == .unavailable ? "lock.fill" : "lock.shield")
+                Image(systemName: symbol)
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                Text(state == .unavailable ? "Unlock your device to see codes" : "Add an account in TOTP")
+                Text(message)
                     .font(.caption)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var symbol: String {
+        switch state {
+        case .unavailable, .locked: "lock.fill"
+        case .ready, .noAccounts: "lock.shield"
+        }
+    }
+
+    private var message: LocalizedStringKey {
+        switch state {
+        case .unavailable: "Unlock your device to see codes"
+        case .locked: "TOTP is locked. Open it to see your codes."
+        case .ready, .noAccounts: "Add an account in TOTP"
         }
     }
 }
@@ -370,6 +400,7 @@ struct TOTP_MultiWidget: Widget {
 } timeline: {
     CodesEntry(date: .now, accounts: [WidgetSamples.primary], state: .ready)
     CodesEntry(date: .now, accounts: [], state: .noAccounts)
+    CodesEntry(date: .now, accounts: [], state: .locked)
 }
 
 #Preview("Medium", as: .systemMedium) {

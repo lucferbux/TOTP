@@ -54,7 +54,7 @@ struct CopyCodeControlConfiguration: ControlConfigurationIntent {
 struct CopyControlCodeIntent: AppIntent {
     static let title: LocalizedStringResource = "Copy Code"
     static let isDiscoverable = false
-
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Account ID")
     var accountID: String?

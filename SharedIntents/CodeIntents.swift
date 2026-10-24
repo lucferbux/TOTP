@@ -13,8 +13,10 @@ import WidgetKit
 /// Shared gate for intents that hand out a code.
 ///
 /// `AppIntent.authenticationPolicy` has to be a compile-time constant, so it can't follow the
-/// user's app-lock preference. Enforcing it here keeps the rule the Settings screen states:
-/// with the lock off nothing prompts; with it on, every surface authenticates first.
+/// user's app-lock preference. Every intent that hands out a code declares
+/// `.requiresAuthentication` — a locked device never gives one to Siri or the Lock Screen — and
+/// this adds the app lock on top: with it off nothing more prompts; with it on, every surface
+/// authenticates first.
 enum IntentAuthentication {
     static func requireIfLocked() async throws {
         guard AppPreferences.appLockEnabled else { return }
@@ -37,6 +39,7 @@ enum IntentAuthentication {
 struct GetCodeIntent: AppIntent {
     static let title: LocalizedStringResource = "Get Code"
     static let description = IntentDescription("Returns the current code for an account, including its fixed prefix.")
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Account")
     var account: AccountEntity
@@ -62,6 +65,7 @@ struct GetCodeIntent: AppIntent {
 struct CopyCodeIntent: AppIntent {
     static let title: LocalizedStringResource = "Copy Code"
     static let description = IntentDescription("Copies the current code for an account, including its fixed prefix, to the clipboard.")
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Account")
     var account: AccountEntity

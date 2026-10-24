@@ -41,6 +41,33 @@ struct KeyLifecycleTests {
         }
     }
 
+    @Test("Every device picks the same primary key: the legacy item, then the oldest by name")
+    func keychainKeysOrderDeterministically() {
+        let legacy = Data(repeating: 1, count: 32)
+        let older = Data(repeating: 2, count: 32)
+        let newer = Data(repeating: 3, count: 32)
+        let olderName = EncryptionKeyManager.newKeyAccount(now: Date(timeIntervalSince1970: 1_000))
+        let newerName = EncryptionKeyManager.newKeyAccount(now: Date(timeIntervalSince1970: 2_000))
+        func bytes(_ keys: [SymmetricKey]) -> [Data] { keys.map { $0.withUnsafeBytes { Data($0) } } }
+
+        // Whatever order the Keychain returns them in
+        let withLegacy = EncryptionKeyManager.orderedKeys([(newerName, newer), ("shared-key", legacy), (olderName, older)])
+        #expect(bytes(withLegacy) == [legacy, older, newer])
+        let withoutLegacy = EncryptionKeyManager.orderedKeys([(newerName, newer), (olderName, older)])
+        #expect(bytes(withoutLegacy) == [older, newer])
+        // Something that isn't a key is ignored, never used to seal
+        #expect(EncryptionKeyManager.orderedKeys([("key-bad", Data(repeating: 0, count: 8))]).isEmpty)
+    }
+
+    @Test("New key items have unique names that sort by creation time")
+    func newKeyNamesSortByTime() {
+        let first = EncryptionKeyManager.newKeyAccount(now: Date(timeIntervalSince1970: 999))
+        let second = EncryptionKeyManager.newKeyAccount(now: Date(timeIntervalSince1970: 1_000))
+        let sameInstant = EncryptionKeyManager.newKeyAccount(now: Date(timeIntervalSince1970: 1_000))
+        #expect(first < second)
+        #expect(second != sameInstant)
+    }
+
     @Test("A wrong-sized key file is treated as unavailable, never overwritten")
     func shortKeyFileIsUnavailable() throws {
         // Guards the case where the file exists but holds something unexpected: we must not

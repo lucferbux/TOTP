@@ -63,7 +63,8 @@ public struct OtpModel: Identifiable, Hashable, Sendable {
 
     /// Whether this account belongs to one of the AutoFill service identifiers (domains or URLs).
     /// Matches exact hosts and subdomains of the account's associated domains, falling back to
-    /// the issuer as a pseudo-domain ("Example Corp" → "examplecorp").
+    /// the issuer as a pseudo-domain ("Example Corp" → "examplecorp") compared with the label that
+    /// names the site — so "github.com" matches issuer GitHub but "github.evil.example" doesn't.
     public func matchesAutoFill(serviceIdentifiers: [String]) -> Bool {
         let hosts = serviceIdentifiers.compactMap(Self.host(from:))
         guard !hosts.isEmpty else { return false }
@@ -74,9 +75,19 @@ public struct OtpModel: Identifiable, Hashable, Sendable {
             }
         }
         guard let issuer = issuer?.lowercased().filter({ $0.isLetter || $0.isNumber }), !issuer.isEmpty else { return false }
-        return hosts.contains { host in
-            host.split(separator: ".").contains { $0 == issuer }
+        return hosts.contains { Self.siteLabel(of: $0) == Substring(issuer) }
+    }
+
+    /// The label just left of the public suffix: "github" for "github.com", "login.github.com" and
+    /// "github.co.uk". Without the Public Suffix List this covers the common "<name>.<co|com|…>.<cc>".
+    static func siteLabel(of host: String) -> Substring? {
+        let labels = host.split(separator: ".")
+        guard labels.count >= 2 else { return nil }
+        let secondLevel: Set<Substring> = ["ac", "co", "com", "edu", "gov", "ne", "net", "or", "org"]
+        if labels.count >= 3, labels[labels.count - 1].count == 2, secondLevel.contains(labels[labels.count - 2]) {
+            return labels[labels.count - 3]
         }
+        return labels[labels.count - 2]
     }
 
     static func host(from identifier: String) -> String? {

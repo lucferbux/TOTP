@@ -62,7 +62,8 @@ public enum ClipboardManager {
                                                                  allowUniversalClipboard: allowUniversalClipboard))
         #elseif canImport(AppKit)
         let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
+        // Same rule as iOS's `.localOnly`: the code stays on this Mac unless the user opted in
+        pasteboard.prepareForNewContents(with: allowUniversalClipboard ? [] : .currentHostOnly)
         pasteboard.setString(value, forType: .string)
         // Tell clipboard managers not to record the code
         pasteboard.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))

@@ -90,6 +90,15 @@ struct OtpModelTests {
         #expect(twoWords.matchesAutoFill(serviceIdentifiers: ["sso.examplecorp.com"]))
         #expect(!twoWords.matchesAutoFill(serviceIdentifiers: ["sso.example.com"]))
     }
+
+    @Test("The issuer only matches the label that names the site, not any label (phishing hosts)")
+    func issuerFallbackIgnoresLookalikeHosts() {
+        let account = OtpModel(issuer: "Example", entry: .totp(key: secret, digits: 6, interval: 30))
+        #expect(account.matchesAutoFill(serviceIdentifiers: ["https://login.example.co.uk/"]))
+        #expect(!account.matchesAutoFill(serviceIdentifiers: ["example.attacker.test"]))
+        #expect(!account.matchesAutoFill(serviceIdentifiers: ["example.login-attacker.co.uk"]))
+        #expect(!account.matchesAutoFill(serviceIdentifiers: ["example"]))
+    }
 }
 
 @Suite("Base32")
