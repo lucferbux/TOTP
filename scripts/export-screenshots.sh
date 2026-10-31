@@ -42,14 +42,17 @@ local result="$TMP/$prefix.xcresult"
     echo "==> $device"
     # Apple's convention for marketing shots: full bars, full battery, 9:41.
     local udid
+    # The newest runtime, since a device name can exist on several: App Review wants the latest OS.
     udid=$(xcrun simctl list devices available -j | /usr/bin/python3 -c "
-import json,sys
+import json,re,sys
 name=sys.argv[1]
-for runtime, devices in json.load(sys.stdin)['devices'].items():
-    for d in devices:
+version=lambda runtime: [int(n) for n in re.findall(r'\d+', runtime.rsplit('.', 1)[-1])]
+runtimes=json.load(sys.stdin)['devices']
+for runtime in sorted(runtimes, key=version, reverse=True):
+    for d in runtimes[runtime]:
         if d['name'] == name:
-            print(d['udid']); break
-" "$device" | head -1)
+            print(d['udid']); sys.exit()
+" "$device")
     if [ -n "$udid" ]; then
         xcrun simctl boot "$udid" 2>/dev/null || true
         xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || true
@@ -58,7 +61,7 @@ for runtime, devices in json.load(sys.stdin)['devices'].items():
 
     xcodebuild test \
         -project "$PROJECT" -scheme "$SCHEME" \
-        -destination "platform=iOS Simulator,name=$device" \
+        -destination "platform=iOS Simulator,id=$udid" \
         -only-testing:TOTPUITests/ScreenshotTests \
         -resultBundlePath "$result" \
         -derivedDataPath "$TMP/dd" \
@@ -129,7 +132,7 @@ capture_mac() {
     shoot_mac() {
         local name="$1" scene="$2"
         pkill -x TOTP 2>/dev/null || true
-        rm -f "$frame_file"
+        rm -f "$frame_file" 2>/dev/null || true
         sleep 2
         if [ -n "$scene" ]; then
             open -n "$app" --args -ScreenshotMode -ScreenshotScene "$scene"

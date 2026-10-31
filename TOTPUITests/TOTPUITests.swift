@@ -29,8 +29,8 @@ final class TOTPUITests: XCTestCase {
     }
 
     /// The menus that hold "Select Accounts" at regular width: the system overflow menu on iPad
-    /// (and iPhone Duo open), our own ⋯ menu on Mac.
-    static let overflowMenus = ["OverflowBarButtonItem", "moreMenu"]
+    /// (and iPhone Duo open), our own ⋯ menu on Mac. iPadOS 27.2 renamed the system one.
+    static let overflowMenus = ["TopOverflowBarButtonItem", "OverflowBarButtonItem", "moreMenu"]
 
     /// What starts select mode: "Select" in the toolbar on iPhone, an overflow menu otherwise.
     private var selectEntryPoint: XCUIElement {

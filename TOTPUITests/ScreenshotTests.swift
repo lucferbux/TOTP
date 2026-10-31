@@ -34,8 +34,17 @@ final class ScreenshotTests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "account-\(title)").firstMatch
     }
 
+    /// Waits for a new 30-second period, so the rings show plenty of time left instead of a red sliver.
+    private func waitForFreshCodes() {
+        let elapsed = Int(Date().timeIntervalSince1970) % 30
+        if elapsed > 2 {
+            Thread.sleep(forTimeInterval: TimeInterval(32 - elapsed))
+        }
+    }
+
     func testCaptureScreenshots() throws {
         XCTAssertTrue(account("Northwind Corp").waitForExistence(timeout: 10))
+        waitForFreshCodes()
         capture("01-codes")
 
         // A copy in progress: the confirmation and the green copied marker
@@ -44,7 +53,7 @@ final class ScreenshotTests: XCTestCase {
 
         // Select mode with a couple of accounts ticked
         // iPhone shows "Select" in the toolbar; iPad keeps it in the system overflow menu
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.buttons.matching(NSPredicate(format: "identifier IN %@", TOTPUITests.overflowMenus)).firstMatch
         if overflow.exists {
             overflow.tap()
         }
