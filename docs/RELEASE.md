@@ -109,8 +109,8 @@ Accepted Mac sizes: 1280×800, 1440×900, 2560×1600, 2880×1800.
 - **Screenshots are per platform**, and are not shared by Universal Purchase.
 - **`release_notes` (What's New) can't be set on a first version** — App Store Connect rejects
   `whatsNew` with `STATE_ERROR` until the app has a released version to describe changes against.
-- **The build is attached separately from the metadata.** `fastlane metadata` never picks one; set
-  it in App Store Connect, or PATCH `/v1/appStoreVersions/{id}/relationships/build`.
+- **The build is attached separately from the metadata.** `fastlane metadata` never picks one; run
+  `fastlane attach_build build:<n>` once it has finished processing.
 - **App Review contact details** (`fastlane/metadata/*/review_information/`) need a
   `phone_number.txt` and `email_address.txt`. Without them the review-detail record can't be
   created, and deliver's metadata step then dies with "No data" (fastlane #20538) — which is why

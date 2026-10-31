@@ -13,8 +13,10 @@ missing is the recording, the new build and the reply.
 | Header and search results, macOS | App Store Connect doesn't offer them for Mac |
 | Review notes, iOS and macOS | Updated with coffee, suggestions and In-App Purchase |
 | Three coffee purchases | Created, 0.99, 2.99 and 4.99 EUR, with review screenshot. Not yet added for review |
-| Build | Still 12, with the old icon. Replace with 13 |
-| Screenshots | Still the earlier set: on 27.2 the toolbar items are icons, so "Select" and "Add" look different. Run `scripts/export-screenshots.sh` and upload them before submitting |
+| Build | 13 attached on iOS and macOS |
+| Screenshots, iOS | Replaced from iOS 27.2: iPhone, iPad and iPhone Duo's outer display |
+| Screenshots, iPhone Duo inner display | Not taken: it has to be opened in Device Hub first (`scripts/export-screenshots.sh --duo-inner`) |
+| Screenshots, macOS | Not replaced. Taking them needs Screen Recording permission, so run `scripts/export-screenshots.sh` from Terminal, then `fastlane screenshots_upload` |
 | App Privacy | Unchanged: Data Not Collected. Check it still reads that way before submitting |
 
 ## Recording
@@ -48,8 +50,7 @@ The tips need the build from TestFlight, or a run from Xcode, which uses `StoreK
 
 ## Steps left
 
-1. Commit, archive and upload build 13 for iOS and macOS (`release-totp` skill).
-2. Attach build 13 to both versions.
-3. On each coffee purchase, press **Add for Review**.
-4. Record, attach the recordings to the reply, and send it.
-5. Press **Update Review** on both versions.
+1. Record on build 13 from TestFlight.
+2. On each coffee purchase, press **Add for Review**.
+3. Attach the recordings to the reply, and send it.
+4. Press **Update Review** on both versions.

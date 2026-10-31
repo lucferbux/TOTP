@@ -28,6 +28,27 @@ def asc_key
   )
 end
 
+# Calls the App Store Connect API for what deliver doesn't cover.
+def asc_api
+  require "net/http"
+  key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
+  token = Spaceship::ConnectAPI::Token.create(
+    key_id: key_id,
+    issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
+    filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
+  )
+  lambda do |method, path, body = nil|
+    uri = URI("https://api.appstoreconnect.apple.com#{path}")
+    request = Net::HTTP.const_get(method).new(uri)
+    request["Authorization"] = "Bearer #{token.text}"
+    request["Content-Type"] = "application/json"
+    request.body = JSON.generate(body) if body
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    UI.user_error!("#{method} #{path}: #{response.code} #{response.body}") unless response.code.to_i < 300
+    response.body.to_s.empty? ? {} : JSON.parse(response.body)
+  end
+end
+
 # MARKETING_VERSION straight from the project. (fastlane's get_version_number can't parse the
 # Xcode 27 pbxproj format — issue #30223 — so read it directly.)
 def marketing_version
@@ -67,7 +88,7 @@ end
 # Screenshots only. Also the way round fastlane #20538: deliver's metadata step crashes with
 # "No data" when an app has no App Store review detail yet, which it can't create without a
 # contact phone number.
-lane :screenshots_upload do
+lane :screenshots_upload do |options|
   UI.message("Uploading iOS screenshots…")
   upload_to_app_store(
     api_key: asc_key,
@@ -84,6 +105,8 @@ lane :screenshots_upload do
     overwrite_screenshots: true,
     run_precheck_before_submit: false
   )
+
+  next if options[:only] == "ios"
 
   UI.message("Uploading macOS screenshots…")
   upload_to_app_store(
@@ -132,23 +155,7 @@ end
 # Only the App Review notes of the current version, on both platforms. `metadata` pushes the whole listing.
 desc "Push the App Review notes"
 lane :review_notes do
-  require "net/http"
-  key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
-  token = Spaceship::ConnectAPI::Token.create(
-    key_id: key_id,
-    issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
-    filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
-  )
-  api = lambda do |method, path, body = nil|
-    uri = URI("https://api.appstoreconnect.apple.com#{path}")
-    request = Net::HTTP.const_get(method).new(uri)
-    request["Authorization"] = "Bearer #{token.text}"
-    request["Content-Type"] = "application/json"
-    request.body = JSON.generate(body) if body
-    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
-    UI.user_error!("#{method} #{path}: #{response.code} #{response.body}") unless response.code.to_i < 300
-    response.body.to_s.empty? ? {} : JSON.parse(response.body)
-  end
+  api = asc_api
   { "IOS" => "ios", "MAC_OS" => "mac" }.each do |platform, folder|
     query = "filter%5Bplatform%5D=#{platform}&filter%5BversionString%5D=#{marketing_version}&include=appStoreReviewDetail"
     version = api.call(:Get, "/v1/apps/6742797604/appStoreVersions?#{query}")["data"].first || UI.user_error!("No #{platform} version")
@@ -156,6 +163,21 @@ lane :review_notes do
     notes = File.read("metadata/#{folder}/review_information/notes.txt").strip
     api.call(:Patch, "/v1/appStoreReviewDetails/#{detail}", { data: { type: "appStoreReviewDetails", id: detail, attributes: { notes: notes } } })
     UI.success("#{platform}: #{notes.length} characters")
+  end
+end
+
+# Attaches a processed build to the current version on both platforms. Usage: fastlane attach_build build:13
+desc "Attach a processed build"
+lane :attach_build do |options|
+  api = asc_api
+  %w[IOS MAC_OS].each do |platform|
+    query = "filter%5Bapp%5D=6742797604&filter%5Bversion%5D=#{options[:build]}&filter%5BpreReleaseVersion.platform%5D=#{platform}"
+    build = api.call(:Get, "/v1/builds?#{query}")["data"].first || UI.user_error!("No #{platform} build #{options[:build]} yet")
+    state = build["attributes"]["processingState"]
+    UI.user_error!("#{platform} build #{options[:build]} is #{state}") unless state == "VALID"
+    version = api.call(:Get, "/v1/apps/6742797604/appStoreVersions?filter%5Bplatform%5D=#{platform}&filter%5BversionString%5D=#{marketing_version}")["data"].first
+    api.call(:Patch, "/v1/appStoreVersions/#{version["id"]}/relationships/build", { data: { type: "builds", id: build["id"] } })
+    UI.success("#{platform}: build #{options[:build]} attached")
   end
 end
 
@@ -169,24 +191,8 @@ TIPS = [
 # Creates the consumable tips, skipping any that exist. Prices are based on Spain, and Apple sets the rest.
 desc "Create the tip in-app purchases"
 lane :tips do
-  require "net/http"
   require "digest"
-  key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
-  token = Spaceship::ConnectAPI::Token.create(
-    key_id: key_id,
-    issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
-    filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
-  )
-  api = lambda do |method, path, body = nil|
-    uri = URI("https://api.appstoreconnect.apple.com#{path}")
-    request = Net::HTTP.const_get(method).new(uri)
-    request["Authorization"] = "Bearer #{token.text}"
-    request["Content-Type"] = "application/json"
-    request.body = JSON.generate(body) if body
-    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
-    UI.user_error!("#{method} #{path}: #{response.code} #{response.body}") unless response.code.to_i < 300
-    response.body.to_s.empty? ? {} : JSON.parse(response.body)
-  end
+  api = asc_api
   app_id = "6742797604"
   screenshot = "screenshots_review/tips.png"
   existing = api.call(:Get, "/v1/apps/#{app_id}/inAppPurchasesV2?limit=50")["data"].map { |i| i["attributes"]["productId"] }
