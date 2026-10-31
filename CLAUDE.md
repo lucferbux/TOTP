@@ -10,7 +10,7 @@ conventions. [AGENTS.md](AGENTS.md) is the portable summary for other agents —
 - **Language / mode:** Swift (Swift 5 language mode — `SWIFT_VERSION = 5.0`)
 - **UI:** SwiftUI with the **iOS 26 "Liquid Glass"** design language
 - **Deployment targets:** iOS/iPadOS **27.0+**, macOS **27.0+** (visionOS 27 is also a supported platform)
-- **Toolchain:** Xcode **27.x** (this machine: Xcode 27.0)
+- **Toolchain:** Xcode **27.x** (this machine: Xcode 27.2)
 - **Crypto:** CryptoKit — HMAC SHA-1/256/512 for OTP, `ChaChaPoly` for at-rest encryption
 
 
@@ -48,7 +48,7 @@ xcodebuild test -project TOTP.xcodeproj -scheme TOTP \
   -only-testing:TOTPTests
 ```
 
-- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M5)`. Foldable: `name=iPhone Duo` (iOS 27.1 runtime, which supports only that device; iPhone and iPad simulators stay on 27.0).
+- Pick a destination that actually exists: `xcrun simctl list devices available`. iPad-class verification: `name=iPad Pro 11-inch (M5)`. Foldable: `name=iPhone Duo`. Device names exist on several runtimes (27.0, 27.1 for iPhone Duo, and 27.2), so add `OS=27.2` to the destination to pick the latest.
 - **iPhone Duo poses** can only be changed in **Device Hub** (Xcode ▸ Open Developer Tool ▸ Device Hub — Xcode 27 has no separate Simulator app); neither `simctl` nor XCTest can fold it. It boots closed. `xcrun simctl io <udid> enumerate` lists both displays (outer 1398×2034, inner 2007×2853), and `simctl io screenshot --display=<port UUID>` captures either. Don't use `simctl io screenConfig … power off` to fake a pose: it blanks both displays until a reboot.
 - Run UI tests with `-parallel-testing-enabled NO` on a freshly created simulator: the clones xcodebuild makes otherwise time out while the simulator finishes its first boot.
 - Prefer the project's **`build-run-totp`** and **`test-totp`** skills — they wrap these commands, pick a live simulator, and pipe through `xcbeautify` when available.
@@ -120,7 +120,7 @@ List / .swipeActions / .contextMenu / ContentUnavailableView / Form(.grouped)
 //    }
 //  • regular (iPad, iPhone Duo open, Mac) — every action lives in the navigation bar: add
 //    (.visibilityPriority(.high)), then "Select Accounts" in the system ToolbarOverflowMenu on iOS
-//    (the ellipsis belongs to it; XCUITest sees it as "OverflowBarButtonItem") and in our own
+//    (the ellipsis belongs to it; XCUITest sees it as "OverflowBarButtonItem", or "TopOverflowBarButtonItem" from iPadOS 27.2) and in our own
 //    ellipsis Menu ("moreMenu") on macOS, where ToolbarOverflowMenu doesn't exist. Search keeps
 //    its default position.
 //  • iPhone Duo puts bars on the side (outer display, inner in landscape). An item with a title but
@@ -220,6 +220,7 @@ PlatformColors.secondarySystemGroupedBackground
 - **CloudKit schema**: the optional `algorithm` field is only written for non-SHA-1 accounts. New fields must be deployed to the Production schema in the CloudKit Console before release. Setup, deployment and troubleshooting live in [docs/CLOUDKIT.md](docs/CLOUDKIT.md) — including why the Console's record browser needs a `recordName` QUERYABLE index that the app must never depend on.
 - **macOS**: `MenuBarExtra` (`.window` style) menu bar mode with a **static** icon (macOS 27 hosts all status items in one window; don't animate it), ⌘, `Settings` scene, launch-at-login via `SMAppService.mainApp`, the main window opens on launch unless launch at login is on (`MacOSAppSettings.presentsWindowAtLaunch` — a launch that showed only a menu bar icon, possibly hidden by the notch, left App Review with nothing to look at), Dock-icon policy via `NSApp.setActivationPolicy`. macOS-only behavior is in `MenuBarView`, `SettingsView`, `MacOSAppSettings`, and `MacAppDelegate`.
 - **Select mode** (`ContentView`): `isSelecting` + `selection: Set<UUID>` drive batch delete through `SyncManager.deleteAccounts(withIds:)`, which removes them locally in one write, deletes each from CloudKit, then refreshes widgets, AutoFill and Spotlight once. Always confirm before deleting.
+- **Suggestions and coffee** (`SettingsView`, `TipJarManager`, `TipJarView`): "Send a Suggestion" is a link to a GitHub issue, not a form that posts somewhere, because the app, its privacy policy and its App Store label all promise no network requests of its own and no data collected. "Buy Me a Coffee" is three consumable in-app purchases (Guideline 3.1.1) that unlock nothing; never add Ko-fi or other payment links inside the app. Product ids live in `TipJarManager`, `StoreKit/Tips.storekit` (used by the scheme's Run action and `TipJarTests`) and App Store Connect (`fastlane tips`): keep the three in step. A successful purchase can only be tested in sandbox, from TestFlight.
 - **App lock** (`AppLockManager`): optional, off by default, stored in the App Group; locks on background (iOS) or screen lock/sleep (macOS).
 
 ## Testing
@@ -248,6 +249,7 @@ PlatformColors.secondarySystemGroupedBackground
   - `test-totp` — run the unit / UI suites.
   - `release-totp` — version bump, archive and App Store Connect upload (pre-flight checks included).
 - **App Store metadata** (`fastlane/`): listing copy lives in `fastlane/metadata/{ios,mac}/en-US/*.txt` and is pushed with `fastlane metadata`. App-level fields (name, subtitle, privacy URL, categories) are shared across platforms by App Store Connect, so they live **only** in the iOS tree — duplicating them lets one lane overwrite the other platform. No lane ever submits for review. Screenshots come from `scripts/export-screenshots.sh`: iPhone and iPad from the UI tests, Mac by relaunching the app per shot with `-ScreenshotMode -ScreenshotScene <select|add>` (both `#if DEBUG` only) because macOS UI automation needs Accessibility permission. The app reports the window frame it actually got to the App Group container, so the capture never assumes a rect. `whatsNew` can't be set on a first version, and the build is attached separately from the metadata. See [docs/RELEASE.md](docs/RELEASE.md).
+- **Icon and App Store art**: `scripts/make-icon.swift` draws the app icon into `TOTP/Assets.xcassets/AppIcon.appiconset`, and `scripts/make-creative-assets.swift` draws the header and search results images into `fastlane/creative_assets/` (upload them in App Store Connect ▸ the version page ▸ Header and Search Results). The second needs `fastlane/screenshots/en-US`, which isn't in git. `fastlane/screenshots_review/tips.png` is the screenshot App Review needs for each in-app purchase, from `TipJarUITests`.
 - **Website** (`site/`): landing page, privacy policy and support page, published to GitHub Pages by `.github/workflows/pages.yml`. Never switch Pages to the `docs/` folder — Jekyll would publish the internal architecture docs as indexable pages.
 - **Hooks** (`scripts/swift-guardrails.sh`, wired as a `PostToolUse` hook for `Write|Edit`):
   warns after editing a Swift file that uses `.foregroundColor`, `.spring()`, `.shadow()`,

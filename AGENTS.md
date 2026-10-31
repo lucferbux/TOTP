@@ -89,6 +89,7 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
     auto-created schema lacks, and they can't report deletions. See `docs/CLOUDKIT.md`.
 12. Never block syncing or launch on another subsystem (Spotlight, push registration); make those
     fire-and-forget. Log failures with `os.Logger` instead of swallowing them.
+13. Suggestions stay a link to GitHub and tips stay consumable in-app purchases: the app promises no network requests of its own and no data collected, and Guideline 3.1.1 rules out outside payment links. Product ids live in `TipJarManager`, `StoreKit/Tips.storekit` and App Store Connect (`fastlane tips`).
 
 **UI**
 13. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:

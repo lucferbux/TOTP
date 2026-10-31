@@ -28,6 +28,7 @@ A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS a
 - Select mode: batch-select accounts and delete them in one go
 - iOS bottom bar with search and Add, like Notes
 - Dynamic Type, VoiceOver labels and haptic feedback
+- Settings links to send a suggestion on GitHub and to buy the developer a coffee (optional in-app purchase that unlocks nothing)
 - Fixed prefix (PIN) per account, added on copy and AutoFill (services that expect PIN + code)
 
 ### ☁️ Sync & Backup

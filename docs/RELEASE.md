@@ -64,6 +64,21 @@ fastlane metadata
 
 Then open App Store Connect, check both versions, attach the builds and submit by hand.
 
+## Icon, header and search results
+
+```bash
+swift scripts/make-icon.swift TOTP/Assets.xcassets/AppIcon.appiconset
+swift scripts/make-creative-assets.swift   # needs fastlane/screenshots/en-US
+```
+
+Upload `fastlane/creative_assets/` on each platform's version page, under **Header and Search
+Results**. The API can do it too, but no lane does yet.
+
+## Coffee (in-app purchases)
+
+`fastlane tips` creates the three consumables, skipping any that exist. They go to review with a
+version: select them under **In-App Purchases and Subscriptions** on the version page.
+
 ## Mac screenshots
 
 macOS UI tests need Accessibility permission, which the script doesn't have, so the Mac shots are
