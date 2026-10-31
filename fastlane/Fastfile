@@ -124,9 +124,121 @@ end
 
 # Apple's own checks (trademarks, placeholder text, broken URLs) before anything is pushed.
 lane :precheck_all do
-  # include_in_app_purchases: precheck can't read IAPs with an API key, and this app has none.
+  # include_in_app_purchases: precheck can't read IAPs with an API key.
   check_app_store_metadata(api_key: asc_key, platform: "ios", default_rule_level: :warn, include_in_app_purchases: false)
   check_app_store_metadata(api_key: asc_key, platform: "osx", default_rule_level: :warn, include_in_app_purchases: false)
+end
+
+# Only the App Review notes of the current version, on both platforms. `metadata` pushes the whole listing.
+desc "Push the App Review notes"
+lane :review_notes do
+  require "net/http"
+  key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
+  token = Spaceship::ConnectAPI::Token.create(
+    key_id: key_id,
+    issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
+    filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
+  )
+  api = lambda do |method, path, body = nil|
+    uri = URI("https://api.appstoreconnect.apple.com#{path}")
+    request = Net::HTTP.const_get(method).new(uri)
+    request["Authorization"] = "Bearer #{token.text}"
+    request["Content-Type"] = "application/json"
+    request.body = JSON.generate(body) if body
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    UI.user_error!("#{method} #{path}: #{response.code} #{response.body}") unless response.code.to_i < 300
+    response.body.to_s.empty? ? {} : JSON.parse(response.body)
+  end
+  { "IOS" => "ios", "MAC_OS" => "mac" }.each do |platform, folder|
+    query = "filter%5Bplatform%5D=#{platform}&filter%5BversionString%5D=#{marketing_version}&include=appStoreReviewDetail"
+    version = api.call(:Get, "/v1/apps/6742797604/appStoreVersions?#{query}")["data"].first || UI.user_error!("No #{platform} version")
+    detail = version.dig("relationships", "appStoreReviewDetail", "data", "id") || UI.user_error!("No #{platform} review detail")
+    notes = File.read("metadata/#{folder}/review_information/notes.txt").strip
+    api.call(:Patch, "/v1/appStoreReviewDetails/#{detail}", { data: { type: "appStoreReviewDetails", id: detail, attributes: { notes: notes } } })
+    UI.success("#{platform}: #{notes.length} characters")
+  end
+end
+
+# Keep in step with TipJarManager and StoreKit/Tips.storekit.
+TIPS = [
+  { id: "com.lucferbux.TOTP.tip.small", name: "A Coffee", description: "A small thank you", price: "0.99" },
+  { id: "com.lucferbux.TOTP.tip.medium", name: "A Large Coffee", description: "For a long night of fixes", price: "2.99" },
+  { id: "com.lucferbux.TOTP.tip.large", name: "A Week of Coffee", description: "For the next big update", price: "4.99" }
+].freeze
+
+# Creates the consumable tips, skipping any that exist. Prices are based on Spain, and Apple sets the rest.
+desc "Create the tip in-app purchases"
+lane :tips do
+  require "net/http"
+  require "digest"
+  key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
+  token = Spaceship::ConnectAPI::Token.create(
+    key_id: key_id,
+    issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
+    filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
+  )
+  api = lambda do |method, path, body = nil|
+    uri = URI("https://api.appstoreconnect.apple.com#{path}")
+    request = Net::HTTP.const_get(method).new(uri)
+    request["Authorization"] = "Bearer #{token.text}"
+    request["Content-Type"] = "application/json"
+    request.body = JSON.generate(body) if body
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    UI.user_error!("#{method} #{path}: #{response.code} #{response.body}") unless response.code.to_i < 300
+    response.body.to_s.empty? ? {} : JSON.parse(response.body)
+  end
+  app_id = "6742797604"
+  screenshot = "screenshots_review/tips.png"
+  existing = api.call(:Get, "/v1/apps/#{app_id}/inAppPurchasesV2?limit=50")["data"].map { |i| i["attributes"]["productId"] }
+  territories = api.call(:Get, "/v1/territories?limit=200")["data"].map { |t| { type: "territories", id: t["id"] } }
+
+  TIPS.each do |tip|
+    if existing.include?(tip[:id])
+      UI.message("#{tip[:id]} already exists")
+      next
+    end
+    purchase_id = api.call(:Post, "/v2/inAppPurchases", { data: { type: "inAppPurchases",
+      attributes: { name: tip[:name], productId: tip[:id], inAppPurchaseType: "CONSUMABLE",
+                    reviewNote: "Voluntary tip to the developer. It unlocks nothing. Settings > Buy Me a Coffee." },
+      relationships: { app: { data: { type: "apps", id: app_id } } } } })["data"]["id"]
+    purchase = { type: "inAppPurchases", id: purchase_id }
+
+    api.call(:Post, "/v1/inAppPurchaseLocalizations", { data: { type: "inAppPurchaseLocalizations",
+      attributes: { locale: "en-US", name: tip[:name], description: tip[:description] },
+      relationships: { inAppPurchaseV2: { data: purchase } } } })
+
+    api.call(:Post, "/v1/inAppPurchaseAvailabilities", { data: { type: "inAppPurchaseAvailabilities",
+      attributes: { availableInNewTerritories: true },
+      relationships: { inAppPurchase: { data: purchase }, availableTerritories: { data: territories } } } })
+
+    points = api.call(:Get, "/v2/inAppPurchases/#{purchase_id}/pricePoints?filter%5Bterritory%5D=ESP&limit=200")["data"]
+    point = points.find { |p| p["attributes"]["customerPrice"] == tip[:price] } || UI.user_error!("No price point #{tip[:price]}")
+    api.call(:Post, "/v1/inAppPurchasePriceSchedules", {
+      data: { type: "inAppPurchasePriceSchedules", relationships: {
+        inAppPurchase: { data: purchase },
+        baseTerritory: { data: { type: "territories", id: "ESP" } },
+        manualPrices: { data: [{ type: "inAppPurchasePrices", id: "${price}" }] } } },
+      included: [{ type: "inAppPurchasePrices", id: "${price}", attributes: { startDate: nil },
+                   relationships: { inAppPurchaseV2: { data: purchase },
+                                    inAppPurchasePricePoint: { data: { type: "inAppPurchasePricePoints", id: point["id"] } } } }] })
+
+    bytes = File.binread(screenshot)
+    reservation = api.call(:Post, "/v1/inAppPurchaseAppStoreReviewScreenshots", { data: { type: "inAppPurchaseAppStoreReviewScreenshots",
+      attributes: { fileName: "tips.png", fileSize: bytes.bytesize },
+      relationships: { inAppPurchaseV2: { data: purchase } } } })["data"]
+    reservation["attributes"]["uploadOperations"].each do |operation|
+      uri = URI(operation["url"])
+      request = Net::HTTP.const_get(operation["method"].capitalize).new(uri)
+      operation["requestHeaders"].each { |header| request[header["name"]] = header["value"] }
+      request.body = bytes.byteslice(operation["offset"], operation["length"])
+      response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+      UI.user_error!("Screenshot upload: #{response.code}") unless response.code.to_i < 300
+    end
+    api.call(:Patch, "/v1/inAppPurchaseAppStoreReviewScreenshots/#{reservation["id"]}", { data: {
+      type: "inAppPurchaseAppStoreReviewScreenshots", id: reservation["id"],
+      attributes: { uploaded: true, sourceFileChecksum: Digest::MD5.hexdigest(bytes) } } })
+    UI.success("Created #{tip[:id]} at #{tip[:price]} EUR")
+  end
 end
 
 # Regenerates App Store screenshots from the UI tests.

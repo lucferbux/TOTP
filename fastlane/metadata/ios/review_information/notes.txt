@@ -1,5 +1,5 @@
 NO ACCOUNT, NO SIGN-IN
-There is no registration, login, user-generated content or paid content. The app works offline the moment it opens; no demo credentials are needed.
+There is no registration, login or user-generated content, and nothing is locked behind a payment. The only purchases are three optional consumable tips (Settings > Buy Me a Coffee, Guideline 3.1.1), which unlock nothing. The app works offline the moment it opens; no demo credentials are needed.
 
 1. SCREEN RECORDING
 Attached to our reply in App Review (iPhone and Mac, latest OS, physical devices).
@@ -16,13 +16,14 @@ c) PIN prefix: open the account, fill "Fixed Prefix (PIN)", save. The row shows 
 d) Select (top right) enters multi-select for batch deletion.
 e) AutoFill must be enabled once by the user: iOS Settings > General > AutoFill & Passwords > enable "TOTP"; macOS System Settings > General > AutoFill & Passwords > enable "TOTP".
 f) Widgets: add "TOTP" from the widget gallery.
+g) Settings > Help Improve TOTP: "Send a Suggestion" opens a public GitHub page in the browser (the app sends nothing itself), and "Buy Me a Coffee" lists the three tips.
 (The app is listed on the App Store as "TOTP Password"; on the device its short name is "TOTP".)
 
 MAC APP
 Opening the Mac app shows its main window. It also lives in the menu bar: the shield icon at the top right of the screen lists every code, and "Open TOTP" (Cmd+O) there brings the window back after it is closed. Closing the window keeps the app running in the menu bar; the Dock icon shows while the window is open and can be kept permanently in Settings (Cmd+,). The window stays hidden at launch only if the user turns on "Launch at login".
 
 4. EXTERNAL SERVICES
-Only Apple's iCloud: a private CloudKit database in the user's own iCloud account for sync, and iCloud Keychain for the encryption key. No servers of ours, no third-party SDKs, analytics, advertising, payment processors or AI services. Codes are computed on device with CryptoKit.
+Only Apple's iCloud: a private CloudKit database in the user's own iCloud account for sync, and iCloud Keychain for the encryption key. Apple's In-App Purchase handles the optional tips. No servers of ours, no third-party SDKs, analytics, advertising, other payment processors or AI services. Codes are computed on device with CryptoKit.
 
 5. REGIONS
 The app functions identically in all regions; there is no regional content or feature difference.
