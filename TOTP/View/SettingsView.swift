@@ -32,6 +32,7 @@ struct SettingsView: View {
             macGeneralSection
             #endif
             autoFillSection
+            supportSection
             aboutSection
         }
         .formStyle(.grouped)
@@ -168,6 +169,25 @@ struct SettingsView: View {
         }
     }
 
+    private var supportSection: some View {
+        Section {
+            Link(destination: Self.suggestionURL) {
+                Label("Send a Suggestion", systemImage: "bubble.left.and.text.bubble.right")
+            }
+            .accessibilityIdentifier("suggestionLink")
+            NavigationLink {
+                TipJarView()
+            } label: {
+                Label("Buy Me a Coffee", systemImage: "cup.and.heat.waves")
+            }
+            .accessibilityIdentifier("tipJarLink")
+        } header: {
+            Text("Help Improve TOTP")
+        } footer: {
+            Text("Suggestions open a public page on GitHub, which needs a free account. TOTP sends nothing itself. Coffee is voluntary and unlocks nothing.")
+        }
+    }
+
     private var aboutSection: some View {
         Section {
             LabeledContent("Version", value: appVersion)
@@ -188,6 +208,10 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
+
+    // A link, not a form that posts somewhere: the app makes no network requests of its own, and the
+    // privacy policy and App Store label say so.
+    private static let suggestionURL = URL(string: "https://github.com/lucferbux/TOTP/issues/new?labels=suggestion&title=Suggestion:%20")!
 
     private func clipboardLabel(_ seconds: Int) -> String {
         switch seconds {

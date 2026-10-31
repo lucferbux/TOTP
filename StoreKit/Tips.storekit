@@ -1,0 +1,47 @@
+{
+  "identifier" : "4E8B1D27",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "6810000001",
+      "localizations" : [
+        { "description" : "A small thank you", "displayName" : "A Coffee", "locale" : "en_US" }
+      ],
+      "productID" : "com.lucferbux.TOTP.tip.small",
+      "referenceName" : "A Coffee",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "6810000002",
+      "localizations" : [
+        { "description" : "For a long night of fixes", "displayName" : "A Large Coffee", "locale" : "en_US" }
+      ],
+      "productID" : "com.lucferbux.TOTP.tip.medium",
+      "referenceName" : "A Large Coffee",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "6810000003",
+      "localizations" : [
+        { "description" : "For the next big update", "displayName" : "A Week of Coffee", "locale" : "en_US" }
+      ],
+      "productID" : "com.lucferbux.TOTP.tip.large",
+      "referenceName" : "A Week of Coffee",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_compatibilityTimeRate" : { "3" : 6 },
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [],
+  "version" : { "major" : 4, "minor" : 0 }
+}

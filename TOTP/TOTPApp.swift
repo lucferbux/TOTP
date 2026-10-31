@@ -42,6 +42,7 @@ struct TOTPApp: App {
                 }
                 .task {
                     syncManager.startIfNeeded()
+                    _ = TipJarManager.pendingTransactionListener
                 }
         }
         #if os(macOS)
@@ -66,8 +67,11 @@ struct TOTPApp: App {
 
         // macOS Settings window (Cmd+,)
         Settings {
-            SettingsView()
-                .environmentObject(syncManager)
+            // The stack is what lets "Buy Me a Coffee" push from this window.
+            NavigationStack {
+                SettingsView()
+                    .environmentObject(syncManager)
+            }
         }
         #endif
     }
