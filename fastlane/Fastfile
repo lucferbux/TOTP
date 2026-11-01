@@ -29,14 +29,18 @@ def asc_key
 end
 
 # Calls the App Store Connect API for what deliver doesn't cover.
-def asc_api
-  require "net/http"
+def asc_token
   key_id = ENV["ASC_KEY_ID"] || "KMSBU6865L"
-  token = Spaceship::ConnectAPI::Token.create(
+  Spaceship::ConnectAPI::Token.create(
     key_id: key_id,
     issuer_id: ENV["ASC_ISSUER_ID"] || "69a6de88-17cf-47e3-e053-5b8c7c11a4d1",
     filepath: File.expand_path(ENV["ASC_KEY_PATH"] || "~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
   )
+end
+
+def asc_api
+  require "net/http"
+  token = asc_token
   lambda do |method, path, body = nil|
     uri = URI("https://api.appstoreconnect.apple.com#{path}")
     request = Net::HTTP.const_get(method).new(uri)
@@ -163,6 +167,24 @@ lane :review_notes do
     notes = File.read("metadata/#{folder}/review_information/notes.txt").strip
     api.call(:Patch, "/v1/appStoreReviewDetails/#{detail}", { data: { type: "appStoreReviewDetails", id: detail, attributes: { notes: notes } } })
     UI.success("#{platform}: #{notes.length} characters")
+  end
+end
+
+# Puts a recording in each version's App Review Information, where it travels with any new submission.
+# A reply's attachments stay on the submission they were sent to.
+# Usage: fastlane review_attachments ios:/path/iphone.mp4 mac:/path/mac.mov
+desc "Attach the App Review recordings"
+lane :review_attachments do |options|
+  api = asc_api
+  Spaceship::ConnectAPI.token = asc_token
+  { "IOS" => options[:ios], "MAC_OS" => options[:mac] }.each do |platform, path|
+    UI.user_error!("No file for #{platform}") unless path && File.file?(path)
+    query = "filter%5Bplatform%5D=#{platform}&filter%5BversionString%5D=#{marketing_version}&include=appStoreReviewDetail"
+    version = api.call(:Get, "/v1/apps/6742797604/appStoreVersions?#{query}")["data"].first || UI.user_error!("No #{platform} version")
+    detail = version.dig("relationships", "appStoreReviewDetail", "data", "id") || UI.user_error!("No #{platform} review detail")
+    Spaceship::ConnectAPI::AppStoreReviewAttachment.create(app_store_review_detail_id: detail, path: path)
+    attached = api.call(:Get, "/v1/appStoreReviewDetails/#{detail}/appStoreReviewAttachments")["data"]
+    UI.success("#{platform}: #{attached.map { |a| "#{a["attributes"]["fileName"]} #{a.dig("attributes", "assetDeliveryState", "state")}" }.join(", ")}")
   end
 end
 

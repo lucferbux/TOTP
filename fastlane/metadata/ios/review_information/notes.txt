@@ -2,7 +2,7 @@ NO ACCOUNT, NO SIGN-IN
 There is no registration, login or user-generated content, and nothing is locked behind a payment. The only purchases are three optional consumable tips (Settings > Buy Me a Coffee, Guideline 3.1.1), which unlock nothing. The app works offline the moment it opens; no demo credentials are needed.
 
 1. SCREEN RECORDING
-Attached to our reply in App Review (iPhone and Mac, latest OS, physical devices).
+Attached to this version's App Review Information (physical device, latest OS). It starts at launch and shows the typical flow, including how to reach the optional tips.
 
 2. PURPOSE AND AUDIENCE
 TOTP Password is a general-purpose two-factor authenticator for anyone who has turned on 2FA for their online accounts. It generates the standard six-digit codes (RFC 6238 TOTP and RFC 4226 HOTP) that services such as email, cloud and developer sites ask for at sign-in, on iPhone, iPad and Mac from one purchase. What it adds over typing codes by hand: AutoFill of codes into sign-in fields, widgets, a Mac menu bar item, private iCloud sync between the user's own devices, and an optional fixed prefix (PIN) for services that require a PIN typed directly before the code. It is not built for, or restricted to, any specific company or organisation.
