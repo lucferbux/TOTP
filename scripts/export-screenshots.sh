@@ -4,6 +4,7 @@
 #
 #   scripts/export-screenshots.sh              # iPhone 6.9" + iPad 13" + iPhone Duo outer + Mac
 #   scripts/export-screenshots.sh --duo-inner  # only iPhone Duo's inner display (open it first, see below)
+#   scripts/export-screenshots.sh --mac-only   # only the Mac shots
 #   scripts/export-screenshots.sh --keep       # keep the .xcresult bundles for inspection
 #
 # Apple's required classes (everything smaller is scaled automatically):
@@ -24,11 +25,12 @@ SCHEME="TOTP"
 OUT="fastlane/screenshots/en-US"
 SITE="site/screenshots"
 TMP="${TMPDIR:-/tmp}/totp-screenshots"
-KEEP=""; DUO_INNER=""
+KEEP=""; DUO_INNER=""; MAC_ONLY=""
 for arg in "$@"; do
     case "$arg" in
         --keep) KEEP=1 ;;
         --duo-inner) DUO_INNER=1 ;;
+        --mac-only) MAC_ONLY=1 ;;
     esac
 done
 
@@ -105,9 +107,11 @@ if [ -n "$DUO_INNER" ]; then
     exit 0
 fi
 
-capture "iPhone 18 Pro Max" "iphone-69"
-capture "iPad Pro 13-inch (M5)" "ipad-13"
-capture "iPhone Duo" "duo-outer" "1398x2034"
+if [ -z "$MAC_ONLY" ]; then
+    capture "iPhone 18 Pro Max" "iphone-69"
+    capture "iPad Pro 13-inch (M5)" "ipad-13"
+    capture "iPhone Duo" "duo-outer" "1398x2034"
+fi
 
 # --- macOS -------------------------------------------------------------------------------------
 # No UI-test automation here (that needs Accessibility permission). Instead the app positions its
@@ -125,14 +129,26 @@ capture_mac() {
     local app
     app=$(find "$TMP/dd-mac/Build/Products" -maxdepth 2 -name 'TOTP.app' -path '*Debug*' | head -1)
 
+    # A failed run must not leave old shots behind for fastlane to upload.
+    rm -f "$out_mac"/*.png
+
+    # The largest normal window TOTP owns. Capturing it by id, not by screen rect, means whatever
+    # else is on screen can't end up in a shot, even with TOTP behind it or on another Space.
+    mac_window_id() {
+        xcrun swift - <<'SWIFT'
+import CoreGraphics
+let windows = CGWindowListCopyWindowInfo(.excludeDesktopElements, kCGNullWindowID) as? [[String: Any]] ?? []
+let height = { (window: [String: Any]) in (window[kCGWindowBounds as String] as? [String: Double])?["Height"] ?? 0 }
+let own = windows.filter { $0[kCGWindowOwnerName as String] as? String == "TOTP" && $0[kCGWindowLayer as String] as? Int == 0 }
+if let window = own.max(by: { height($0) < height($1) }), let id = window[kCGWindowNumber as String] as? Int { print(id) }
+SWIFT
+    }
+
     # One launch per shot: every screenshot in an App Store set must be the same size, so the
-    # window is always 1440x900 points and only its contents change. The app reports where AppKit
-    # actually put it (it clamps against the menu bar), so the capture never has to assume a rect.
-    local frame_file="$HOME/Library/Group Containers/group.com.lucferbux.TOTP/screenshot-window-frame"
+    # window is always 1440x900 points and only its contents change.
     shoot_mac() {
-        local name="$1" scene="$2"
+        local name="$1" scene="$2" file="$out_mac/$1.png" id size
         pkill -x TOTP 2>/dev/null || true
-        rm -f "$frame_file" 2>/dev/null || true
         sleep 2
         if [ -n "$scene" ]; then
             open -n "$app" --args -ScreenshotMode -ScreenshotScene "$scene"
@@ -140,14 +156,23 @@ capture_mac() {
             open -n "$app" --args -ScreenshotMode
         fi
         sleep 13
-        local rect="100,100,1440,900"
-        [ -s "$frame_file" ] && rect=$(cat "$frame_file")
-        screencapture -x -R "$rect" "$out_mac/$name.png"
+        id=$(mac_window_id || true)
+        [ -z "$id" ] || screencapture -x -o -l "$id" "$file" || true
         pkill -x TOTP 2>/dev/null || true
-        if [ -s "$out_mac/$name.png" ]; then
-            printf '   %-18s %s (rect %s)\n' "$name.png" "$(sips -g pixelWidth -g pixelHeight "$out_mac/$name.png" | awk '/pixel/{printf "%s ", $2}')" "$rect"
-        else
+        if [ ! -s "$file" ]; then
+            rm -f "$file"
             echo "   $name capture FAILED — grant Screen Recording to the app running this script"
+            return 0
+        fi
+        # App Store Connect rejects transparency, which the window's rounded corners have.
+        sips -s format jpeg -s formatOptions best "$file" --out "$TMP/flat.jpg" >/dev/null
+        sips -s format png "$TMP/flat.jpg" --out "$file" >/dev/null
+        size=$(sips -g pixelWidth -g pixelHeight "$file" | awk '/pixel/{printf "%s ", $2}')
+        if [ "$size" = "2880 1800 " ]; then
+            printf '   %-18s %s\n' "$name.png" "$size"
+        else
+            rm -f "$file"
+            echo "   $name capture FAILED — window is $size, expected 2880 1800"
         fi
     }
 
@@ -178,8 +203,8 @@ cat <<'NOTE'
 
 Mac capture needs Screen Recording permission for whatever runs this script (System Settings ▸
 Privacy & Security ▸ Screen & System Audio Recording). It needs no Accessibility permission: each
-shot relaunches the app with -ScreenshotScene, which opens it straight in that state, and the app
-writes the window's real frame to the App Group container for the capture to use.
+shot relaunches the app with -ScreenshotScene, which opens it straight in that state, and captures
+TOTP's own window by id.
 
 If it was skipped, take the shots by hand (⌘⇧4 then space, click the window) and pad them:
     sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-codes.png
