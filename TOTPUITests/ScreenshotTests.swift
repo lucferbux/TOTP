@@ -13,12 +13,35 @@
 import XCTest
 
 final class ScreenshotTests: XCTestCase {
-    private var app: XCUIApplication!
+    private var app = XCUIApplication()
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        XCUIDevice.shared.appearance = .light
+        launch()
+    }
+
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.appearance = .light
+    }
+
+    /// Launches in screenshot mode, optionally straight into a `-ScreenshotScene`. Scenes that
+    /// would need a localized label to reach (the iPad overflow menu) open this way instead.
+    private func launch(scene: String? = nil) {
         app = XCUIApplication()
         app.launchArguments = ["-ScreenshotMode"]
+        if let scene {
+            app.launchArguments += ["-ScreenshotScene", scene]
+        }
+        // scripts/export-screenshots.sh --locales passes these as TEST_RUNNER_SCREENSHOT_LANG / _LOCALE
+        // (xcodebuild strips the prefix), so each run shoots the app in that language.
+        let environment = ProcessInfo.processInfo.environment
+        if let language = environment["SCREENSHOT_LANG"], !language.isEmpty {
+            app.launchArguments += ["-AppleLanguages", "(\(language))"]
+        }
+        if let locale = environment["SCREENSHOT_LOCALE"], !locale.isEmpty {
+            app.launchArguments += ["-AppleLocale", locale]
+        }
         app.launch()
     }
 
@@ -51,22 +74,6 @@ final class ScreenshotTests: XCTestCase {
         account("Contoso Cloud").tap()
         capture("02-copied")
 
-        // Select mode with a couple of accounts ticked
-        // iPhone shows "Select" in the toolbar; iPad keeps it in the system overflow menu
-        let overflow = app.buttons.matching(NSPredicate(format: "identifier IN %@", TOTPUITests.overflowMenus)).firstMatch
-        if overflow.exists {
-            overflow.tap()
-        }
-        // The system overflow menu drops our identifier, so match the title there
-        let select = app.buttons.matching(NSPredicate(format: "identifier == 'selectButton' OR label == 'Select Accounts'")).firstMatch
-        if select.waitForExistence(timeout: 3) {
-            select.tap()
-            account("Fabrikam Mail").tap()
-            account("Acme Bank").tap()
-            capture("03-select")
-            app.buttons["doneSelectingButton"].tap()
-        }
-
         // Adding an account
         app.buttons["addAccountButton"].tap()
         XCTAssertTrue(app.textFields["issuerField"].waitForExistence(timeout: 5))
@@ -80,5 +87,19 @@ final class ScreenshotTests: XCTestCase {
             capture("05-settings")
             app.buttons["settingsDoneButton"].tap()
         }
+
+        // Select mode with the first accounts ticked
+        app.terminate()
+        launch(scene: "select")
+        XCTAssertTrue(app.buttons["doneSelectingButton"].waitForExistence(timeout: 10))
+        capture("03-select")
+
+        // The list in Dark Mode (Apple recommends showing it)
+        app.terminate()
+        XCUIDevice.shared.appearance = .dark
+        launch()
+        XCTAssertTrue(account("Northwind Corp").waitForExistence(timeout: 10))
+        waitForFreshCodes()
+        capture("06-dark")
     }
 }

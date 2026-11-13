@@ -1,11 +1,12 @@
 #!/usr/bin/env swift
 // Draws the App Store header (3840x1646) and search results (3840x2560) images, in the icon's colours.
-// The search results image shows real screenshots, so run scripts/export-screenshots.sh first.
+// The search results image shows real (unframed) screenshots from fastlane/screenshots_raw/en-US, so run
+// scripts/export-screenshots.sh first.
 // Usage: swift scripts/make-creative-assets.swift
 import AppKit
 import CoreGraphics
 
-let screenshots = "fastlane/screenshots/en-US"
+let screenshots = "fastlane/screenshots_raw/en-US"   // the unframed captures
 let output = URL(filePath: "fastlane/creative_assets", directoryHint: .isDirectory)
 
 func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
@@ -15,7 +16,7 @@ func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColo
 func drawBackground(_ context: CGContext, height: CGFloat) {
     let gradient = CGGradient(
         colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-        colors: [color(0.12, 0.53, 0.96), color(0.01, 0.22, 0.58)] as CFArray, locations: [0, 1]
+        colors: [color(0.31, 0.55, 1.0), color(0.06, 0.16, 0.61)] as CFArray, locations: [0, 1]
     )!
     context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: height), end: .zero, options: [])
 }

@@ -1,0 +1,32 @@
+TOTP Password erzeugt die sechsstelligen Bestätigungscodes, die du zum Anmelden bei deinen Diensten brauchst – auf iPhone, iPad und Mac, mit einem einzigen Kauf.
+
+Die App ist für genau eine Sache gemacht: den richtigen Code schnell ins richtige Feld zu bringen, ohne deine geheimen Schlüssel aus der Hand zu geben.
+
+EINE PIN VOR DEM CODE
+Manche Logins bei der Arbeit erwarten eine feste PIN direkt vor dem generierten Code. Gib einem Account einen Präfix, und TOTP kopiert den kompletten Wert und füllt ihn in einem Schritt aus. Die PIN wird nie angezeigt und zusammen mit dem geheimen Schlüssel verschlüsselt.
+
+CODES DORT, WO DU DICH ANMELDEST
+Aktiviere das automatische Ausfüllen, und deine Codes erscheinen auf iPhone und iPad direkt über der Tastatur und am Mac in Safari. Accounts mit PIN können Passwortfelder mit PIN und Code zusammen ausfüllen.
+
+AUF DEM HOME-BILDSCHIRM UND IM KONTROLLZENTRUM
+Füge ein Widget für den Account hinzu, den du am häufigsten brauchst, und tippe darauf, um den Code zu kopieren. Leg eine Steuerung ins Kontrollzentrum – oder auf die Aktionstaste –, um einen Code zu kopieren, ohne etwas zu öffnen. Frag Siri oder erstelle einen Kurzbefehl.
+
+AM HANDGELENK
+Die Apple Watch App zeigt deine Codes mit Countdown, und eine Komplikation bringt den Code eines Accounts aufs Zifferblatt. Die Codes kommen vom iPhone. Deine PINs und zählerbasierte Accounts (HOTP) landen nie auf der Watch, und bei aktiver App-Sperre zeigt sie nichts an.
+
+EINE ECHTE MAC-APP
+Keine iPhone-App im Fenster. Über ein Symbol in der Menüleiste ist jeder Code nur einen Klick entfernt – mit Suche, Tastaturkurzbefehlen und einem Einstellungsfenster genau da, wo du es erwartest.
+
+IN SEKUNDEN EINGERICHTET
+Scanne den QR-Code, den dein Dienst anzeigt, wähle einen Screenshot davon, füge einen otpauth://-Link ein oder gib den geheimen Schlüssel von Hand ein. Unterstützt werden SHA-1, SHA-256 und SHA-512 mit 6 bis 10 Stellen und eigenen Intervallen.
+
+SYNC, DER DIR GEHÖRT
+Accounts werden über deine eigene private iCloud-Datenbank synchronisiert – verschlüsselt, bevor sie das Gerät verlassen, mit einem Schlüssel, der nur über deinen iCloud-Schlüsselbund geteilt wird. Du musst kein Konto anlegen, und kein Server von uns sitzt dazwischen – denn wir haben gar keinen.
+
+PRIVAT VON GRUND AUF
+Keine Analysen. Keine Werbung. Keinerlei Code von Drittanbietern. Die App stellt selbst keine Netzwerkanfragen. Geheime Schlüssel werden mit ChaChaPoly verschlüsselt, bevor sie irgendwo gespeichert werden, und nie protokolliert. Mit aktiver App-Sperre sind Face ID, Touch ID oder dein Gerätecode nötig, bevor Codes angezeigt werden – und bevor das automatische Ausfüllen, Kurzbefehle oder die Steuerung einen herausgeben.
+
+FÜR DIE PLATTFORM GEMACHT
+Komplett mit Apple-Frameworks und der neuesten Designsprache gebaut. Die App passt sich jeder Größe an, vom schmalen iPhone bis zum iPad im Vollbild oder einem frei skalierten Mac-Fenster, mit voller Unterstützung für Dynamic Type, VoiceOver-Beschriftungen und den Dunkelmodus. Verfügbar auf Deutsch, Englisch, Spanisch und Französisch.
+
+Die App ist Open Source unter der MIT-Lizenz, jede Aussage hier lässt sich also im Code nachprüfen: github.com/lucferbux/TOTP

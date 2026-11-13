@@ -1,0 +1,22 @@
+TOTP Password place vos codes de double authentification dans la barre des menus du Mac, et aussi sur votre iPhone, votre iPad et votre Apple Watch, pour un seul achat.
+
+Cliquez sur l’icône de la barre des menus et tous vos codes sont là, avec la recherche et la copie en un clic. Ou gardez-la dans le Dock, ou les deux. C’est une vraie app Mac : des raccourcis clavier, une vraie fenêtre Réglages et une fenêtre qui se redimensionne comme vous l’attendez.
+
+UN CODE PIN EN PRÉFIXE
+Certains accès professionnels attendent un code PIN fixe saisi juste avant le code généré. Ajoutez un préfixe au compte, et TOTP copie et remplit la valeur complète en une seule fois. Le code PIN n’est jamais affiché à l’écran, et il est chiffré avec le secret.
+
+DES CODES REMPLIS DANS SAFARI
+Activez TOTP dans Remplissage automatique et mots de passe, et vos codes vous sont proposés à la connexion. Les comptes avec code PIN peuvent remplir les champs de mot de passe avec le PIN et le code ensemble.
+
+PRÊTE EN QUELQUES SECONDES
+Choisissez une capture d’écran du code QR affiché par votre service ou faites-la glisser sur la fenêtre, collez un lien otpauth:// ou saisissez le secret à la main. SHA-1, SHA-256 et SHA-512 sont pris en charge, avec 6 à 10 chiffres et des périodes d’actualisation personnalisées.
+
+UNE SYNCHRO QUI RESTE LA VÔTRE
+Vos comptes se synchronisent via votre propre base de données iCloud privée, chiffrés avant de quitter l’appareil avec une clé partagée uniquement par votre trousseau iCloud. Aucun compte à créer, et aucun serveur à nous entre les deux, tout simplement parce que nous n’en avons aucun.
+
+PRIVÉE PAR CONCEPTION
+Aucune analyse. Aucune publicité. Aucun code tiers, de quelque nature que ce soit. L’app n’effectue aucune requête réseau de son propre chef. Les secrets sont scellés par chiffrement ChaChaPoly avant d’être écrits où que ce soit, et ne sont jamais journalisés. Activez le verrouillage de l’app : Touch ID ou votre mot de passe sera demandé avant d’afficher les codes, et avant que le remplissage automatique, Raccourcis ou la commande n’en fournissent un.
+
+Disponible en français, anglais, espagnol et allemand.
+
+L’app est open source sous licence MIT, vous pouvez donc vérifier chacune de ces affirmations dans le code : github.com/lucferbux/TOTP

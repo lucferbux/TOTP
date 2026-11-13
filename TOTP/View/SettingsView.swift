@@ -25,25 +25,59 @@ struct SettingsView: View {
     #endif
 
     var body: some View {
+        settings
+            .onChange(of: clipboardClearSeconds) { _, seconds in
+                AppPreferences.clipboardClearSeconds = seconds
+            }
+    }
+
+    #if os(macOS)
+    /// The Mac Settings window: one pane per tab in the toolbar, like the system's own apps.
+    private var settings: some View {
+        TabView {
+            Tab("General", systemImage: "gearshape") {
+                pane { macGeneralSection }
+            }
+            Tab("Security", systemImage: "lock") {
+                pane { securitySection }
+            }
+            Tab("iCloud", systemImage: "icloud") {
+                pane { iCloudSection }
+            }
+            Tab("AutoFill", systemImage: "key.viewfinder") {
+                pane { autoFillSection }
+            }
+            Tab("About", systemImage: "info.circle") {
+                // The stack is what lets "Buy Me a Coffee" push inside this pane
+                NavigationStack {
+                    pane {
+                        supportSection
+                        aboutSection
+                    }
+                }
+            }
+        }
+        .frame(width: 520)
+    }
+
+    private func pane<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Form { content() }
+            .formStyle(.grouped)
+            .frame(minHeight: 320)
+    }
+    #else
+    private var settings: some View {
         Form {
             iCloudSection
             securitySection
-            #if os(macOS)
-            macGeneralSection
-            #endif
             autoFillSection
             supportSection
             aboutSection
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
-        #if os(macOS)
-        .frame(minWidth: 440, idealWidth: 480, minHeight: 420, idealHeight: 520)
-        #endif
-        .onChange(of: clipboardClearSeconds) { _, seconds in
-            AppPreferences.clipboardClearSeconds = seconds
-        }
     }
+    #endif
 
     // MARK: - Sections
 
@@ -64,36 +98,51 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            LabeledContent("Encryption Key", value: EncryptionKeyManager.shared.usesSharedKey ? "Shared via iCloud Keychain" : "This device only")
-            LabeledContent("Environment", value: CloudKitDataManager.shared.environmentName)
-            LabeledContent("Container", value: CloudKitDataManager.shared.containerIdentifier)
-                .font(.caption)
+            LabeledContent("Encryption Key", value: usesSharedKey ? String(localized: "Shared via iCloud Keychain") : String(localized: "This device only"))
             Button {
-                Task { await refreshDiagnostics() }
+                Task { await syncNow() }
             } label: {
                 Label("Sync Now", systemImage: "arrow.clockwise.icloud")
             }
             .accessibilityIdentifier("syncNowButton")
+            // For support requests, out of the way of everyday settings
+            DisclosureGroup("Diagnostics") {
+                LabeledContent("Environment", value: CloudKitDataManager.shared.environmentName)
+                LabeledContent("Container", value: CloudKitDataManager.shared.containerIdentifier)
+                    .font(.caption)
+            }
         } header: {
             Text("iCloud Sync")
         } footer: {
-            if !EncryptionKeyManager.shared.usesSharedKey {
+            if !usesSharedKey {
                 Text("Turn on iCloud Keychain so this device can share its encryption key — without it, codes synced from other devices can't be read.")
             } else {
                 Text("Accounts sync through your private iCloud database. Secrets stay encrypted with a key shared only through your iCloud Keychain.")
             }
         }
-        .task {
-            await refreshDiagnostics()
+        .onAppear(perform: readCloudCount)
+    }
+
+    /// What the last sync saw; opening Settings doesn't start a sync of its own.
+    private func readCloudCount() {
+        if AppEnvironment.isTakingScreenshots {
+            cloudRecordCount = syncManager.accounts.count
+            return
         }
+        cloudRecordCount = syncManager.iCloudAvailable ? CloudKitDataManager.shared.accounts.count : nil
+    }
+
+    /// Screenshots show a signed-in user's setup, not the simulator's lack of iCloud Keychain.
+    private var usesSharedKey: Bool {
+        AppEnvironment.isTakingScreenshots || EncryptionKeyManager.shared.usesSharedKey
     }
 
     @MainActor
-    private func refreshDiagnostics() async {
+    private func syncNow() async {
         isChecking = true
         defer { isChecking = false }
         await syncManager.refresh()
-        cloudRecordCount = syncManager.iCloudAvailable ? CloudKitDataManager.shared.accounts.count : nil
+        readCloudCount()
     }
 
     private var securitySection: some View {
@@ -122,9 +171,7 @@ struct SettingsView: View {
         } header: {
             Text("Security")
         } footer: {
-            Text("""
-            With the lock on, TOTP asks for \(lock.methodName) before showing codes — and before AutoFill,             Shortcuts or the Control Center control hand one over. Copied codes are removed from the clipboard             after the chosen time, and stay on this device unless you allow sharing with your other Apple devices.
-            """)
+            Text("With the lock on, TOTP asks for \(lock.methodName) before showing codes — and before AutoFill, Shortcuts or the Control Center control hand one over. Copied codes are removed from the clipboard after the chosen time, and stay on this device unless you allow sharing with your other Apple devices.")
         }
         .onChange(of: allowUniversalClipboard) { _, allow in
             AppPreferences.allowUniversalClipboard = allow
@@ -135,8 +182,13 @@ struct SettingsView: View {
     private var macGeneralSection: some View {
         Section {
             Toggle("Launch TOTP at Login", isOn: $macSettings.launchAtLogin)
+            if macSettings.loginItemStatus == .requiresApproval {
+                LabeledContent("Login Item", value: loginItemStatusText)
+                Button("Open Login Items Settings…") {
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            }
             Toggle("Show Dock Icon", isOn: $macSettings.showDockIcon)
-            LabeledContent("Login Item", value: loginItemStatusText)
         } header: {
             Text("General")
         } footer: {
@@ -211,7 +263,7 @@ struct SettingsView: View {
 
     // A link, not a form that posts somewhere: the app makes no network requests of its own, and the
     // privacy policy and App Store label say so.
-    private static let suggestionURL = URL(string: "https://github.com/lucferbux/TOTP/issues/new?labels=suggestion&title=Suggestion:%20")!
+    static let suggestionURL = URL(string: "https://github.com/lucferbux/TOTP/issues/new?labels=suggestion&title=Suggestion:%20")!
 
     private func clipboardLabel(_ seconds: Int) -> String {
         switch seconds {

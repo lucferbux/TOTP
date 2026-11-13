@@ -1,0 +1,32 @@
+TOTP Password genera los códigos de verificación de seis dígitos que necesitas para iniciar sesión en los servicios que ya usas, en tu iPhone, tu iPad y tu Mac, con una sola compra.
+
+Está pensada para una sola cosa: poner el código correcto en el campo correcto, rápido y sin entregar tus secretos a nadie.
+
+UN PIN DELANTE DEL CÓDIGO
+Algunos accesos del trabajo piden un PIN fijo escrito justo antes del código generado. Añade un prefijo a la cuenta y TOTP copia y rellena el valor completo de una vez. El PIN nunca se muestra en pantalla y se cifra junto con el secreto.
+
+RELLENA LOS CÓDIGOS DONDE INICIAS SESIÓN
+Activa Autorrelleno y tus códigos aparecen justo encima del teclado en el iPhone y el iPad, y en Safari en el Mac. Las cuentas con PIN pueden rellenar los campos de contraseña con el PIN y el código juntos.
+
+EN LA PANTALLA DE INICIO Y EN EL CENTRO DE CONTROL
+Añade un widget para la cuenta que más usas y tócalo para copiar el código. Pon un control en el centro de control, o en el botón de acción, para copiar un código sin abrir nada. Pídeselo a Siri o crea un atajo.
+
+EN TU MUÑECA
+La app del Apple Watch muestra tus códigos con su cuenta atrás, y una complicación deja el código de una cuenta en la esfera del reloj. Los códigos llegan desde el iPhone. Tus PIN y las cuentas por contador (HOTP) nunca van al reloj, y con el bloqueo de la app activado no muestra nada.
+
+UNA APP DE MAC DE VERDAD
+No es una app de iPhone metida en una ventana. Un icono en la barra de menús te deja todos los códigos a un clic, con búsqueda, atajos de teclado y una ventana de Ajustes justo donde la esperas.
+
+LISTA EN SEGUNDOS
+Escanea el código QR que te muestra el servicio, elige una captura de pantalla de él, pega un enlace otpauth:// o escribe el secreto a mano. Es compatible con SHA-1, SHA-256 y SHA-512, códigos de 6 a 10 dígitos y periodos de actualización personalizados.
+
+UNA SINCRONIZACIÓN QUE SIGUE SIENDO TUYA
+Las cuentas se sincronizan a través de tu propia base de datos privada de iCloud, cifradas antes de salir del dispositivo con una clave que solo se comparte mediante tu llavero de iCloud. No hay que crear ninguna cuenta ni hay un servidor nuestro en medio, porque no tenemos ningún servidor.
+
+PRIVADA POR DISEÑO
+Sin analíticas. Sin publicidad. Sin código de terceros de ningún tipo. La app no hace ninguna petición de red por su cuenta. Los secretos se sellan con cifrado ChaChaPoly antes de guardarse en ningún sitio y nunca se registran. Activa el bloqueo de la app y se pedirá Face ID, Touch ID o el código del dispositivo antes de mostrar los códigos, y antes de que Autorrelleno, Atajos o el control den uno.
+
+PENSADA PARA LA PLATAFORMA
+Hecha íntegramente con frameworks de Apple y el lenguaje de diseño más reciente. Se adapta a cualquier tamaño, desde un iPhone estrecho hasta un iPad a pantalla completa o una ventana de Mac redimensionada, con compatibilidad total con Dynamic Type, etiquetas de VoiceOver y modo oscuro. Disponible en español, inglés, alemán y francés.
+
+La app es de código abierto con licencia MIT, así que puedes comprobar en el código todo lo que se dice aquí: github.com/lucferbux/TOTP

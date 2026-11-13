@@ -17,7 +17,9 @@ A secure, native TOTP (Time-based One-Time Password) authenticator app for iOS a
 
 ### 📱 Cross-Platform
 - Native iOS app (iPhone & iPad)
-- Native macOS app (Apple Silicon & Intel)
+- Native macOS app (Apple Silicon & Intel) with an Accounts menu (⌘1…⌘9 to copy), tabbed Settings and a menu bar panel
+- Apple Watch app with a complication: TOTP codes synced from the iPhone (never PINs or HOTP)
+- In English, Spanish, German and French
 - Shared codebase with platform-specific optimizations
 - Universal purchase across all platforms
 
@@ -169,7 +171,6 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 See [RFE.md](docs/RFE.md) for the full feature roadmap including:
 
-- 🔜 Apple Watch app
 - 🔜 Import/Export functionality
 
 ## License

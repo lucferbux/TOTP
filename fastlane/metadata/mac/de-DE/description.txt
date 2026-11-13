@@ -1,0 +1,22 @@
+TOTP Password bringt deine Zwei-Faktor-Codes in die Menüleiste deines Mac – und auch auf iPhone, iPad und Apple Watch, mit einem einzigen Kauf.
+
+Klick auf das Symbol in der Menüleiste, und alle Codes sind da, mit Suche und Kopieren per Klick. Oder lass die App im Dock, oder beides. Es ist eine echte Mac-App: Tastaturkurzbefehle, ein richtiges Einstellungsfenster und ein Fenster, dessen Größe sich so ändern lässt, wie du es erwartest.
+
+EINE PIN VOR DEM CODE
+Manche Logins bei der Arbeit erwarten eine feste PIN direkt vor dem generierten Code. Gib einem Account einen Präfix, und TOTP kopiert den kompletten Wert und füllt ihn in einem Schritt aus. Die PIN wird nie angezeigt und zusammen mit dem geheimen Schlüssel verschlüsselt.
+
+CODES IN SAFARI AUSFÜLLEN
+Aktiviere TOTP unter „Automatisch ausfüllen & Passwörter“, und deine Codes werden dir beim Anmelden angeboten. Accounts mit PIN können Passwortfelder mit PIN und Code zusammen ausfüllen.
+
+IN SEKUNDEN EINGERICHTET
+Wähle einen Screenshot des QR-Codes, den dein Dienst anzeigt, oder zieh ihn ins Fenster, füge einen otpauth://-Link ein oder gib den geheimen Schlüssel von Hand ein. Unterstützt werden SHA-1, SHA-256 und SHA-512 mit 6 bis 10 Stellen und eigenen Intervallen.
+
+SYNC, DER DIR GEHÖRT
+Accounts werden über deine eigene private iCloud-Datenbank synchronisiert – verschlüsselt, bevor sie das Gerät verlassen, mit einem Schlüssel, der nur über deinen iCloud-Schlüsselbund geteilt wird. Du musst kein Konto anlegen, und kein Server von uns sitzt dazwischen – denn wir haben gar keinen.
+
+PRIVAT VON GRUND AUF
+Keine Analysen. Keine Werbung. Keinerlei Code von Drittanbietern. Die App stellt selbst keine Netzwerkanfragen. Geheime Schlüssel werden mit ChaChaPoly verschlüsselt, bevor sie irgendwo gespeichert werden, und nie protokolliert. Mit aktiver App-Sperre sind Touch ID oder dein Passwort nötig, bevor Codes angezeigt werden – und bevor das automatische Ausfüllen, Kurzbefehle oder die Steuerung einen herausgeben.
+
+Verfügbar auf Deutsch, Englisch, Spanisch und Französisch.
+
+Die App ist Open Source unter der MIT-Lizenz, jede Aussage hier lässt sich also im Code nachprüfen: github.com/lucferbux/TOTP

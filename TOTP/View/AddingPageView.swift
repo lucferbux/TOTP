@@ -8,6 +8,7 @@
 
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 
 public struct AddingPageView: View {
     @Environment(\.dismiss) private var dismiss
@@ -33,6 +34,8 @@ public struct AddingPageView: View {
     @State private var importedFromCode = false
     @State private var showScanner = false
     @State private var photoItem: PhotosPickerItem?
+    @State private var showFileImporter = false
+    @State private var confirmDelete = false
 
     private var isEditing: Bool { editingAccount != nil }
 
@@ -78,8 +81,17 @@ public struct AddingPageView: View {
                 secretSection
                 prefixSection
                 autoFillSection
+                if isEditing {
+                    deleteSection
+                }
             }
             .formStyle(.grouped)
+            // A QR code image dragged in from Finder, Photos or a browser fills the form
+            .dropDestination(for: Data.self) { items, _ in
+                guard !isEditing, let data = items.first else { return false }
+                Task { await importImageData(data) }
+                return true
+            }
             .navigationTitle(isEditing ? "Edit Account" : "Add Account")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -129,6 +141,24 @@ public struct AddingPageView: View {
             guard let item else { return }
             Task { await importImage(item) }
         }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image]) { result in
+            Task { await importImageFile(result) }
+        }
+        .confirmationDialog(
+            "Delete \(editingAccount?.displayTitle ?? "")?",
+            isPresented: $confirmDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                guard let editingAccount else { return }
+                Task {
+                    await syncManager.deleteAccount(editingAccount)
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("You won't be able to generate codes for this account unless you add it again.")
+        }
     }
 
     // MARK: - Sections
@@ -145,9 +175,19 @@ public struct AddingPageView: View {
                 .accessibilityIdentifier("scanQRButton")
             }
             #endif
+            #if os(macOS)
+            // On a Mac the setup code is usually a file or a screenshot, not a photo in Photos
+            Button {
+                showFileImporter = true
+            } label: {
+                Label("Choose QR Code Image…", systemImage: "photo.on.rectangle")
+            }
+            .accessibilityIdentifier("chooseImageButton")
+            #else
             PhotosPicker(selection: $photoItem, matching: .images) {
                 Label("Choose QR Code Image", systemImage: "photo.on.rectangle")
             }
+            #endif
             PasteButton(payloadType: String.self) { strings in
                 guard let text = strings.first else { return }
                 Task { @MainActor in apply(scanned: text) }
@@ -157,10 +197,19 @@ public struct AddingPageView: View {
             Text("Quick Setup")
         } footer: {
             if importedFromCode {
+                #if os(macOS)
+                Label("Details filled in from the setup code. Review them, then click Add.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                #else
                 Label("Details filled in from the setup code. Review them, then tap Add.", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                #endif
             } else {
+                #if os(macOS)
+                Text("Choose or drop the QR code image shown when you turn on two-factor authentication, or paste an otpauth:// link.")
+                #else
                 Text("Scan the QR code shown when you turn on two-factor authentication, or paste an otpauth:// link.")
+                #endif
             }
         }
     }
@@ -265,6 +314,15 @@ public struct AddingPageView: View {
         }
     }
 
+    private var deleteSection: some View {
+        Section {
+            Button("Delete Account…", role: .destructive) {
+                confirmDelete = true
+            }
+            .accessibilityIdentifier("deleteAccountButton")
+        }
+    }
+
     private func revealButton(isOn: Binding<Bool>, label: LocalizedStringKey) -> some View {
         Button {
             isOn.wrappedValue.toggle()
@@ -281,20 +339,23 @@ public struct AddingPageView: View {
 
     private func apply(scanned payload: String) {
         do {
-            let parsed = try OtpAuthURL(string: payload)
-            withAnimation(.smooth(duration: 0.3)) {
-                if let issuer = parsed.issuer { self.issuer = issuer }
-                if let name = parsed.name { self.name = name }
-                key = parsed.entry.key.base32EncodedString()
-                isHotp = parsed.entry.isHotp
-                digits = parsed.entry.digits
-                interval = Int(parsed.entry.interval ?? 30)
-                counter = Int(clamping: parsed.entry.counter ?? 0)
-                algorithm = parsed.entry.algorithm
-                importedFromCode = true
-            }
+            apply(try OtpAuthURL(string: payload))
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func apply(_ parsed: OtpAuthURL) {
+        withAnimation(.smooth(duration: 0.3)) {
+            if let issuer = parsed.issuer { self.issuer = issuer }
+            if let name = parsed.name { self.name = name }
+            key = parsed.entry.key.base32EncodedString()
+            isHotp = parsed.entry.isHotp
+            digits = parsed.entry.digits
+            interval = Int(parsed.entry.interval ?? 30)
+            counter = Int(clamping: parsed.entry.counter ?? 0)
+            algorithm = parsed.entry.algorithm
+            importedFromCode = true
         }
     }
 
@@ -302,12 +363,27 @@ public struct AddingPageView: View {
         defer { photoItem = nil }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            let payloads = try await QRCodeDecoder.payloads(inImageData: data)
-            guard let payload = payloads.first(where: { $0.lowercased().hasPrefix("otpauth://") }) ?? payloads.first else {
-                errorMessage = String(localized: "No QR code was found in that image.")
-                return
-            }
-            apply(scanned: payload)
+            await importImageData(data)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func importImageFile(_ result: Result<URL, Error>) async {
+        do {
+            let url = try result.get()
+            // The importer hands out a security-scoped URL in the sandbox
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            await importImageData(try Data(contentsOf: url))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func importImageData(_ data: Data) async {
+        do {
+            apply(try await QRCodeDecoder.otpAuthURL(inImageData: data))
         } catch {
             errorMessage = error.localizedDescription
         }

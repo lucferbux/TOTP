@@ -203,26 +203,70 @@ lane :attach_build do |options|
   end
 end
 
-# Keep in step with TipJarManager and StoreKit/Tips.storekit.
+# Keep in step with TipJarManager and StoreKit/Tips.storekit (same text per locale there).
+# `name` is the en-US display name and also the reference name in App Store Connect.
 TIPS = [
-  { id: "com.lucferbux.TOTP.tip.small", name: "A Coffee", description: "A small thank you", price: "0.99" },
-  { id: "com.lucferbux.TOTP.tip.medium", name: "A Large Coffee", description: "For a long night of fixes", price: "2.99" },
-  { id: "com.lucferbux.TOTP.tip.large", name: "A Week of Coffee", description: "For the next big update", price: "4.99" }
+  { id: "com.lucferbux.TOTP.tip.small", name: "A Coffee", description: "A small thank you", price: "0.99",
+    localizations: {
+      "es-ES" => { name: "Un café", description: "Un pequeño agradecimiento" },
+      "de-DE" => { name: "Ein Kaffee", description: "Ein kleines Dankeschön" },
+      "fr-FR" => { name: "Un café", description: "Un petit merci" }
+    } },
+  { id: "com.lucferbux.TOTP.tip.medium", name: "A Large Coffee", description: "For a long night of fixes", price: "2.99",
+    localizations: {
+      "es-ES" => { name: "Un café grande", description: "Para una larga noche de arreglos" },
+      "de-DE" => { name: "Ein großer Kaffee", description: "Für eine lange Nacht voller Fixes" },
+      "fr-FR" => { name: "Un grand café", description: "Pour une longue nuit de correctifs" }
+    } },
+  { id: "com.lucferbux.TOTP.tip.large", name: "A Week of Coffee", description: "For the next big update", price: "4.99",
+    localizations: {
+      "es-ES" => { name: "Una semana de café", description: "Para la próxima gran actualización" },
+      "de-DE" => { name: "Eine Woche Kaffee", description: "Für das nächste große Update" },
+      "fr-FR" => { name: "Une semaine de café", description: "Pour la prochaine grande mise à jour" }
+    } }
 ].freeze
 
-# Creates the consumable tips, skipping any that exist. Prices are based on Spain, and Apple sets the rest.
-desc "Create the tip in-app purchases"
+# Every locale a tip should have in App Store Connect: en-US plus the translations above.
+def tip_localizations(tip)
+  { "en-US" => { name: tip[:name], description: tip[:description] } }.merge(tip[:localizations])
+end
+
+# Creates missing localizations and corrects any whose text differs. Leaves matching ones (and
+# locales not listed here) untouched, so it is safe to run again.
+def sync_tip_localizations(api, tip, purchase_id)
+  current = api.call(:Get, "/v2/inAppPurchases/#{purchase_id}/inAppPurchaseLocalizations?limit=50")["data"]
+    .to_h { |l| [l["attributes"]["locale"], l] }
+  tip_localizations(tip).each do |locale, text|
+    existing = current[locale]
+    if existing.nil?
+      api.call(:Post, "/v1/inAppPurchaseLocalizations", { data: { type: "inAppPurchaseLocalizations",
+        attributes: { locale: locale, name: text[:name], description: text[:description] },
+        relationships: { inAppPurchaseV2: { data: { type: "inAppPurchases", id: purchase_id } } } } })
+      UI.message("#{tip[:id]} #{locale}: added")
+    elsif existing["attributes"]["name"] != text[:name] || existing["attributes"]["description"] != text[:description]
+      api.call(:Patch, "/v1/inAppPurchaseLocalizations/#{existing["id"]}", { data: { type: "inAppPurchaseLocalizations",
+        id: existing["id"], attributes: { name: text[:name], description: text[:description] } } })
+      UI.message("#{tip[:id]} #{locale}: updated")
+    end
+  end
+end
+
+# Creates the consumable tips, skipping any that exist, and brings every tip's localizations in
+# line with TIPS. Prices are based on Spain, and Apple sets the rest.
+desc "Create the tip in-app purchases and sync their localizations"
 lane :tips do
   require "digest"
   api = asc_api
   app_id = "6742797604"
   screenshot = "screenshots_review/tips.png"
-  existing = api.call(:Get, "/v1/apps/#{app_id}/inAppPurchasesV2?limit=50")["data"].map { |i| i["attributes"]["productId"] }
+  existing = api.call(:Get, "/v1/apps/#{app_id}/inAppPurchasesV2?limit=50")["data"]
+    .to_h { |i| [i["attributes"]["productId"], i["id"]] }
   territories = api.call(:Get, "/v1/territories?limit=200")["data"].map { |t| { type: "territories", id: t["id"] } }
 
   TIPS.each do |tip|
-    if existing.include?(tip[:id])
+    if existing.key?(tip[:id])
       UI.message("#{tip[:id]} already exists")
+      sync_tip_localizations(api, tip, existing[tip[:id]])
       next
     end
     purchase_id = api.call(:Post, "/v2/inAppPurchases", { data: { type: "inAppPurchases",
@@ -231,9 +275,7 @@ lane :tips do
       relationships: { app: { data: { type: "apps", id: app_id } } } } })["data"]["id"]
     purchase = { type: "inAppPurchases", id: purchase_id }
 
-    api.call(:Post, "/v1/inAppPurchaseLocalizations", { data: { type: "inAppPurchaseLocalizations",
-      attributes: { locale: "en-US", name: tip[:name], description: tip[:description] },
-      relationships: { inAppPurchaseV2: { data: purchase } } } })
+    sync_tip_localizations(api, tip, purchase_id)
 
     api.call(:Post, "/v1/inAppPurchaseAvailabilities", { data: { type: "inAppPurchaseAvailabilities",
       attributes: { availableInNewTerritories: true },

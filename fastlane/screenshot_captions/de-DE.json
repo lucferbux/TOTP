@@ -1,0 +1,14 @@
+{
+  "01-codes":      { "title": "Alle Codes auf einen Blick",   "subtitle": "TOTP- und HOTP-Codes live, jeder mit Countdown.",                 "style": "light" },
+  "02-copied":     { "title": "Antippen, kopiert",            "subtitle": "Ab in die Zwischenablage – und danach automatisch gelöscht.",     "style": "light" },
+  "03-select":     { "title": "Schnell aufgeräumt",           "subtitle": "Mehrere Accounts auswählen und auf einmal löschen.",              "style": "light" },
+  "04-add":        { "title": "Scannen, einfügen, fertig",    "subtitle": "Accounts per QR-Code oder otpauth://-Link hinzufügen.",           "style": "light" },
+  "05-settings":   { "title": "Sicher und synchron",          "subtitle": "Face ID, iCloud-Sync mit eigenem Schlüssel, automatisches Ausfüllen.", "style": "light" },
+  "06-dark":       { "title": "Schön auch im Dunkeln",        "subtitle": "Keine Werbung, kein Tracking. Niemals.",                          "style": "dark" },
+  "mac:01-codes":  { "title": "Alle Codes auch am Mac",       "subtitle": "Per iCloud synchronisiert, Ende-zu-Ende-verschlüsselt.",          "style": "light" },
+  "mac:02-select": { "title": "Schnell aufgeräumt",           "subtitle": "Mehrere Accounts auswählen und auf einmal löschen.",              "style": "light" },
+  "mac:03-add":    { "title": "Im Nu hinzugefügt",            "subtitle": "QR-Code-Bild wählen oder otpauth://-Link einfügen.",               "style": "light" },
+  "mac:04-menubar":{ "title": "Codes in der Menüleiste",      "subtitle": "Einen Klick entfernt, ganz ohne Fenster.",                        "style": "dark" },
+  "watch:01-codes":{ "title": "Codes am Handgelenk",          "subtitle": "Immer nur einen Blick entfernt.",                                 "style": "dark" },
+  "watch:02-detail":{ "title": "Ablesen, eintippen",          "subtitle": "Große Ziffern, klarer Countdown.",                                "style": "dark" }
+}

@@ -11,6 +11,9 @@ Turn on AutoFill and your codes appear right above the keyboard on iPhone and iP
 ON YOUR HOME SCREEN AND IN CONTROL CENTRE
 Add a widget for the account you reach for most and tap it to copy the code. Put a control in Control Centre — or on the Action button — to copy a code without opening anything. Ask Siri, or build a Shortcut.
 
+ON YOUR WRIST
+The Apple Watch app shows your codes with their countdown, and a complication keeps one account's code on the watch face. Codes come from your iPhone. Your PINs and counter-based (HOTP) accounts never go to the watch, and with the app lock on it shows nothing.
+
 A REAL MAC APP
 Not a phone app in a window. A menu bar icon keeps every code a click away, with search, keyboard shortcuts and a Settings window where you expect one.
 
@@ -24,6 +27,6 @@ PRIVATE BY CONSTRUCTION
 No analytics. No advertising. No third-party code of any kind. The app makes no network requests of its own. Secrets are sealed with ChaChaPoly encryption before they are written anywhere, and are never logged. Turn on the app lock and Face ID, Touch ID or your passcode is required before codes are shown — and before AutoFill, Shortcuts or the Control hand one over.
 
 DESIGNED FOR THE PLATFORM
-Built entirely with Apple frameworks and the latest design language. It adapts to every size, from a narrow iPhone to a full-screen iPad or a resized Mac window, with full Dynamic Type, VoiceOver labels and Dark Mode.
+Built entirely with Apple frameworks and the latest design language. It adapts to every size, from a narrow iPhone to a full-screen iPad or a resized Mac window, with full Dynamic Type, VoiceOver labels and Dark Mode. Available in English, Spanish, German and French.
 
 The app is open source under the MIT licence, so every claim above can be checked in the code: github.com/lucferbux/TOTP

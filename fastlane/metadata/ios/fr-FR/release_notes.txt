@@ -1,0 +1,8 @@
+TOTP Password arrive sur Apple Watch, et parle désormais français, espagnol et allemand.
+
+• Apple Watch : vos codes à votre poignet, chacun avec son compte à rebours. Ajoutez une complication pour garder le code d’un compte sur le cadran.
+• Les codes arrivent sur la montre depuis votre iPhone. Vos codes PIN et les comptes à compteur (HOTP) ne sont jamais envoyés à la montre, et lorsque le verrouillage de l’app est activé, elle n’affiche rien.
+• L’app est désormais disponible en français, espagnol et allemand, en plus de l’anglais.
+• Supprimez un compte directement depuis sa fiche de modification.
+• Sur iPad, faites glisser l’image d’un code QR sur la fiche d’ajout pour ajouter un compte.
+• Sur Mac : un nouveau menu Comptes avec des raccourcis clavier, des Réglages organisés en onglets, l’état de la synchro dans la barre de titre, et des images de code QR à choisir ou à faire glisser sur la fenêtre.

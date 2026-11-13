@@ -1,7 +1,13 @@
-Lighter and more reliable.
+A more complete Mac app, now in Spanish, German and French.
 
-• The menu bar app no longer uses CPU in the background: codes stop refreshing whenever their window is closed, minimised or covered, or the app is locked.
-• iCloud sync now keeps your latest change on every device, so renamed accounts, new PINs and updated secret keys show up everywhere. Accounts you delete stay deleted, even if you were offline.
-• Counter-based (HOTP) codes are never handed out twice, even across devices.
-• With the app lock on, widgets hide your codes, AutoFill asks for Touch ID before showing your accounts, and the locked window can't be used from the keyboard.
-• Copied codes stay on this Mac unless you allow sharing with your other devices in Settings.
+• A new Accounts menu: Sync Now (⌘R), and copy the code of any of your first nine accounts with ⌘1 to ⌘9.
+• Select Accounts and Delete Selected Accounts (⌘⌫) are in the Edit menu. Esc leaves selection.
+• Add an account by choosing a QR code image file, or by dragging one onto the window.
+• Settings is now organised in tabs: General, Security, iCloud, AutoFill and About.
+• The title bar shows sync status, and cards highlight as you hover over them.
+• In the menu bar panel, search is ready the moment it opens: ↑ and ↓ pick an account, Return copies its code.
+• Delete an account straight from its edit sheet.
+• Widgets on the Mac now say "Click to copy".
+• The Help menu links to TOTP Support and to Send a Suggestion.
+• The app is now available in Spanish, German and French, as well as English.
+• On iPhone, a new Apple Watch app puts your codes on your wrist.

@@ -20,7 +20,7 @@ final class TOTPUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestMode"]
+        app.launchArguments = ["-UITestMode", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         XCTAssertTrue(app.buttons["account-Example Corp"].firstMatch.waitForExistence(timeout: 5))

@@ -27,6 +27,8 @@ struct AccountCodeView: View {
     var selectionState: SelectionState = .none
 
     @Environment(\.liveCodesEnabled) private var liveCodesEnabled
+    /// Mac: the pointer is over the card, so it shows it can be clicked.
+    @State private var isHovered = false
 
     var body: some View {
         TimelineView(.codeTicks(paused: !liveCodesEnabled)) { context in
@@ -34,6 +36,13 @@ struct AccountCodeView: View {
         }
         // Start the timeline afresh when it resumes, so it never keeps a paused schedule
         .id(liveCodesEnabled)
+        #if os(macOS)
+        .onHover { hovering in
+            guard style == .card else { return }
+            withAnimation(.smooth(duration: 0.15)) { isHovered = hovering }
+        }
+        .pointerStyle(style == .card ? .link : nil)
+        #endif
     }
 
     @ViewBuilder
@@ -77,7 +86,7 @@ struct AccountCodeView: View {
                 if selectionState == .none {
                     Image(systemName: isCopied ? "checkmark.circle.fill" : "doc.on.doc")
                         .font(.body)
-                        .foregroundStyle(isCopied ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
+                        .foregroundStyle(isCopied ? AnyShapeStyle(.green) : isHovered ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                         .contentTransition(.symbolEffect(.replace))
                         .accessibilityHidden(true)
                 }
@@ -107,6 +116,9 @@ struct AccountCodeView: View {
             if style == .card && selectionState == .selected {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(.tint, lineWidth: 2)
+            } else if isHovered {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.tint.opacity(0.5), lineWidth: 1)
             }
         }
         .contentShape(.rect(cornerRadius: style == .card ? 16 : 0))

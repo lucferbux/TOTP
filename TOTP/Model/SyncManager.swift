@@ -31,19 +31,19 @@ public enum SyncState: Equatable {
     public var description: String {
         switch self {
         case .idle:
-            return "Ready"
+            return String(localized: "Ready")
         case .syncing:
-            return "Syncing..."
+            return String(localized: "Syncing…")
         case .synced(let date):
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .abbreviated
-            return "Synced \(formatter.localizedString(for: date, relativeTo: Date()))"
+            return String(localized: "Synced \(formatter.localizedString(for: date, relativeTo: Date()))")
         case .offline:
-            return "Offline"
+            return String(localized: "Offline")
         case .error(let message):
             return message
         case .iCloudDisabled:
-            return "iCloud Disabled"
+            return String(localized: "iCloud Disabled")
         }
     }
     
@@ -216,9 +216,14 @@ public final class SyncManager: ObservableObject {
         hasStarted = true
         if AppEnvironment.isUITesting {
             accounts = localManager.accounts
-            syncState = .idle
+            // Screenshots show what a signed-in user sees: synced a moment ago
+            syncState = AppEnvironment.isTakingScreenshots ? .synced(Date().addingTimeInterval(-60)) : .idle
             return
         }
+
+        #if os(iOS)
+        WatchSyncManager.shared.activate { SyncManager.shared.accounts }
+        #endif
 
         logger.debug("Initial sync starting")
         isLoading = true
@@ -515,6 +520,7 @@ public final class SyncManager: ObservableObject {
         localManager.moveAccounts(fromOffsets: source, toOffset: destination)
         accounts = localManager.accounts
         WidgetCenter.shared.reloadAllTimelines()
+        updateWatch()
     }
 
     /// Returns the value to copy (prefix + code) and, for HOTP, advances and saves the counter
@@ -595,6 +601,7 @@ public final class SyncManager: ObservableObject {
     /// Keeps widgets, AutoFill and Spotlight consistent after any change.
     private func afterMutation() async {
         WidgetCenter.shared.reloadAllTimelines()
+        updateWatch()
         await syncCredentialIdentities()
         scheduleSpotlightIndexing()
     }
@@ -631,6 +638,15 @@ public final class SyncManager: ObservableObject {
     public func appLockDidChange() {
         WidgetCenter.shared.reloadAllTimelines()
         scheduleSpotlightIndexing()
+        updateWatch()
+    }
+
+    /// Sends the TOTP accounts (or, with the app lock on, only "locked") to the paired watch.
+    private func updateWatch() {
+        #if os(iOS)
+        guard !AppEnvironment.isUITesting else { return }
+        WatchSyncManager.shared.update()
+        #endif
     }
 
     // MARK: - Manual Sync
@@ -687,7 +703,7 @@ public final class SyncManager: ObservableObject {
 
             // If account has prefix, also create password identity
             if let prefix = account.prefix, !prefix.isEmpty {
-                let userName = account.name ?? account.issuer ?? "Account"
+                let userName = account.name ?? account.issuer ?? String(localized: "Account")
                 let passwordIdentity = ASPasswordCredentialIdentity(
                     serviceIdentifier: serviceIdentifier,
                     user: userName,
@@ -741,13 +757,13 @@ public enum SyncError: LocalizedError, Identifiable {
     public var errorDescription: String? {
         switch self {
         case .localSaveFailed(let error):
-            return "Failed to save locally: \(error.localizedDescription)"
+            return String(localized: "Failed to save locally: \(error.localizedDescription)")
         case .cloudSyncFailed(let error):
-            return "Failed to sync to cloud: \(error.localizedDescription)"
+            return String(localized: "Failed to sync to iCloud: \(error.localizedDescription)")
         case .mergeConflict:
-            return "Conflict detected during sync"
+            return String(localized: "Conflict detected during sync")
         case .unknown(let error):
-            return "An error occurred: \(error.localizedDescription)"
+            return String(localized: "An error occurred: \(error.localizedDescription)")
         }
     }
 }

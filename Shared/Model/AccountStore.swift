@@ -227,7 +227,13 @@ public enum AccountStore {
 
     /// Read-only loader used by the widget, AutoFill and App Intents.
     public static func loadAccounts(from defaults: UserDefaults = AppGroup.defaults, key: SymmetricKey? = nil) -> [OtpModel] {
+        #if os(watchOS)
+        // The watch never sees the iPhone's key (EncryptionKeyManager isn't even compiled there):
+        // its copy is sealed with its own device-only key, which the caller passes in.
+        let keys = key.map { [$0] } ?? []
+        #else
         let keys = key.map { [$0] } ?? EncryptionKeyManager.existingKeys()
+        #endif
         guard !keys.isEmpty, let data = defaults.data(forKey: accountsKey) else { return [] }
         return (try? decode(data, keys: keys)) ?? []
     }

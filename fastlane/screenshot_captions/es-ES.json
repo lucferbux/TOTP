@@ -1,0 +1,14 @@
+{
+  "01-codes":      { "title": "Tus códigos de un vistazo",    "subtitle": "Códigos TOTP y HOTP al momento, cada uno con su cuenta atrás.",   "style": "light" },
+  "02-copied":     { "title": "Un toque y copiado",           "subtitle": "El código va al portapapeles y luego se borra solo.",             "style": "light" },
+  "03-select":     { "title": "Ordena en un momento",         "subtitle": "Selecciona varias cuentas y elimínalas de una vez.",              "style": "light" },
+  "04-add":        { "title": "Escanea, pega y listo",        "subtitle": "Añade cuentas con un código\u00a0QR o un enlace otpauth://.",           "style": "light" },
+  "05-settings":   { "title": "Protegido y sincronizado",     "subtitle": "Bloqueo con Face ID, iCloud cifrado con tu propia clave y Autorrelleno.", "style": "light" },
+  "06-dark":       { "title": "Precioso en modo oscuro",      "subtitle": "Sin anuncios ni rastreo. Nunca.",                                 "style": "dark" },
+  "mac:01-codes":  { "title": "Todos tus códigos en el Mac",  "subtitle": "Las mismas cuentas, sincronizadas con iCloud y cifradas de extremo a extremo.", "style": "light" },
+  "mac:02-select": { "title": "Ordena en un momento",         "subtitle": "Selecciona varias cuentas y elimínalas de una vez.",              "style": "light" },
+  "mac:03-add":    { "title": "Añade cuentas al instante",    "subtitle": "Elige la imagen de un código\u00a0QR o pega un enlace otpauth://.",     "style": "light" },
+  "mac:04-menubar":{ "title": "Tus códigos en la barra de menús", "subtitle": "A un clic, sin abrir ninguna ventana.",                         "style": "dark" },
+  "watch:01-codes":{ "title": "Códigos en tu muñeca",         "subtitle": "Siempre a un vistazo.",                                           "style": "dark" },
+  "watch:02-detail":{ "title": "Míralo y tecléalo",           "subtitle": "Dígitos grandes y una cuenta atrás clara.",                       "style": "dark" }
+}

@@ -67,11 +67,8 @@ struct TOTPApp: App {
 
         // macOS Settings window (Cmd+,)
         Settings {
-            // The stack is what lets "Buy Me a Coffee" push from this window.
-            NavigationStack {
-                SettingsView()
-                    .environmentObject(syncManager)
-            }
+            SettingsView()
+                .environmentObject(syncManager)
         }
         #endif
     }
@@ -94,9 +91,12 @@ struct TOTPApp: App {
     }
 }
 
-/// File ▸ Add Account (⌘N) — also shown in the iPadOS menu bar.
+/// Menu bar commands, also shown in the iPadOS menu bar: File ▸ Add Account (⌘N), Edit ▸ Select
+/// Accounts / Delete Selected Accounts (⌘⌫), Accounts ▸ Sync Now (⌘R) and Copy (⌘1…⌘9), Help ▸
+/// support and suggestions.
 struct AccountCommands: Commands {
     @FocusedValue(\.addAccountAction) private var addAccount
+    @FocusedValue(\.mainWindowActions) private var actions
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -105,6 +105,41 @@ struct AccountCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: .command)
             .disabled(addAccount == nil)
+        }
+
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button(actions?.isSelecting == true ? "Done Selecting" : "Select Accounts") {
+                actions?.toggleSelecting()
+            }
+            .disabled(actions == nil || actions?.copyItems.isEmpty == true)
+            Button("Delete Selected Accounts…") {
+                actions?.deleteSelection?()
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(actions?.deleteSelection == nil)
+        }
+
+        CommandMenu("Accounts") {
+            Button("Sync Now") {
+                actions?.sync()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(actions == nil)
+            if let items = actions?.copyItems, !items.isEmpty {
+                Divider()
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    Button("Copy \(item.title)") {
+                        item.copy()
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                }
+            }
+        }
+
+        CommandGroup(replacing: .help) {
+            Link("TOTP Support", destination: URL(string: "https://lucferbux.github.io/TOTP/support.html")!)
+            Link("Send a Suggestion", destination: SettingsView.suggestionURL)
         }
     }
 }

@@ -15,9 +15,13 @@ import VisionKit
 enum QRCodeDecoder {
     enum DecodeError: LocalizedError {
         case unreadableImage
+        case noCode
 
         var errorDescription: String? {
-            String(localized: "The image couldn't be read.")
+            switch self {
+            case .unreadableImage: String(localized: "The image couldn't be read.")
+            case .noCode: String(localized: "No QR code was found in that image.")
+            }
         }
     }
 
@@ -27,6 +31,15 @@ enum QRCodeDecoder {
         request.symbologies = [.qr]
         let observations = try await request.perform(on: data)
         return observations.compactMap(\.payloadString)
+    }
+
+    /// The otpauth:// link in a QR code image (a dropped or chosen file, a photo).
+    static func otpAuthURL(inImageData data: Data) async throws -> OtpAuthURL {
+        let payloads = try await payloads(inImageData: data)
+        guard let payload = payloads.first(where: { $0.lowercased().hasPrefix("otpauth://") }) ?? payloads.first else {
+            throw DecodeError.noCode
+        }
+        return try OtpAuthURL(string: payload)
     }
 }
 

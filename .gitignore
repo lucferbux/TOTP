@@ -29,3 +29,6 @@ fastlane/test_output
 # Generated screenshots (regenerate with scripts/export-screenshots.sh)
 fastlane/screenshots/**/*.png
 fastlane/screenshots_mac/**/*.png
+# Raw captures, before scripts/frame-screenshots.swift frames them
+fastlane/screenshots_raw/**/*.png
+fastlane/screenshots_mac_raw/**/*.png

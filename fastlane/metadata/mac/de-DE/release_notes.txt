@@ -1,0 +1,13 @@
+Eine vollständigere Mac-App – jetzt auch auf Deutsch, Spanisch und Französisch.
+
+• Neues Menü „Accounts“: „Jetzt synchronisieren“ (⌘R), und den Code jedes deiner ersten neun Accounts kopierst du mit ⌘1 bis ⌘9.
+• „Accounts auswählen“ und „Ausgewählte Accounts löschen“ (⌘⌫) findest du im Menü „Bearbeiten“. Mit Esc beendest du die Auswahl.
+• Füge einen Account hinzu, indem du eine Bilddatei mit QR-Code auswählst oder ins Fenster ziehst.
+• Die Einstellungen sind jetzt in Tabs gegliedert: Allgemein, Sicherheit, iCloud, Automatisch ausfüllen und Über.
+• Die Titelleiste zeigt den Sync-Status, und Karten werden hervorgehoben, wenn du mit dem Zeiger darüberfährst.
+• Im Menüleisten-Fenster ist die Suche sofort bereit: Mit ↑ und ↓ wählst du einen Account, mit Return kopierst du seinen Code.
+• Lösche einen Account direkt in seinem Bearbeitungsfenster.
+• Widgets am Mac zeigen jetzt „Zum Kopieren klicken“.
+• Das Menü „Hilfe“ führt zum TOTP-Support und zum Senden eines Vorschlags.
+• Die App gibt es jetzt neben Englisch auch auf Deutsch, Spanisch und Französisch.
+• Auf dem iPhone bringt eine neue Apple Watch App deine Codes ans Handgelenk.

@@ -358,9 +358,9 @@ public final class CloudKitDataManager: ObservableObject {
     /// Human-readable environment for the diagnostics UI.
     public var environmentName: String {
         #if DEBUG
-        "Development"
+        String(localized: "Development")
         #else
-        "Production"
+        String(localized: "Production")
         #endif
     }
 
@@ -473,25 +473,25 @@ public enum CloudKitError: LocalizedError, Identifiable {
     public var errorDescription: String? {
         switch self {
         case .accountNotAvailable:
-            return "iCloud account is not available. Please sign in to iCloud in Settings."
+            return String(localized: "iCloud account is not available. Please sign in to iCloud in Settings.")
         case .fetchFailed(let error):
-            return "Failed to fetch accounts from iCloud: \(error.localizedDescription)"
+            return String(localized: "Failed to fetch accounts from iCloud: \(error.localizedDescription)")
         case .saveFailed(let error):
-            return "Failed to save account to iCloud: \(error.localizedDescription)"
+            return String(localized: "Failed to save account to iCloud: \(error.localizedDescription)")
         case .deleteFailed(let error):
-            return "Failed to delete account from iCloud: \(error.localizedDescription)"
+            return String(localized: "Failed to delete account from iCloud: \(error.localizedDescription)")
         case .encryptionFailed:
-            return "Failed to encrypt account data"
+            return String(localized: "Failed to encrypt account data")
         case .decryptionFailed:
-            return "Failed to decrypt account data"
+            return String(localized: "Failed to decrypt account data")
         case .networkError:
-            return "Network connection unavailable. Changes will sync when connected."
+            return String(localized: "Network connection unavailable. Changes will sync when connected.")
         case .quotaExceeded:
-            return "iCloud storage quota exceeded. Please free up space."
+            return String(localized: "iCloud storage quota exceeded. Please free up space.")
         case .serverError:
-            return "iCloud server error. Please try again later."
+            return String(localized: "iCloud server error. Please try again later.")
         case .unknown(let error):
-            return "An unknown error occurred: \(error.localizedDescription)"
+            return String(localized: "An unknown error occurred: \(error.localizedDescription)")
         }
     }
     

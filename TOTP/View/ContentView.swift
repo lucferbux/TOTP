@@ -15,6 +15,8 @@ final class AppRouter: ObservableObject {
     static let shared = AppRouter()
     @Published var pendingImport: OtpAuthURL?
     @Published var importError: String?
+    /// The menu bar panel's "Add Account…" when there are no accounts yet.
+    @Published var requestsNewAccount = false
 }
 
 /// Lets ⌘N (File ▸ Add Account) reach the focused window.
@@ -27,8 +29,34 @@ struct AddAccountAction: Equatable {
     static func == (lhs: AddAccountAction, rhs: AddAccountAction) -> Bool { true }
 }
 
+/// What the focused main window offers the menu bar: Accounts ▸ Sync Now, Copy (⌘1…⌘9), and
+/// Edit ▸ Select Accounts / Delete Selected Accounts.
+struct MainWindowActions: Equatable {
+    struct CopyItem {
+        let id: UUID
+        let title: String
+        let copy: () -> Void
+    }
+
+    let sync: () -> Void
+    let toggleSelecting: () -> Void
+    let isSelecting: Bool
+    /// nil while nothing is selected
+    let deleteSelection: (() -> Void)?
+    let copyItems: [CopyItem]
+
+    // Closures always act on the same window; only the state the menus show can change.
+    static func == (lhs: MainWindowActions, rhs: MainWindowActions) -> Bool {
+        lhs.isSelecting == rhs.isSelecting
+            && (lhs.deleteSelection == nil) == (rhs.deleteSelection == nil)
+            && lhs.copyItems.map(\.id) == rhs.copyItems.map(\.id)
+            && lhs.copyItems.map(\.title) == rhs.copyItems.map(\.title)
+    }
+}
+
 extension FocusedValues {
     @Entry var addAccountAction: AddAccountAction?
+    @Entry var mainWindowActions: MainWindowActions?
 }
 
 enum AccountSheet: Identifiable {
@@ -90,6 +118,12 @@ public struct ContentView: View {
                 .refreshable { await syncManager.refresh() }
         }
         .focusedSceneValue(\.addAccountAction, AddAccountAction { sheet = .add(nil) })
+        .focusedSceneValue(\.mainWindowActions, windowActions)
+        #if os(macOS)
+        .navigationSubtitle(syncSubtitle)
+        .onExitCommand { if isSelecting { toggleSelecting() } }
+        .onDeleteCommand { if isSelecting && !selection.isEmpty { confirmBatchDelete = true } }
+        #endif
         #if DEBUG
         .task { applyScreenshotScene() }
         #endif
@@ -111,11 +145,11 @@ public struct ContentView: View {
             Text("You won't be able to generate codes for this account unless you add it again.")
         }
         .confirmationDialog(
-            selection.count == 1 ? "Delete 1 account?" : "Delete \(selection.count) accounts?",
+            "Delete \(selection.count) accounts?",
             isPresented: $confirmBatchDelete,
             titleVisibility: .visible
         ) {
-            Button(selection.count == 1 ? "Delete Account" : "Delete \(selection.count) Accounts", role: .destructive) {
+            Button("Delete \(selection.count) Accounts", role: .destructive) {
                 deleteSelection()
             }
             .accessibilityIdentifier("confirmBatchDeleteButton")
@@ -131,6 +165,11 @@ public struct ContentView: View {
             Button("OK", role: .cancel) { router.importError = nil }
         } message: {
             Text(router.importError ?? "")
+        }
+        .onChange(of: router.requestsNewAccount, initial: true) { _, requested in
+            guard requested else { return }
+            sheet = .add(nil)
+            router.requestsNewAccount = false
         }
         .onChange(of: router.pendingImport) { _, pending in
             guard let pending else { return }
@@ -179,11 +218,26 @@ public struct ContentView: View {
         ContentUnavailableView {
             Label("No Accounts", systemImage: "lock.shield")
         } description: {
+            #if os(macOS)
+            Text("Add an account from its setup QR code image or secret key. You can also drop a QR code image here.")
+            #else
             Text("Add an account by scanning its setup QR code or entering the secret key.")
+            #endif
         } actions: {
             Button("Add Account") { sheet = .add(nil) }
                 .prominentActionStyle()
                 .accessibilityIdentifier("emptyStateAddButton")
+        }
+        .dropDestination(for: Data.self) { items, _ in
+            guard let data = items.first else { return false }
+            Task {
+                do {
+                    sheet = .add(try await QRCodeDecoder.otpAuthURL(inImageData: data))
+                } catch {
+                    router.importError = error.localizedDescription
+                }
+            }
+            return true
         }
     }
 
@@ -390,7 +444,9 @@ public struct ContentView: View {
             ToolbarItem(placement: .automatic) {
                 deleteSelectionButton
             }
+            #if !os(visionOS)
             ToolbarSpacer(.fixed)
+            #endif
             ToolbarItem(placement: .automatic) {
                 selectButton
             }
@@ -399,9 +455,12 @@ public struct ContentView: View {
                 addButton
             }
             if !syncManager.accounts.isEmpty {
+                #if !os(visionOS)
                 ToolbarSpacer(.fixed)
+                #endif
                 ToolbarItem(placement: .automatic) {
-                    moreMenu
+                    selectAccountsButton
+                        .help("Select accounts to delete them together")
                 }
             }
         }
@@ -446,20 +505,6 @@ public struct ContentView: View {
         .accessibilityIdentifier("selectButton")
     }
 
-    #if os(macOS)
-    /// Mac: secondary actions behind an ellipsis, so add keeps its own button. (iOS uses the system
-    /// overflow menu instead, which doesn't exist on macOS.)
-    private var moreMenu: some View {
-        Menu {
-            selectAccountsButton
-        } label: {
-            Label("More", systemImage: "ellipsis")
-        }
-        .menuIndicator(.hidden)
-        .accessibilityIdentifier("moreMenu")
-        .help("More actions")
-    }
-    #endif
 
     private func toggleSelecting() {
         withAnimation(.smooth(duration: 0.25)) {
@@ -535,6 +580,28 @@ public struct ContentView: View {
             }
         }
     }
+
+    private var windowActions: MainWindowActions {
+        MainWindowActions(
+            sync: { Task { await syncManager.refresh() } },
+            toggleSelecting: { toggleSelecting() },
+            isSelecting: isSelecting,
+            deleteSelection: isSelecting && !selection.isEmpty ? { confirmBatchDelete = true } : nil,
+            copyItems: syncManager.accounts.prefix(9).map { account in
+                MainWindowActions.CopyItem(id: account.id, title: account.displayTitle) { copy(account) }
+            }
+        )
+    }
+
+    #if os(macOS)
+    /// Title-bar status: when it last synced, or why it can't. Nothing while idle.
+    private var syncSubtitle: String {
+        switch syncManager.syncState {
+        case .idle: ""
+        default: syncManager.syncState.description
+        }
+    }
+    #endif
 
     private var deleteTitle: String {
         guard let deleting else { return "" }

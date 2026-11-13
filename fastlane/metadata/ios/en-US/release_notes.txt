@@ -1,8 +1,8 @@
-Ready for iPhone Duo, and lighter and more reliable everywhere.
+TOTP Password comes to Apple Watch, and now speaks Spanish, German and French.
 
-• Made for iPhone Duo: on the outer display the controls move to the side, and when you open it your codes fill the inner display in a grid that keeps clear of the fold. Folding or unfolding keeps your place in the list.
-• Uses far less battery: codes stop refreshing whenever they're off screen or the app is locked.
-• iCloud sync now keeps your latest change on every device, so renamed accounts, new PINs and updated secret keys show up everywhere. Accounts you delete stay deleted, even if you were offline.
-• Counter-based (HOTP) codes are never handed out twice, even across devices.
-• With the app lock on, widgets hide your codes and AutoFill asks for Face ID before showing your accounts.
-• AutoFill only suggests an account on that account's own website.
+• Apple Watch: your codes on your wrist, each with its countdown. Add a complication to keep one account's code on the watch face.
+• Codes reach the watch from your iPhone. Your PINs and counter-based (HOTP) accounts never go to the watch, and with the app lock on it shows nothing.
+• The app is now available in Spanish, German and French, as well as English.
+• Delete an account straight from its edit sheet.
+• On iPad, drag a QR code image onto the add sheet to add an account.
+• On the Mac: a new Accounts menu with keyboard shortcuts, Settings in tabs, sync status in the title bar, and QR code images you can choose or drag onto the window.

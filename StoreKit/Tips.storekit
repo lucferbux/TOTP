@@ -7,7 +7,10 @@
       "familyShareable" : false,
       "internalID" : "6810000001",
       "localizations" : [
-        { "description" : "A small thank you", "displayName" : "A Coffee", "locale" : "en_US" }
+        { "description" : "A small thank you", "displayName" : "A Coffee", "locale" : "en_US" },
+        { "description" : "Un pequeño agradecimiento", "displayName" : "Un café", "locale" : "es_ES" },
+        { "description" : "Ein kleines Dankeschön", "displayName" : "Ein Kaffee", "locale" : "de_DE" },
+        { "description" : "Un petit merci", "displayName" : "Un café", "locale" : "fr_FR" }
       ],
       "productID" : "com.lucferbux.TOTP.tip.small",
       "referenceName" : "A Coffee",
@@ -18,7 +21,10 @@
       "familyShareable" : false,
       "internalID" : "6810000002",
       "localizations" : [
-        { "description" : "For a long night of fixes", "displayName" : "A Large Coffee", "locale" : "en_US" }
+        { "description" : "For a long night of fixes", "displayName" : "A Large Coffee", "locale" : "en_US" },
+        { "description" : "Para una larga noche de arreglos", "displayName" : "Un café grande", "locale" : "es_ES" },
+        { "description" : "Für eine lange Nacht voller Fixes", "displayName" : "Ein großer Kaffee", "locale" : "de_DE" },
+        { "description" : "Pour une longue nuit de correctifs", "displayName" : "Un grand café", "locale" : "fr_FR" }
       ],
       "productID" : "com.lucferbux.TOTP.tip.medium",
       "referenceName" : "A Large Coffee",
@@ -29,7 +35,10 @@
       "familyShareable" : false,
       "internalID" : "6810000003",
       "localizations" : [
-        { "description" : "For the next big update", "displayName" : "A Week of Coffee", "locale" : "en_US" }
+        { "description" : "For the next big update", "displayName" : "A Week of Coffee", "locale" : "en_US" },
+        { "description" : "Para la próxima gran actualización", "displayName" : "Una semana de café", "locale" : "es_ES" },
+        { "description" : "Für das nächste große Update", "displayName" : "Eine Woche Kaffee", "locale" : "de_DE" },
+        { "description" : "Pour la prochaine grande mise à jour", "displayName" : "Une semaine de café", "locale" : "fr_FR" }
       ],
       "productID" : "com.lucferbux.TOTP.tip.large",
       "referenceName" : "A Week of Coffee",

@@ -1,0 +1,22 @@
+TOTP Password pone tus códigos de verificación en dos pasos en la barra de menús del Mac, y también en tu iPhone, tu iPad y tu Apple Watch, con una sola compra.
+
+Haz clic en el icono de la barra de menús y ahí están todos tus códigos, con búsqueda y copia en un clic. O déjala en el Dock, o en los dos sitios. Es una app de Mac de verdad: atajos de teclado, una ventana de Ajustes como es debido y una ventana que cambia de tamaño como esperas.
+
+UN PIN DELANTE DEL CÓDIGO
+Algunos accesos del trabajo piden un PIN fijo escrito justo antes del código generado. Añade un prefijo a la cuenta y TOTP copia y rellena el valor completo de una vez. El PIN nunca se muestra en pantalla y se cifra junto con el secreto.
+
+RELLENA LOS CÓDIGOS EN SAFARI
+Activa TOTP en Autorrelleno y contraseñas y tus códigos se te ofrecerán al iniciar sesión. Las cuentas con PIN pueden rellenar los campos de contraseña con el PIN y el código juntos.
+
+LISTA EN SEGUNDOS
+Elige una captura de pantalla del código QR que te muestra el servicio o arrástrala a la ventana, pega un enlace otpauth:// o escribe el secreto a mano. Es compatible con SHA-1, SHA-256 y SHA-512, códigos de 6 a 10 dígitos y periodos de actualización personalizados.
+
+UNA SINCRONIZACIÓN QUE SIGUE SIENDO TUYA
+Las cuentas se sincronizan a través de tu propia base de datos privada de iCloud, cifradas antes de salir del dispositivo con una clave que solo se comparte mediante tu llavero de iCloud. No hay que crear ninguna cuenta ni hay un servidor nuestro en medio, porque no tenemos ningún servidor.
+
+PRIVADA POR DISEÑO
+Sin analíticas. Sin publicidad. Sin código de terceros de ningún tipo. La app no hace ninguna petición de red por su cuenta. Los secretos se sellan con cifrado ChaChaPoly antes de guardarse en ningún sitio y nunca se registran. Activa el bloqueo de la app y se pedirá Touch ID o tu contraseña antes de mostrar los códigos, y antes de que Autorrelleno, Atajos o el control den uno.
+
+Disponible en español, inglés, alemán y francés.
+
+La app es de código abierto con licencia MIT, así que puedes comprobar en el código todo lo que se dice aquí: github.com/lucferbux/TOTP

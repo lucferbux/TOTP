@@ -1,0 +1,13 @@
+Une app Mac plus complète, désormais en français, espagnol et allemand.
+
+• Nouveau menu Comptes : Synchroniser maintenant (⌘R), et copiez le code de n’importe lequel de vos neuf premiers comptes avec ⌘1 à ⌘9.
+• Sélectionner des comptes et Supprimer les comptes sélectionnés (⌘⌫) se trouvent dans le menu Édition. Échap quitte la sélection.
+• Ajoutez un compte en choisissant un fichier image contenant un code QR, ou en le faisant glisser sur la fenêtre.
+• Les Réglages sont désormais organisés en onglets : Général, Sécurité, iCloud, Remplissage automatique et À propos.
+• La barre de titre affiche l’état de la synchro, et les cartes s’illuminent au survol du pointeur.
+• Dans le panneau de la barre des menus, la recherche est prête dès l’ouverture : ↑ et ↓ choisissent un compte, Retour copie son code.
+• Supprimez un compte directement depuis sa fiche de modification.
+• Sur Mac, les widgets indiquent désormais « Cliquez pour copier ».
+• Le menu Aide renvoie vers l’assistance de TOTP et vers l’envoi d’une suggestion.
+• L’app est désormais disponible en français, espagnol et allemand, en plus de l’anglais.
+• Sur iPhone, une nouvelle app Apple Watch met vos codes à votre poignet.

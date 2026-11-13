@@ -1,0 +1,14 @@
+{
+  "01-codes":      { "title": "Your codes at a glance",       "subtitle": "Live TOTP and HOTP codes, each with its own countdown.",            "style": "light" },
+  "02-copied":     { "title": "Tap once to copy",             "subtitle": "The code goes to your clipboard and clears itself afterwards.",   "style": "light" },
+  "03-select":     { "title": "Tidy up in one go",            "subtitle": "Select several accounts and delete them all at once.",            "style": "light" },
+  "04-add":        { "title": "Scan, paste, done",            "subtitle": "Add an account from a QR\u00a0code or an otpauth:// link.",            "style": "light" },
+  "05-settings":   { "title": "Locked down, synced up",       "subtitle": "Face ID lock, iCloud sync encrypted with your own key, AutoFill.", "style": "light" },
+  "06-dark":       { "title": "Beautiful in the dark",        "subtitle": "Full dark mode. No ads, no tracking, ever.",                      "style": "dark" },
+  "mac:01-codes":  { "title": "All your codes on your Mac",   "subtitle": "The same accounts, synced through iCloud and end-to-end encrypted.", "style": "light" },
+  "mac:02-select": { "title": "Tidy up in one go",            "subtitle": "Select several accounts and delete them all at once.",            "style": "light" },
+  "mac:03-add":    { "title": "Add accounts in seconds",      "subtitle": "Choose a QR\u00a0code image or paste an otpauth:// link.",             "style": "light" },
+  "mac:04-menubar":{ "title": "Codes in your menu bar",       "subtitle": "One click away, without opening a window.",                       "style": "dark" },
+  "watch:01-codes":{ "title": "Codes on your wrist",          "subtitle": "Always one glance away.",                                         "style": "dark" },
+  "watch:02-detail":{ "title": "Read it, type it",            "subtitle": "Big digits and a clear countdown.",                               "style": "dark" }
+}

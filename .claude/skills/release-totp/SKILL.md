@@ -6,7 +6,9 @@ description: Cut a TOTP release — bump the version and build number, archive f
 # Release TOTP
 
 Ships the `TOTP` scheme to App Store Connect for **iOS** and **macOS** from one codebase
-(Universal Purchase). Team `7Y2Y846R76`, automatic signing.
+(Universal Purchase). Team `7Y2Y846R76`, automatic signing. The iOS app carries the Apple Watch app
+(`TOTP Watch` + its `TOTP Watch Widget` complication) in `TOTP.app/Watch/`, so the iOS archive ships
+both; there is no separate watch upload.
 
 ## 1. Pre-flight (do not skip)
 
@@ -24,15 +26,17 @@ grep -rniE "(secret|prefix|pin)\s*[:=]\s*\"[A-Z0-9]{6,}\"" --include="*.swift" .
 
 ## 2. Bump the version
 
-`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` must move **together across the app, widget and
-AutoFill targets** (6 occurrences each in `TOTP.xcodeproj/project.pbxproj`; the test targets keep
-their own 1.0/1).
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` must move **together across the app, widget,
+AutoFill, watch app and watch widget targets** (10 occurrences each in
+`TOTP.xcodeproj/project.pbxproj` — Debug + Release for each of the five; the test targets keep their
+own 1.0/1). A watch app whose version doesn't match its companion's is rejected on upload.
 
 ```bash
 # marketing version x.y, build n (build must be higher than any build already uploaded)
 sed -i '' -e 's/MARKETING_VERSION = 4.0;/MARKETING_VERSION = 4.1;/g' \
           -e 's/CURRENT_PROJECT_VERSION = 6;/CURRENT_PROJECT_VERSION = 7;/g' TOTP.xcodeproj/project.pbxproj
-grep -c "MARKETING_VERSION = 4.1;" TOTP.xcodeproj/project.pbxproj   # expect 6
+grep -c "MARKETING_VERSION = 4.1;" TOTP.xcodeproj/project.pbxproj        # expect 10
+grep -c "CURRENT_PROJECT_VERSION = 7;" TOTP.xcodeproj/project.pbxproj    # expect 10
 ```
 
 ## 3. Archive
@@ -47,6 +51,13 @@ xcodebuild archive -project TOTP.xcodeproj -scheme TOTP -configuration Release \
 # sanity-check version + embedded extensions
 /usr/libexec/PlistBuddy -c "Print :ApplicationProperties" $OUT/TOTP-iOS.xcarchive/Info.plist
 ls "$OUT/TOTP-macOS.xcarchive/Products/Applications/TOTP.app/Contents/PlugIns/"   # both .appex present
+IOS_APP="$OUT/TOTP-iOS.xcarchive/Products/Applications/TOTP.app"
+ls "$IOS_APP/Watch/"                                         # TOTP Watch.app present
+ls "$IOS_APP/Watch/TOTP Watch.app/PlugIns/"                  # TOTP Watch Widget.appex present
+for p in "$IOS_APP" "$IOS_APP/Watch/TOTP Watch.app" "$IOS_APP/Watch/TOTP Watch.app/PlugIns/TOTP Watch Widget.appex"; do
+  /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" -c "Print :CFBundleVersion" "$p/Info.plist"
+done                                                         # all three identical
+ls "$OUT/TOTP-macOS.xcarchive/Products/Applications/TOTP.app/Contents/" | grep -c Watch   # expect 0
 ```
 
 ## 4. Upload
@@ -97,6 +108,8 @@ Privacy / EU trader / age-rating steps that no API can do: [docs/RELEASE.md](../
 
 ## Notes
 
+- The watch app is embedded only in iOS builds (`platformFilter = ios` on the "Embed Watch Content"
+  phase and its target dependency); macOS and visionOS archives must not contain it.
 - visionOS is a supported platform in the project but is not part of the App Store release flow;
   archive it only if explicitly asked.
 - `aps-environment` stays `development` in the checked-in entitlements; export rewrites it for

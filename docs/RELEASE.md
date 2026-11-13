@@ -46,14 +46,15 @@ git status --short            # must be clean
 sed -i '' -e 's/MARKETING_VERSION = 4.4;/MARKETING_VERSION = 4.5;/g' \
           -e 's/CURRENT_PROJECT_VERSION = 10;/CURRENT_PROJECT_VERSION = 11;/g' TOTP.xcodeproj/project.pbxproj
 
-# 3. Release notes
-$EDITOR fastlane/metadata/ios/en-US/release_notes.txt
-cp fastlane/metadata/ios/en-US/release_notes.txt fastlane/metadata/mac/en-US/release_notes.txt
+# 3. Release notes, in every language (en-US, es-ES, de-DE, fr-FR)
+$EDITOR fastlane/metadata/{ios,mac}/*/release_notes.txt
 
-# 4. Screenshots, if the UI changed
-scripts/export-screenshots.sh     # iPhone + iPad + iPhone Duo outer + Mac
+# 4. Screenshots, if the UI changed: raw captures, then the framed App Store images
+scripts/export-screenshots.sh --locales en-US,es-ES,de-DE,fr-FR --watch
 # iPhone Duo inner display: open the "iPhone Duo" simulator in Device Hub first, then
-scripts/export-screenshots.sh --duo-inner
+scripts/export-screenshots.sh --duo-inner --locales en-US,es-ES,de-DE,fr-FR
+# Captions only changed? Re-frame the existing raw captures:
+swift scripts/frame-screenshots.swift
 
 # 5. Archive and upload the binaries (the release-totp skill has the full commands)
 
@@ -68,7 +69,7 @@ Then open App Store Connect, check both versions, attach the builds and submit b
 
 ```bash
 swift scripts/make-icon.swift TOTP/Assets.xcassets/AppIcon.appiconset
-swift scripts/make-creative-assets.swift   # needs fastlane/screenshots/en-US
+swift scripts/make-creative-assets.swift   # needs fastlane/screenshots_raw/en-US
 ```
 
 Upload `fastlane/creative_assets/` on each platform's version page, under **Header and Search
@@ -78,6 +79,24 @@ Results**. The API can do it too, but no lane does yet.
 
 `fastlane tips` creates the three consumables, skipping any that exist. They go to review with a
 version: select them under **In-App Purchases and Subscriptions** on the version page.
+
+## Framed screenshots
+
+The App Store images are designed frames, not raw captures: the icon's gradient, a headline and
+subheadline, and the capture inside a device frame drawn in code (no downloaded bezels).
+
+- `scripts/export-screenshots.sh` writes the raw captures to `fastlane/screenshots_raw/<locale>/`
+  (iPhone, iPad, iPhone Duo, Watch) and `fastlane/screenshots_mac_raw/<locale>/`, both
+  git-ignored, running the app in each locale's language. It then runs the framer.
+- `scripts/frame-screenshots.swift` writes `fastlane/screenshots/<locale>/` and
+  `fastlane/screenshots_mac/<locale>/`, which `fastlane screenshots_upload` uploads. A locale
+  without its own raw captures falls back to `--raw-locale` (en-US).
+- Captions live in `fastlane/screenshot_captions/<locale>.json`, keyed by scene (`01-codes`, …),
+  with `mac:` / `watch:` overrides and a `"style": "dark"` option. Keep headlines to 3–6 words:
+  the first three images show in search results.
+- iOS scenes: 01 codes, 02 copied, 03 select (launched with `-ScreenshotScene select`), 04 add,
+  05 settings, 06 dark mode. In `-ScreenshotMode` the app shows a signed-in user's state (synced,
+  shared key) and seeds fictional accounts only.
 
 ## Mac screenshots
 
@@ -99,7 +118,7 @@ come out empty and the script says so. To fall back to doing it by hand — ⌘�
 window — pad the result to an accepted size:
 
 ```bash
-sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac/en-US/01-codes.png
+sips --padToHeightWidth 1800 2880 shot.png --out fastlane/screenshots_mac_raw/en-US/01-codes.png
 ```
 
 Accepted Mac sizes: 1280×800, 1440×900, 2560×1600, 2880×1800.

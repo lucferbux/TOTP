@@ -185,7 +185,7 @@ struct SingleAccountWidgetView: View {
                 #if os(iOS)
                 case .accessoryInline:
                     CopyButton(account: account) {
-                        Text("\(account.displayTitle) \(account.code(at: entry.date).groupedOTP)")
+                        Text(verbatim: "\(account.displayTitle) \(account.code(at: entry.date).groupedOTP)")
                             .privacySensitive()
                     }
                 case .accessoryCircular:
@@ -237,6 +237,15 @@ struct SmallCodeView: View {
     let account: OtpModel
     let date: Date
 
+    // Mac widgets are clicked, not tapped.
+    private var copyHint: LocalizedStringKey {
+        #if os(macOS)
+        account.hasPrefix ? "Click to copy PIN + code" : "Click to copy"
+        #else
+        account.hasPrefix ? "Tap to copy PIN + code" : "Tap to copy"
+        #endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top) {
@@ -267,7 +276,7 @@ struct SmallCodeView: View {
 
             Spacer(minLength: 0)
 
-            Label(account.hasPrefix ? "Tap to copy PIN + code" : "Tap to copy", systemImage: "doc.on.doc")
+            Label(copyHint, systemImage: "doc.on.doc")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

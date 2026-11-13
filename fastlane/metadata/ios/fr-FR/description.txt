@@ -1,0 +1,32 @@
+TOTP Password génère les codes de vérification à six chiffres dont vous avez besoin pour vous connecter aux services que vous utilisez déjà, sur votre iPhone, votre iPad et votre Mac, pour un seul achat.
+
+Elle ne fait qu’une chose : placer le bon code dans le bon champ, rapidement, sans confier vos secrets à qui que ce soit.
+
+UN CODE PIN EN PRÉFIXE
+Certains accès professionnels attendent un code PIN fixe saisi juste avant le code généré. Ajoutez un préfixe au compte, et TOTP copie et remplit la valeur complète en une seule fois. Le code PIN n’est jamais affiché à l’écran, et il est chiffré avec le secret.
+
+DES CODES LÀ OÙ VOUS VOUS CONNECTEZ
+Activez le remplissage automatique et vos codes apparaissent juste au-dessus du clavier sur iPhone et iPad, et dans Safari sur Mac. Les comptes avec code PIN peuvent remplir les champs de mot de passe avec le PIN et le code ensemble.
+
+SUR L’ÉCRAN D’ACCUEIL ET DANS LE CENTRE DE CONTRÔLE
+Ajoutez un widget pour le compte que vous utilisez le plus et touchez-le pour copier le code. Placez une commande dans le centre de contrôle, ou sur le bouton Action, pour copier un code sans rien ouvrir. Demandez à Siri ou créez un raccourci.
+
+À VOTRE POIGNET
+L’app Apple Watch affiche vos codes avec leur compte à rebours, et une complication garde le code d’un compte sur le cadran. Les codes arrivent depuis l’iPhone. Vos codes PIN et les comptes à compteur (HOTP) ne sont jamais envoyés à la montre, et lorsque le verrouillage de l’app est activé, elle n’affiche rien.
+
+UNE VRAIE APP MAC
+Pas une app iPhone dans une fenêtre. Une icône dans la barre des menus garde chaque code à portée de clic, avec la recherche, des raccourcis clavier et une fenêtre Réglages là où vous l’attendez.
+
+PRÊTE EN QUELQUES SECONDES
+Scannez le code QR affiché par votre service, choisissez-en une capture d’écran, collez un lien otpauth:// ou saisissez le secret à la main. SHA-1, SHA-256 et SHA-512 sont pris en charge, avec 6 à 10 chiffres et des périodes d’actualisation personnalisées.
+
+UNE SYNCHRO QUI RESTE LA VÔTRE
+Vos comptes se synchronisent via votre propre base de données iCloud privée, chiffrés avant de quitter l’appareil avec une clé partagée uniquement par votre trousseau iCloud. Aucun compte à créer, et aucun serveur à nous entre les deux, tout simplement parce que nous n’en avons aucun.
+
+PRIVÉE PAR CONCEPTION
+Aucune analyse. Aucune publicité. Aucun code tiers, de quelque nature que ce soit. L’app n’effectue aucune requête réseau de son propre chef. Les secrets sont scellés par chiffrement ChaChaPoly avant d’être écrits où que ce soit, et ne sont jamais journalisés. Activez le verrouillage de l’app : Face ID, Touch ID ou votre code sera demandé avant d’afficher les codes, et avant que le remplissage automatique, Raccourcis ou la commande n’en fournissent un.
+
+CONÇUE POUR LA PLATEFORME
+Entièrement construite avec les frameworks d’Apple et le tout dernier langage de design. Elle s’adapte à toutes les tailles, d’un iPhone étroit à un iPad en plein écran ou une fenêtre Mac redimensionnée, avec la prise en charge complète de Dynamic Type, des libellés VoiceOver et du mode sombre. Disponible en français, anglais, espagnol et allemand.
+
+L’app est open source sous licence MIT, vous pouvez donc vérifier chacune de ces affirmations dans le code : github.com/lucferbux/TOTP

@@ -14,7 +14,7 @@ final class TipJarUITests: XCTestCase {
     func testSettingsOpensSuggestionAndCoffee() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestMode", "-ScreenshotTips", "YES"]
+        app.launchArguments = ["-UITestMode", "-ScreenshotTips", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         app.buttons["settingsButton"].tap()

@@ -18,6 +18,9 @@ struct MenuBarView: View {
     /// The panel outlives its window: closing it only orders it out, so without this the rows
     /// would keep redrawing every second for as long as the app runs.
     @State private var isPanelVisible = true
+    /// The row Return copies, moved with ↑ and ↓ while typing in the search field.
+    @State private var highlightedID: UUID?
+    @FocusState private var searchFocused: Bool
 
     /// Height per account row, so the overall list height is deterministic.
     private let rowHeight: CGFloat = 52
@@ -47,7 +50,8 @@ struct MenuBarView: View {
                     MenuBarAccountRow(
                         account: account,
                         date: context.date,
-                        isCopied: copiedAccountId == account.id
+                        isCopied: copiedAccountId == account.id,
+                        isHighlighted: highlightedID == account.id
                     ) {
                         copyCode(for: account)
                     }
@@ -78,12 +82,10 @@ struct MenuBarView: View {
             if lock.isLocked {
                 lockedContent
             } else {
-                // Search field
-                if syncManager.accounts.count > 3 {
-                    TextField("Search accounts", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
+                // Search field: focused when the panel opens, so typing filters straight away;
+                // ↑/↓ pick a row, Return copies it, Esc clears.
+                if !syncManager.accounts.isEmpty {
+                    searchField
                 }
 
                 Divider()
@@ -140,6 +142,52 @@ struct MenuBarView: View {
 
     // MARK: - Subviews
 
+    private var searchField: some View {
+        TextField("Search accounts", text: $searchText)
+            .textFieldStyle(.roundedBorder)
+            .focused($searchFocused)
+            .onSubmit {
+                if let account = highlightedAccount {
+                    copyCode(for: account)
+                }
+            }
+            .onKeyPress(.downArrow) {
+                moveHighlight(by: 1)
+                return .handled
+            }
+            .onKeyPress(.upArrow) {
+                moveHighlight(by: -1)
+                return .handled
+            }
+            .onKeyPress(.escape) {
+                guard !searchText.isEmpty else { return .ignored }
+                searchText = ""
+                return .handled
+            }
+            .onChange(of: searchText) { _, _ in
+                highlightedID = filteredAccounts.first?.id
+            }
+            .onChange(of: isPanelVisible, initial: true) { _, visible in
+                guard visible else { return }
+                highlightedID = filteredAccounts.first?.id
+                searchFocused = true
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+    }
+
+    private var highlightedAccount: OtpModel? {
+        filteredAccounts.first { $0.id == highlightedID } ?? filteredAccounts.first
+    }
+
+    private func moveHighlight(by offset: Int) {
+        let accounts = filteredAccounts
+        guard !accounts.isEmpty else { return }
+        let current = accounts.firstIndex { $0.id == highlightedID } ?? -offset
+        let next = min(max(current + offset, 0), accounts.count - 1)
+        highlightedID = accounts[next].id
+    }
+
     private var lockedContent: some View {
         VStack(spacing: 10) {
             Divider()
@@ -150,6 +198,13 @@ struct MenuBarView: View {
             Text("Codes are locked")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if let message = lock.errorMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            }
             Button {
                 Task { await lock.unlock() }
             } label: {
@@ -171,9 +226,11 @@ struct MenuBarView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if syncManager.accounts.isEmpty {
-                Text("Open TOTP to add accounts")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Button("Add Account…") {
+                    MacOSAppSettings.shared.showMainWindow(openWindow: openWindow)
+                    AppRouter.shared.requestsNewAccount = true
+                }
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity)
@@ -193,7 +250,7 @@ struct MenuBarView: View {
             Label(title, systemImage: systemImage)
                 .font(.subheadline)
             Spacer()
-            Text("⌘\(String(shortcut).uppercased())")
+            Text(verbatim: "⌘\(String(shortcut).uppercased())")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -226,6 +283,7 @@ struct MenuBarAccountRow: View {
     let account: OtpModel
     let date: Date
     let isCopied: Bool
+    var isHighlighted = false
     let onTap: () -> Void
 
     @State private var isHovered = false
@@ -249,6 +307,7 @@ struct MenuBarAccountRow: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .help("A fixed prefix is added before the code when copying")
+                                .accessibilityLabel("PIN")
                         }
                     }
                     if let subtitle = account.displaySubtitle {
@@ -277,7 +336,7 @@ struct MenuBarAccountRow: View {
             .padding(.vertical, 8)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.15) : .clear)
+                    .fill(isHovered || isHighlighted ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.15) : .clear)
             }
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
@@ -288,8 +347,21 @@ struct MenuBarAccountRow: View {
                 isHovered = hovering
             }
         }
-        .accessibilityLabel("\(account.displayTitle), \(code)")
+        .accessibilityLabel(accessibilityLabel(code: code))
         .accessibilityHint("Copies the code")
+    }
+
+    /// Digits read one by one, plus the time left and whether a PIN is added.
+    private func accessibilityLabel(code: String) -> String {
+        var parts = [account.displayTitle]
+        if let subtitle = account.displaySubtitle { parts.append(subtitle) }
+        parts.append(code.map(String.init).joined(separator: " "))
+        if !account.entry.isHotp {
+            parts.append(String(localized: "\(account.entry.secondsRemaining(at: date)) seconds left"))
+        }
+        if account.hasPrefix { parts.append(String(localized: "Includes PIN")) }
+        if isCopied { parts.append(String(localized: "Copied")) }
+        return parts.joined(separator: ", ")
     }
 }
 #endif

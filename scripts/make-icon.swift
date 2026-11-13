@@ -1,78 +1,65 @@
 #!/usr/bin/env swift
-// Draws the app icon: a shield holding the countdown ring that every code runs against.
-// Usage: swift scripts/make-icon.swift TOTP/Assets.xcassets/AppIcon.appiconset
+// Draws the app icon: the countdown ring every code runs against, three quarters of the way round.
+// Usage: swift scripts/make-icon.swift TOTP/Assets.xcassets/AppIcon.appiconset \
+//            ["TOTP Watch/Assets.xcassets/AppIcon.appiconset"]
+// The optional second directory gets the Apple Watch icon: one 1024 px universal watchOS image,
+// full bleed and opaque (watchOS masks it to a circle).
 import AppKit
 import CoreGraphics
 
 let size: CGFloat = 1024
 let outputDirectory = URL(filePath: CommandLine.arguments[1], directoryHint: .isDirectory)
+let watchDirectory = CommandLine.arguments.count > 2
+    ? URL(filePath: CommandLine.arguments[2], directoryHint: .isDirectory)
+    : nil
 
 func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
     CGColor(srgbRed: r, green: g, blue: b, alpha: a)
 }
 
-/// The shield, softened with a stroke so its points read as rounded at small sizes.
-func shield() -> CGPath {
-    func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: 512 + x, y: 512 + y) }
-    let path = CGMutablePath()
-    path.move(to: point(0, 320))
-    path.addCurve(to: point(272, 218), control1: point(84, 268), control2: point(178, 226))
-    path.addCurve(to: point(0, -330), control1: point(272, -56), control2: point(160, -244))
-    path.addCurve(to: point(-272, 218), control1: point(-160, -244), control2: point(-272, -56))
-    path.addCurve(to: point(0, 320), control1: point(-178, 226), control2: point(-84, 268))
-    path.closeSubpath()
-    return path
-}
-
-func gradient(_ context: CGContext, top: CGColor, bottom: CGColor) {
-    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [top, bottom] as CFArray, locations: [0, 1])!
+func gradient(_ context: CGContext, _ colors: [CGColor], locations: [CGFloat]) {
+    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors as CFArray, locations: locations)!
     context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: size), end: .zero, options: [])
 }
 
-func drawShield(_ context: CGContext, top: CGColor, bottom: CGColor) {
-    let path = shield()
-    context.saveGState()
-    context.addPath(path)
-    context.addPath(path.copy(strokingWithWidth: 36, lineCap: .round, lineJoin: .round, miterLimit: 1))
-    context.clip()
-    gradient(context, top: top, bottom: bottom)
-    context.restoreGState()
+/// The countdown ring: a thick arc from twelve o'clock, clockwise, with round caps. Angles are
+/// in clock terms (0 = twelve, clockwise).
+func ring(sweep: CGFloat) -> CGPath {
+    let path = CGMutablePath()
+    path.addArc(center: CGPoint(x: 512, y: 512), radius: 300, startAngle: .pi / 2, endAngle: .pi / 2 - sweep, clockwise: true)
+    return path.copy(strokingWithWidth: 132, lineCap: .round, lineJoin: .round, miterLimit: 1)
 }
 
-/// Three quarters of a turn from twelve o'clock: a code with time left on it.
-func drawRing(_ context: CGContext, color ringColor: CGColor) {
-    context.saveGState()
-    context.setStrokeColor(ringColor)
-    context.setLineWidth(58)
-    context.setLineCap(.round)
-    context.addArc(center: CGPoint(x: 512, y: 538), radius: 124, startAngle: .pi / 2, endAngle: .pi, clockwise: true)
-    context.strokePath()
-    context.restoreGState()
+/// The full track, faint, then three quarters of it: a code with time left on it.
+func drawRing(_ context: CGContext, track: CGColor, arc: CGColor) {
+    context.addPath(ring(sweep: 2 * .pi))
+    context.setFillColor(track)
+    context.fillPath()
+    context.addPath(ring(sweep: .pi * 1.5))
+    context.setFillColor(arc)
+    context.fillPath()
 }
 
 func drawLight(_ context: CGContext) {
-    gradient(context, top: color(0.12, 0.53, 0.96), bottom: color(0.01, 0.22, 0.58))
-    drawShield(context, top: color(1, 1, 1), bottom: color(0.93, 0.96, 1))
-    drawRing(context, color: color(0.05, 0.36, 0.80))
+    gradient(context, [color(0.31, 0.55, 1.0), color(0.15, 0.34, 0.91), color(0.06, 0.16, 0.61)], locations: [0, 0.5, 1])
+    drawRing(context, track: color(1, 1, 1, 0.18), arc: color(1, 1, 1))
 }
 
 func drawDark(_ context: CGContext) {
-    gradient(context, top: color(0.03, 0.10, 0.26), bottom: color(0.02, 0.05, 0.14))
-    drawShield(context, top: color(0.20, 0.62, 1.0), bottom: color(0.03, 0.30, 0.74))
-    drawRing(context, color: color(1, 1, 1))
+    gradient(context, [color(0.06, 0.10, 0.26), color(0.02, 0.04, 0.12)], locations: [0, 1])
+    drawRing(context, track: color(0.31, 0.55, 1.0, 0.18), arc: color(0.36, 0.60, 1.0))
 }
 
 /// Tinted icons are greyscale: iOS applies the user's tint to the luminance.
 func drawTinted(_ context: CGContext) {
     context.setFillColor(color(0, 0, 0))
     context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-    drawShield(context, top: color(1, 1, 1), bottom: color(0.62, 0.62, 0.62))
-    drawRing(context, color: color(0, 0, 0))
+    drawRing(context, track: color(1, 1, 1, 0.22), arc: color(1, 1, 1))
 }
 
-func write(_ image: CGImage, _ name: String) throws {
+func write(_ image: CGImage, _ name: String, in directory: URL = outputDirectory) throws {
     let bitmap = NSBitmapImageRep(cgImage: image)
-    try bitmap.representation(using: .png, properties: [:])!.write(to: outputDirectory.appending(path: name))
+    try bitmap.representation(using: .png, properties: [:])!.write(to: directory.appending(path: name))
 }
 
 func makeImage(pixels: Int, opaque: Bool, draw: (CGContext) -> Void) -> CGImage {
@@ -105,4 +92,27 @@ try write(makeImage(pixels: 1024, opaque: true, draw: drawTinted), "icon-tinted.
 
 for pixels in [16, 32, 64, 128, 256, 512, 1024] {
     try write(makeImage(pixels: pixels, opaque: false) { drawMac($0, pixels: pixels, artwork: light) }, "mac-\(pixels).png")
+}
+
+if let watchDirectory {
+    try FileManager.default.createDirectory(at: watchDirectory, withIntermediateDirectories: true)
+    try write(light, "watch-1024.png", in: watchDirectory)
+    let contents = """
+    {
+      "images" : [
+        {
+          "filename" : "watch-1024.png",
+          "idiom" : "universal",
+          "platform" : "watchos",
+          "size" : "1024x1024"
+        }
+      ],
+      "info" : {
+        "author" : "xcode",
+        "version" : 1
+      }
+    }
+
+    """
+    try contents.write(to: watchDirectory.appending(path: "Contents.json"), atomically: true, encoding: .utf8)
 }

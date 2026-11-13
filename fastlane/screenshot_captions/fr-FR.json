@@ -1,0 +1,14 @@
+{
+  "01-codes":      { "title": "Vos codes en un coup d’œil",   "subtitle": "Codes TOTP et HOTP en direct, chacun avec son compte à rebours.", "style": "light" },
+  "02-copied":     { "title": "Touchez, c’est copié",         "subtitle": "Le code part dans le presse-papiers, puis s’efface tout seul.",   "style": "light" },
+  "03-select":     { "title": "Faites le tri d’un geste",     "subtitle": "Sélectionnez plusieurs comptes et supprimez-les d’un coup.",      "style": "light" },
+  "04-add":        { "title": "Scannez, collez, c’est fait",  "subtitle": "Ajoutez un compte par code\u00a0QR ou lien otpauth://.",               "style": "light" },
+  "05-settings":   { "title": "Protégé et synchronisé",       "subtitle": "Face ID, synchro iCloud chiffrée avec votre clé, remplissage auto.", "style": "light" },
+  "06-dark":       { "title": "Superbe en mode sombre",       "subtitle": "Sans pub ni pistage. Jamais.",                                    "style": "dark" },
+  "mac:01-codes":  { "title": "Tous vos codes sur Mac",       "subtitle": "Les mêmes comptes, synchronisés via iCloud et chiffrés de bout en bout.", "style": "light" },
+  "mac:02-select": { "title": "Faites le tri d’un geste",     "subtitle": "Sélectionnez plusieurs comptes et supprimez-les d’un coup.",      "style": "light" },
+  "mac:03-add":    { "title": "Ajoutez un compte en un clin d’œil", "subtitle": "Choisissez l’image d’un code\u00a0QR ou collez un lien otpauth://.", "style": "light" },
+  "mac:04-menubar":{ "title": "Vos codes dans la barre des menus", "subtitle": "À un clic, sans ouvrir de fenêtre.",                           "style": "dark" },
+  "watch:01-codes":{ "title": "Vos codes au poignet",         "subtitle": "Toujours à portée de regard.",                                    "style": "dark" },
+  "watch:02-detail":{ "title": "Un regard suffit",            "subtitle": "Grands chiffres, compte à rebours clair.",                        "style": "dark" }
+}

@@ -97,7 +97,7 @@ This document tracks planned features, enhancements, and future improvements for
 #### Widget Improvements
 - [ ] **Multi-Account Widget** - Show multiple codes
 - [x] **Lock Screen Widget** - iOS 16+ lock screen support (4.0)
-- [ ] **Watch App** - Apple Watch companion
+- [x] **Watch App** - Apple Watch codes + complication, synced from the iPhone (4.6)
 - [ ] **Widget Tap to Copy** - Direct copy without app launch
 
 ### P2 - Medium Priority
@@ -138,7 +138,7 @@ This document tracks planned features, enhancements, and future improvements for
 
 #### Community
 - [ ] **Open Source Components** - OSS the OTP library
-- [ ] **Localization** - Multi-language support
+- [x] **Localization** - English, Spanish, German and French (4.6)
 - [ ] **Themes** - Custom color themes
 - [ ] **Icon Packs** - Third-party icon packs
 
@@ -170,7 +170,7 @@ This document tracks planned features, enhancements, and future improvements for
 |---------|-------|--------|
 | QR Code Scanning | ⭐⭐⭐⭐⭐ | In Progress |
 | Biometric Lock | ⭐⭐⭐⭐ | Planned P0 |
-| Apple Watch App | ⭐⭐⭐ | Planned P1 |
+| Apple Watch App | ⭐⭐⭐ | Shipped in 4.6 |
 | Import from Authy | ⭐⭐ | Backlog |
 | Desktop Widget | ⭐⭐ | Backlog |
 

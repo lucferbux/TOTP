@@ -12,6 +12,8 @@
 		1F9FFEA02D77757700D81249 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFE9F2D77757700D81249 /* WidgetKit.framework */; };
 		1F9FFEA22D77757700D81249 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9FFEA12D77757700D81249 /* SwiftUI.framework */; };
 		1F9FFEB32D77757800D81249 /* TOTP WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB0000152F90000000000001 /* TOTP Watch Widget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB0000022F90000000000001 /* TOTP Watch Widget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB0000312F90000000000001 /* TOTP Watch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB0000012F90000000000001 /* TOTP Watch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +45,20 @@
 			remoteGlobalIDString = 1F9FFE9C2D77757700D81249;
 			remoteInfo = "TOTP WidgetExtension";
 		};
+		BB0000162F90000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F9FFE4D2D77729500D81249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BB0000202F90000000000001;
+			remoteInfo = "TOTP Watch Widget";
+		};
+		BB0000322F90000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F9FFE4D2D77729500D81249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BB0000102F90000000000001;
+			remoteInfo = "TOTP Watch";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -58,6 +74,28 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB0000142F90000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BB0000152F90000000000001 /* TOTP Watch Widget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000302F90000000000001 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				BB0000312F90000000000001 /* TOTP Watch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +108,8 @@
 		1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "TOTP WidgetExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F9FFE9F2D77757700D81249 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		1F9FFEA12D77757700D81249 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		BB0000012F90000000000001 /* TOTP Watch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TOTP Watch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000022F90000000000001 /* TOTP Watch Widget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "TOTP Watch Widget.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,6 +133,29 @@
 				Info.plist,
 			);
 			target = 1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */;
+		};
+		BB0000082F90000000000001 /* Exceptions for "TOTP Watch Widget" folder in "TOTP Watch Widget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BB0000202F90000000000001 /* TOTP Watch Widget */;
+		};
+		BB0000062F90000000000001 /* Exceptions for "Shared" folder in "TOTP Watch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Model/EncryptionKeyManager.swift,
+				Platform/ClipboardManager.swift,
+			);
+			target = BB0000102F90000000000001 /* TOTP Watch */;
+		};
+		BB0000072F90000000000001 /* Exceptions for "Shared" folder in "TOTP Watch Widget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Model/EncryptionKeyManager.swift,
+				Platform/ClipboardManager.swift,
+			);
+			target = BB0000202F90000000000001 /* TOTP Watch Widget */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -133,12 +196,34 @@
 		};
 		AA0000012F80000000000001 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BB0000062F90000000000001 /* Exceptions for "Shared" folder in "TOTP Watch" target */,
+				BB0000072F90000000000001 /* Exceptions for "Shared" folder in "TOTP Watch Widget" target */,
+			);
 			path = Shared;
 			sourceTree = "<group>";
 		};
 		AA0000022F80000000000001 /* SharedIntents */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SharedIntents;
+			sourceTree = "<group>";
+		};
+		BB0000032F90000000000001 /* TOTP Watch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "TOTP Watch";
+			sourceTree = "<group>";
+		};
+		BB0000042F90000000000001 /* TOTP Watch Widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BB0000082F90000000000001 /* Exceptions for "TOTP Watch Widget" folder in "TOTP Watch Widget" target */,
+			);
+			path = "TOTP Watch Widget";
+			sourceTree = "<group>";
+		};
+		BB0000052F90000000000001 /* Watch Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Watch Shared";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -182,6 +267,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB0000122F90000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000222F90000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -196,6 +295,9 @@
 				1F9FFE732D77729700D81249 /* TOTPUITests */,
 				1F9FFEA32D77757700D81249 /* TOTP Widget */,
 				1F2B6E002F00232D004402DE /* TOTP Autofill */,
+				BB0000032F90000000000001 /* TOTP Watch */,
+				BB0000042F90000000000001 /* TOTP Watch Widget */,
+				BB0000052F90000000000001 /* Watch Shared */,
 				1F9FFE9E2D77757700D81249 /* Frameworks */,
 				1F9FFE562D77729500D81249 /* Products */,
 			);
@@ -209,6 +311,8 @@
 				1F9FFE702D77729700D81249 /* TOTPUITests.xctest */,
 				1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */,
 				1F2B6DFD2F00232D004402DE /* TOTP Autofill.appex */,
+				BB0000012F90000000000001 /* TOTP Watch.app */,
+				BB0000022F90000000000001 /* TOTP Watch Widget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -257,12 +361,14 @@
 				1F9FFE522D77729500D81249 /* Frameworks */,
 				1F9FFE532D77729500D81249 /* Resources */,
 				1F9FFEB82D77757800D81249 /* Embed Foundation Extensions */,
+				BB0000302F90000000000001 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				1F9FFEB22D77757800D81249 /* PBXTargetDependency */,
 				1F2B6E092F00232D004402DE /* PBXTargetDependency */,
+				BB0000332F90000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1F9FFE572D77729500D81249 /* TOTP */,
@@ -346,6 +452,56 @@
 			productReference = 1F9FFE9D2D77757700D81249 /* TOTP WidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BB0000102F90000000000001 /* TOTP Watch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000182F90000000000001 /* Build configuration list for PBXNativeTarget "TOTP Watch" */;
+			buildPhases = (
+				BB0000112F90000000000001 /* Sources */,
+				BB0000122F90000000000001 /* Frameworks */,
+				BB0000132F90000000000001 /* Resources */,
+				BB0000142F90000000000001 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BB0000172F90000000000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BB0000032F90000000000001 /* TOTP Watch */,
+				BB0000052F90000000000001 /* Watch Shared */,
+				AA0000012F80000000000001 /* Shared */,
+			);
+			name = "TOTP Watch";
+			packageProductDependencies = (
+			);
+			productName = "TOTP Watch";
+			productReference = BB0000012F90000000000001 /* TOTP Watch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BB0000202F90000000000001 /* TOTP Watch Widget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000282F90000000000001 /* Build configuration list for PBXNativeTarget "TOTP Watch Widget" */;
+			buildPhases = (
+				BB0000212F90000000000001 /* Sources */,
+				BB0000222F90000000000001 /* Frameworks */,
+				BB0000232F90000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BB0000042F90000000000001 /* TOTP Watch Widget */,
+				BB0000052F90000000000001 /* Watch Shared */,
+				AA0000012F80000000000001 /* Shared */,
+			);
+			name = "TOTP Watch Widget";
+			packageProductDependencies = (
+			);
+			productName = "TOTP Watch Widget";
+			productReference = BB0000022F90000000000001 /* TOTP Watch Widget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -373,6 +529,12 @@
 					1F9FFE9C2D77757700D81249 = {
 						CreatedOnToolsVersion = 16.2;
 					};
+					BB0000102F90000000000001 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					BB0000202F90000000000001 = {
+						CreatedOnToolsVersion = 27.2;
+					};
 				};
 			};
 			buildConfigurationList = 1F9FFE502D77729500D81249 /* Build configuration list for PBXProject "TOTP" */;
@@ -381,6 +543,9 @@
 			knownRegions = (
 				en,
 				Base,
+				es,
+				de,
+				fr,
 			);
 			mainGroup = 1F9FFE4C2D77729500D81249;
 			minimizedProjectReferenceProxies = 1;
@@ -394,6 +559,8 @@
 				1F9FFE6F2D77729700D81249 /* TOTPUITests */,
 				1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */,
 				1F2B6DFC2F00232D004402DE /* TOTP Autofill */,
+				BB0000102F90000000000001 /* TOTP Watch */,
+				BB0000202F90000000000001 /* TOTP Watch Widget */,
 			);
 		};
 /* End PBXProject section */
@@ -428,6 +595,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		1F9FFE9B2D77757700D81249 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000132F90000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000232F90000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -472,6 +653,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB0000112F90000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000212F90000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -495,6 +690,17 @@
 			target = 1F9FFE9C2D77757700D81249 /* TOTP WidgetExtension */;
 			targetProxy = 1F9FFEB12D77757800D81249 /* PBXContainerItemProxy */;
 		};
+		BB0000172F90000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BB0000202F90000000000001 /* TOTP Watch Widget */;
+			targetProxy = BB0000162F90000000000001 /* PBXContainerItemProxy */;
+		};
+		BB0000332F90000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = BB0000102F90000000000001 /* TOTP Watch */;
+			targetProxy = BB0000322F90000000000001 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -503,7 +709,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = "TOTP Autofill/TOTP_Autofill.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TOTP Autofill/Info.plist";
@@ -522,7 +728,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Autofill";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -543,7 +749,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = "TOTP Autofill/TOTP_Autofill.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TOTP Autofill/Info.plist";
@@ -562,7 +768,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Autofill";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -706,7 +912,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TOTP/TOTP.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"TOTP/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
@@ -735,7 +941,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -755,7 +961,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TOTP/TOTP.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"TOTP/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
@@ -784,7 +990,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -894,7 +1100,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "TOTP WidgetExtension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TOTP Widget/Info.plist";
@@ -912,7 +1118,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -933,7 +1139,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "TOTP WidgetExtension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TOTP Widget/Info.plist";
@@ -951,7 +1157,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 4.5;
+				MARKETING_VERSION = 4.6;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.lucferbux.TOTP.TOTP-Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -963,6 +1169,144 @@
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				VALIDATE_PRODUCT = YES;
 				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		BB0000192F90000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "TOTP Watch/TOTP_Watch.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TOTP;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lucas Fernández Aragón";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.lucferbux.TOTP;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 4.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		BB00001A2F90000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "TOTP Watch/TOTP_Watch.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TOTP;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lucas Fernández Aragón";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.lucferbux.TOTP;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 4.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		BB0000292F90000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "TOTP Watch Widget/TOTP_Watch_Widget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TOTP Watch Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TOTP Watch Widget";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lucas Fernández Aragón";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 4.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP.watchkitapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		BB00002A2F90000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "TOTP Watch Widget/TOTP_Watch_Widget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TOTP Watch Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TOTP Watch Widget";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lucas Fernández Aragón";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 4.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lucferbux.TOTP.watchkitapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -1019,6 +1363,24 @@
 			buildConfigurations = (
 				1F9FFEB62D77757800D81249 /* Debug */,
 				1F9FFEB72D77757800D81249 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB0000182F90000000000001 /* Build configuration list for PBXNativeTarget "TOTP Watch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000192F90000000000001 /* Debug */,
+				BB00001A2F90000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB0000282F90000000000001 /* Build configuration list for PBXNativeTarget "TOTP Watch Widget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000292F90000000000001 /* Debug */,
+				BB00002A2F90000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

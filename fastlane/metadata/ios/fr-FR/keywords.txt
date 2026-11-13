@@ -1,0 +1,1 @@
+authentificateur,double authentification,otp,mfa,sécurité,vérification,connexion,mot de passe

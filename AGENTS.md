@@ -8,24 +8,26 @@ Guide for AI coding agents working in this repository. Claude Code additionally 
 
 **TOTP Password** — a native SwiftUI authenticator (RFC 4226 HOTP / RFC 6238 TOTP) shipping
 from one codebase to iPhone, iPad and Mac (Universal Purchase), with iCloud/CloudKit sync, widgets
-and a Control, an AutoFill credential provider, Siri/Shortcuts/Spotlight intents, and a macOS menu
-bar mode. **No third-party dependencies — 100% Apple frameworks.**
+and a Control, an AutoFill credential provider, Siri/Shortcuts/Spotlight intents, a macOS menu
+bar mode, and a read-only Apple Watch app with a complication (embedded in the iOS app). **No third-party dependencies — 100% Apple frameworks.**
 
 A distinguishing feature: each account may carry a **fixed prefix (PIN)** that is prepended to the
 generated code everywhere it is copied or filled. Never break, log or display that value.
 
 - Swift 5 language mode, SwiftUI, Liquid Glass design
-- Minimum OS: **iOS/iPadOS 27, macOS 27, visionOS 27**; build with **Xcode 27+**
+- Minimum OS: **iOS/iPadOS 27, macOS 27, watchOS 27, visionOS 27**; build with **Xcode 27+**
 - Crypto: CryptoKit (HMAC SHA-1/256/512, `ChaChaPoly` at rest)
 
 ## Build, run, test
 
-`TOTP.xcodeproj` — no workspace, no SPM, no CocoaPods. Scheme: `TOTP`.
+`TOTP.xcodeproj` — no workspace, no SPM, no CocoaPods. Schemes: `TOTP` (its iOS build also builds
+and embeds the watch app in `TOTP.app/Watch/`) and `TOTP Watch`.
 
 ```bash
 # Build (pick a live device: xcrun simctl list devices available)
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 xcodebuild build -project TOTP.xcodeproj -scheme TOTP -destination 'platform=macOS'
+xcodebuild build -project TOTP.xcodeproj -scheme "TOTP Watch" -destination 'platform=watchOS Simulator,name=Apple Watch Ultra 4 (49mm)'
 
 # Tests (Swift Testing + XCUITest)
 xcodebuild test -project TOTP.xcodeproj -scheme TOTP -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
@@ -43,18 +45,24 @@ xcodebuild test ... -only-testing:TOTPUITests        # UI only
 ## Layout
 
 ```
-Shared/            Compiled into app + widget + AutoFill: OTP math, OtpModel, encrypted
-                   AccountStore, EncryptionKeyManager, Base32, otpauth:// parser, ClipboardManager
+Shared/            Compiled into app + widget + AutoFill + watch targets: OTP math, OtpModel, encrypted
+                   AccountStore, EncryptionKeyManager, Base32, otpauth:// parser, ClipboardManager,
+                   WatchPayload, SampleAccounts (watch targets exclude EncryptionKeyManager/ClipboardManager)
 SharedIntents/     App + widget: AccountEntity, Get/Copy Code intents
-TOTP/              App: views, SyncManager, CloudKit, AppLockManager, Siri phrases
+TOTP/              App: views, SyncManager, CloudKit, AppLockManager, Siri phrases, WatchSyncManager (iOS)
 TOTP Widget/       Widgets (home + Lock Screen) and the Control Center control
 TOTP AutoFill/     Credential provider extension (iOS + macOS)
+TOTP Watch/        watchOS app (read-only list + large code)   TOTP Watch Widget/  complication
+Watch Shared/      Both watch targets: WatchKeyStore (watch-only device key)
 TOTPTests/         Swift Testing unit tests    TOTPUITests/  XCUITest
 ```
 
 Identifiers that must stay in sync across targets, entitlements and `pbxproj`:
 App Group `group.com.lucferbux.TOTP`, Keychain group `$(AppIdentifierPrefix)com.lucferbux.TOTP`,
-iCloud container `iCloud.com.lucferbux.TOTP`.
+iCloud container `iCloud.com.lucferbux.TOTP`, encryption-key Keychain service `TOTP-Shared-Encryption`
+(`TOTP-SharedData-Encryption` / `TOTP-CloudKit-Encryption` are legacy, read only). Watch: bundle ids
+`com.lucferbux.TOTP.watchkitapp` (+ `.widget`), Keychain group
+`$(AppIdentifierPrefix)com.lucferbux.TOTP.watchkitapp`, service `TOTP-Watch-Encryption`.
 
 ## Rules
 
@@ -71,10 +79,17 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
    A key is minted only when every source is positively absent — an unreadable source is not absent —
    and only to seal something (`primaryKey`); reading (`allKeys`) never mints. Never discard a key
    (replaced ones go to the retired-keys file) and never drop records you can't decrypt.
-   Each iCloud Keychain key is its own item (added, never updated or deleted); the oldest by name
-   is primary everywhere. AutoFill authenticates before drawing its list; widgets show a locked
-   state while the app lock is on; HOTP never leaves the app (no widget, intent, control or AutoFill).
+   Each iCloud Keychain key is its own item (only ever added — no `SecItemUpdate`, no delete); the
+   oldest by name is primary everywhere. AutoFill authenticates before drawing its list; widgets show
+   a locked state while the app lock is on; HOTP never leaves the app (no widget, intent, control,
+   AutoFill or watch).
    Sync is last-write-wins per account on `modifiedDate`, which only an edit or an HOTP use changes.
+   **Apple Watch**: the iPhone (`WatchSyncManager`, WatchConnectivity application context) sends
+   TOTP accounts only, with just issuer, name, secret, digits, period, algorithm and order — never the
+   prefix, associated domains or HOTP — and with the app lock on, no accounts at all (the watch shows
+   "Locked on iPhone"). The watch seals them with its **own** non-synchronizable
+   `AfterFirstUnlockThisDeviceOnly` Keychain key (`WatchKeyStore`); `EncryptionKeyManager` is not
+   compiled into the watch targets. Only the watch app creates that key; the complication only reads it.
 
 **Correctness**
 6. Codes are zero-padded `String`s. Never format a code from an integer — leading zeros matter,
@@ -95,7 +110,7 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 13. Adapt with **size classes only** — never device idiom, orientation or screen size (iPhone Duo:
     outer display compact, inner display regular and it ignores orientation locks).
 14. Regular width (iPad, iPhone Duo open, Mac): add, then Select Accounts in the system
-    `ToolbarOverflowMenu` on iOS (our own ellipsis `Menu` on macOS). Every toolbar item has a title
+    `ToolbarOverflowMenu` on iOS (a plain Select Accounts button on macOS). Every toolbar item has a title
     **and** a symbol — iPhone Duo moves bars to the side, and a title-only item can't go there.
     The grid keeps an even column count on a display that folds and keeps cards off the fold
     (`AccountGridLayout`). iOS 27.1 ships only on iPhone Duo, so the deployment target stays 27.0
@@ -127,7 +142,15 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 23. The website is `site/`, published by GitHub Actions. Never point Pages at `docs/`.
 24. Screenshots come from `scripts/export-screenshots.sh`. The Mac shots are driven by
     `-ScreenshotMode -ScreenshotScene <name>` (debug-only launch arguments) rather than UI
-    automation, which would need Accessibility permission.
+    automation, which would need Accessibility permission. The watch app takes the same arguments
+    (`-ScreenshotScene detail`); its seeds come from `SampleAccounts` in `Shared/`. Raw captures go
+    to `fastlane/screenshots_raw/<locale>/`; `scripts/frame-screenshots.swift` turns them into the
+    framed App Store images (captions in `fastlane/screenshot_captions/<locale>.json`).
+24b. The app is localized in en, es, de and fr with one String Catalog per target folder, never in
+    `Shared/`. UI text that travels as a `String` uses `String(localized:)`; counts use catalog
+    plurals; non-text uses `Text(verbatim:)`. Functional UI tests pin `-AppleLanguages (en)`.
+24c. Mac menus live in `AccountCommands` and act on the focused window through `FocusedValues`
+    (`addAccountAction`, `mainWindowActions`). Mac Settings is a `TabView` of `Form` panes.
 
 **Workflow**
 25. Conventional Commits: `type(scope): subject` with
@@ -139,5 +162,6 @@ iCloud container `iCloud.com.lucferbux.TOTP`.
 
 ## Release
 
-Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` for the app, widget and AutoFill targets
-together, then archive and upload. See `.claude/skills/release-totp/SKILL.md` for the exact commands.
+Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` for the app, widget, AutoFill, watch app and
+watch widget targets together (10 occurrences each), then archive and upload; the iOS archive must
+contain `TOTP.app/Watch/TOTP Watch.app`. See `.claude/skills/release-totp/SKILL.md` for the exact commands.

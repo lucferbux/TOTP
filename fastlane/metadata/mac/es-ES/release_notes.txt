@@ -1,0 +1,13 @@
+Una app de Mac más completa, ahora en español, alemán y francés.
+
+• Nuevo menú Cuentas: Sincronizar ahora (⌘R) y copia el código de cualquiera de tus nueve primeras cuentas con ⌘1 a ⌘9.
+• Seleccionar cuentas y Eliminar cuentas seleccionadas (⌘⌫) están en el menú Edición. Esc sale de la selección.
+• Añade una cuenta eligiendo un archivo de imagen con un código QR o arrastrándolo a la ventana.
+• Los Ajustes se organizan ahora en pestañas: General, Seguridad, iCloud, Autorrelleno y Acerca de.
+• La barra de título muestra el estado de la sincronización, y las tarjetas se resaltan al pasar el puntero por encima.
+• En el panel de la barra de menús, la búsqueda está lista nada más abrirlo: ↑ y ↓ eligen una cuenta y Retorno copia su código.
+• Elimina una cuenta directamente desde su hoja de edición.
+• Los widgets del Mac ahora dicen «Haz clic para copiar».
+• El menú Ayuda enlaza con el soporte de TOTP y con el envío de sugerencias.
+• La app ya está disponible en español, alemán y francés, además de en inglés.
+• En el iPhone, una nueva app para el Apple Watch te pone los códigos en la muñeca.

@@ -1,0 +1,1 @@
+authenticator,2fa,otp,mfa,authentifizierung,bestätigungscode,sicherheit,anmeldung,passwort,offline

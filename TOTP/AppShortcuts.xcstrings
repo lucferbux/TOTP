@@ -1,0 +1,90 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Copy my ${applicationName} code for ${account}" : {
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Meinen ${applicationName}-Code für ${account} kopieren",
+              "Code für ${account} mit ${applicationName} kopieren",
+              "Meinen ${applicationName}-Code kopieren"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Copy my ${applicationName} code for ${account}",
+              "Copy ${account} code with ${applicationName}",
+              "Copy my ${applicationName} code"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Copiar mi código de ${applicationName} para ${account}",
+              "Copiar el código de ${account} con ${applicationName}",
+              "Copiar mi código de ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Copier mon code ${applicationName} pour ${account}",
+              "Copier le code de ${account} avec ${applicationName}",
+              "Copier mon code ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Get my ${applicationName} code for ${account}" : {
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Meinen ${applicationName}-Code für ${account} abrufen",
+              "Code für ${account} aus ${applicationName} abrufen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Get my ${applicationName} code for ${account}",
+              "Get ${account} code from ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Obtener mi código de ${applicationName} para ${account}",
+              "Obtener el código de ${account} de ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Obtenir mon code ${applicationName} pour ${account}",
+              "Obtenir le code de ${account} depuis ${applicationName}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
