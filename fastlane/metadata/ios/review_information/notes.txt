@@ -17,10 +17,12 @@ d) Select (top right) enters multi-select for batch deletion.
 e) AutoFill must be enabled once by the user: iOS Settings > General > AutoFill & Passwords > enable "TOTP"; macOS System Settings > General > AutoFill & Passwords > enable "TOTP".
 f) Widgets: add "TOTP" from the widget gallery.
 g) Settings > Help Improve TOTP: "Send a Suggestion" opens a public GitHub page in the browser (the app sends nothing itself), and "Buy Me a Coffee" lists the three tips.
-(The app is listed on the App Store as "TOTP Password"; on the device its short name is "TOTP".)
 
 MAC APP
 Opening the Mac app shows its main window. It also lives in the menu bar: the shield icon at the top right of the screen lists every code, and "Open TOTP" (Cmd+O) there brings the window back after it is closed. Closing the window keeps the app running in the menu bar; the Dock icon shows while the window is open and can be kept permanently in Settings (Cmd+,). The window stays hidden at launch only if the user turns on "Launch at login".
+
+APPLE WATCH (new in 4.6)
+The watch app is read-only and installs with the iPhone app. Open TOTP on the paired iPhone after adding the test account above: its code appears on the watch, with a countdown, and can be added to a watch face as a complication. Only time-based (TOTP) accounts are sent, never the PIN, and nothing is sent while the iPhone app lock is on (the watch then shows "Locked on iPhone"). The app is also now localized in Spanish, German and French.
 
 4. EXTERNAL SERVICES
 Only Apple's iCloud: a private CloudKit database in the user's own iCloud account for sync, and iCloud Keychain for the encryption key. Apple's In-App Purchase handles the optional tips. No servers of ours, no third-party SDKs, analytics, advertising, other payment processors or AI services. Codes are computed on device with CryptoKit.

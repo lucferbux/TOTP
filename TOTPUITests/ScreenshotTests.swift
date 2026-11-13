@@ -92,6 +92,7 @@ final class ScreenshotTests: XCTestCase {
         app.terminate()
         launch(scene: "select")
         XCTAssertTrue(app.buttons["doneSelectingButton"].waitForExistence(timeout: 10))
+        waitForFreshCodes()
         capture("03-select")
 
         // The list in Dark Mode (Apple recommends showing it)

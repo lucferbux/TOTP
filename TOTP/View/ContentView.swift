@@ -125,7 +125,7 @@ public struct ContentView: View {
         .onDeleteCommand { if isSelecting && !selection.isEmpty { confirmBatchDelete = true } }
         #endif
         #if DEBUG
-        .task { applyScreenshotScene() }
+        .task { await applyScreenshotScene() }
         #endif
         .sensoryFeedback(.success, trigger: copyCount)
         .sheet(item: $sheet) { sheet in
@@ -366,10 +366,12 @@ public struct ContentView: View {
     #if DEBUG
     /// Opens the state named by `-ScreenshotScene` so `scripts/export-screenshots.sh` can shoot the
     /// Mac listing without Accessibility permission. Debug-only: release builds ignore the argument.
-    private func applyScreenshotScene() {
+    private func applyScreenshotScene() async {
         switch AppEnvironment.screenshotScene {
         case "select":
             isSelecting = true
+            // Entering edit mode resets a List's selection, so tick the accounts once it has
+            try? await Task.sleep(for: .milliseconds(600))
             selection = Set(syncManager.accounts.prefix(3).map(\.id))
         case "add":
             sheet = .add(nil)

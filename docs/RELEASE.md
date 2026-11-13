@@ -106,7 +106,8 @@ once per shot with `-ScreenshotMode -ScreenshotScene <name>` (`select`, `add`, o
 plain list); `ContentView.applyScreenshotScene()` opens that state directly. Both flags are
 `#if DEBUG` only — a release build ignores them.
 
-The app sizes its own window to 1440×900 points, which captures at 2880×1800. AppKit can still
+The app sizes its own window to 1040×650 points (2080×1300 captured), which the framer scales onto
+the 2880×1800 canvas; a larger window leaves the cards tiny in a sea of white. AppKit can still
 move it (the menu bar clamps it, and `NSScreen.main` is the *focused* screen, not necessarily the
 one being captured), so the app writes the frame it actually ended up with to
 `~/Library/Group Containers/group.com.lucferbux.TOTP/screenshot-window-frame` and the script

@@ -5,7 +5,7 @@
 //   swift scripts/frame-screenshots.swift [--locales en-US,es-ES,de-DE,fr-FR] [--raw-locale en-US] [--only <prefix>]
 //
 // In:   fastlane/screenshots_raw/<locale>/<prefix>-<NN-scene>.png   (iphone-69, ipad-13, duo-outer, duo-inner, watch)
-//       fastlane/screenshots_mac_raw/<locale>/<NN-scene>.png          (2880x1800 window captures)
+//       fastlane/screenshots_mac_raw/<locale>/<NN-scene>.png          (window captures, scaled onto the 2880x1800 canvas)
 //       fastlane/screenshot_captions/<locale>.json                    {"01-codes": {"title", "subtitle", "style"}}
 // Out:  fastlane/screenshots/<locale>/…  and  fastlane/screenshots_mac/<locale>/…  (what fastlane deliver reads;
 //       it picks the display type by pixel size, so every canvas size below is exact)

@@ -142,7 +142,7 @@ PY
 
 # --- macOS -------------------------------------------------------------------------------------
 # No UI-test automation here (that needs Accessibility permission). Instead the app positions its
-# own window at 1440x900 points in -ScreenshotMode, which captures at 2880x1800 — an accepted size,
+# own window at 1040x650 points in -ScreenshotMode (2080x1300 captured; the framer scales it onto 2880x1800),
 # and -ScreenshotScene opens it directly in the state each shot needs.
 # Needs Screen Recording permission for whatever runs this script.
 MAC_APP=""
@@ -181,7 +181,7 @@ capture_mac() {
     rm -f "$out_mac"/*.png
 
     # One launch per shot: every screenshot in an App Store set must be the same size, so the
-    # window is always 1440x900 points and only its contents change.
+    # window is always 1040x650 points and only its contents change.
     shoot_mac() {
         local name="$1" scene="$2" file="$out_mac/$1.png" id size
         pkill -x TOTP 2>/dev/null || true
@@ -202,11 +202,12 @@ capture_mac() {
         sips -s format jpeg -s formatOptions best "$file" --out "$TMP/flat.jpg" >/dev/null
         sips -s format png "$TMP/flat.jpg" --out "$file" >/dev/null
         size=$(sips -g pixelWidth -g pixelHeight "$file" | awk '/pixel/{printf "%s ", $2}')
-        if [ "$size" = "2880 1800 " ]; then
+        # Only the width is fixed: a sheet can make SwiftUI grow the window a little, and the framer scales it anyway.
+        if [ "${size%% *}" = "2080" ]; then
             printf '   %-34s %s\n' "$file" "$size"
         else
             rm -f "$file"
-            echo "   $name capture FAILED — window is $size, expected 2880 1800"
+            echo "   $name capture FAILED — window is $size, expected 2080 wide"
         fi
     }
 

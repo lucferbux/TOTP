@@ -195,8 +195,8 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
 
     #if DEBUG
     /// Puts the window at a known place and size so `scripts/export-screenshots.sh` can capture it
-    /// without needing Accessibility permission. 1440x900 points captures at 2880x1800 — an
-    /// App Store–accepted Mac size.
+    /// without needing Accessibility permission. 1040x650 points (2080x1300 captured) fills the
+    /// window with three columns of cards; the framer scales it onto the 2880x1800 App Store canvas.
     private func positionWindowForScreenshotsIfNeeded() {
         guard AppEnvironment.isTakingScreenshots else { return }
         // Always the primary (menu bar) display: its frame origin is (0, 0), which is the space
@@ -204,7 +204,7 @@ class MacAppDelegate: NSObject, NSApplicationDelegate {
         // with a second display it silently puts the window in another coordinate space.
         guard let screen = NSScreen.screens.first else { return }
 
-        let size = CGSize(width: 1440, height: 900)
+        let size = CGSize(width: 1040, height: 650)
         let insetFromTop: CGFloat = 100
 
         func mainWindows() -> [NSWindow] {
